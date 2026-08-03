@@ -1,0 +1,4 @@
+firebase-functions>=0.1.0
+firebase-admin>=6.0.0
+PuLP>=2.9
+openpyxl>=3.1.0

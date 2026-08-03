@@ -37,6 +37,15 @@ yarn-error.log
 testem.log
 /typings
 
+# Firebase
+.firebaserc
+firebase.json
+firebase-debug.log
+
+# Python virtual environment
+venv/
+__pycache__/
+
 # System files
 .DS_Store
 Thumbs.db
