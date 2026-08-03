@@ -6,6 +6,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
+  sendPasswordResetEmail,
   user,
   User,
   updateProfile,
@@ -131,6 +132,13 @@ export class AuthService {
     }
 
     this.router.navigate(['/dashboard']);
+  }
+
+  /**
+   * Send a password reset email for the given address.
+   */
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    await sendPasswordResetEmail(this.auth, email);
   }
 
   /**
