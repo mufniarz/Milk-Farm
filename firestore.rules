@@ -66,8 +66,14 @@ service cloud.firestore {
     // ─── User Profiles ──────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isAuthenticated() && request.auth.uid == userId;
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && request.auth.uid == userId;
+      // farmId may only be set to a farm the caller actually owns, so a
+      // profile write can never grant access to someone else's farm data.
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && get(/databases/$(database)/documents/farms/$(request.resource.data.farmId)).data.ownerUid == request.auth.uid;
+      // farmId is immutable after creation — only non-farm profile fields
+      // (displayName, language, ...) may be updated.
+      allow update: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.farmId == resource.data.farmId;
       allow delete: if false;
     }
 

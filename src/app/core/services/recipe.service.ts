@@ -1,4 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import {
   Firestore,
   collection,
@@ -14,6 +15,7 @@ import {
   writeBatch,
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
+import { filter, switchMap, take } from 'rxjs/operators';
 import { Recipe, AnimalGroupId } from '../models/recipe.model';
 import { RecipeFeed } from '../models/feed.model';
 import { AuthService } from './auth.service';
@@ -25,33 +27,38 @@ export class RecipeService {
 
   readonly loading = signal(false);
 
+  private readonly farmId$ = toObservable(this.authService.farmId).pipe(
+    filter((id) => !!id),
+  );
+
   /**
    * Get all recipes for the current farm.
    */
   getRecipes(): Observable<Recipe[]> {
-    const farmId = this.authService.farmId();
-    const recipesRef = collection(this.firestore, 'recipes');
-    const q = query(
-      recipesRef,
-      where('farmId', '==', farmId),
-      orderBy('createdAt', 'desc')
+    return this.farmId$.pipe(
+      switchMap((farmId) => {
+        const q = query(
+          collection(this.firestore, 'recipes'),
+          where('farmId', '==', farmId),
+          orderBy('createdAt', 'desc'),
+        );
+        return collectionData(q, { idField: 'id' }) as Observable<Recipe[]>;
+      }),
     );
-    return collectionData(q, { idField: 'id' }) as Observable<Recipe[]>;
   }
 
-  /**
-   * Get recipes filtered by animal group.
-   */
   getRecipesByGroup(groupId: AnimalGroupId): Observable<Recipe[]> {
-    const farmId = this.authService.farmId();
-    const recipesRef = collection(this.firestore, 'recipes');
-    const q = query(
-      recipesRef,
-      where('farmId', '==', farmId),
-      where('animalGroupId', '==', groupId),
-      orderBy('createdAt', 'desc')
+    return this.farmId$.pipe(
+      switchMap((farmId) => {
+        const q = query(
+          collection(this.firestore, 'recipes'),
+          where('farmId', '==', farmId),
+          where('animalGroupId', '==', groupId),
+          orderBy('createdAt', 'desc'),
+        );
+        return collectionData(q, { idField: 'id' }) as Observable<Recipe[]>;
+      }),
     );
-    return collectionData(q, { idField: 'id' }) as Observable<Recipe[]>;
   }
 
   /**
@@ -70,10 +77,12 @@ export class RecipeService {
     const feedsQuery = query(feedsRef, orderBy('feedName', 'asc'));
 
     return new Promise((resolve) => {
-      collectionData(feedsQuery, { idField: 'id' }).subscribe((feeds) => {
-        recipe.feeds = feeds as RecipeFeed[];
-        resolve(recipe);
-      });
+      collectionData(feedsQuery, { idField: 'id' })
+        .pipe(take(1))
+        .subscribe((feeds) => {
+          recipe.feeds = feeds as RecipeFeed[];
+          resolve(recipe);
+        });
     });
   }
 
@@ -82,7 +91,7 @@ export class RecipeService {
    */
   async saveRecipe(
     recipe: Omit<Recipe, 'id' | 'farmId' | 'createdAt'>,
-    feeds: Omit<RecipeFeed, 'id'>[]
+    feeds: Omit<RecipeFeed, 'id'>[],
   ): Promise<string> {
     this.loading.set(true);
     try {
@@ -99,7 +108,12 @@ export class RecipeService {
 
       // Batch write feed entries as subcollection
       const batch = writeBatch(this.firestore);
-      const feedsRef = collection(this.firestore, 'recipes', docRef.id, 'feeds');
+      const feedsRef = collection(
+        this.firestore,
+        'recipes',
+        docRef.id,
+        'feeds',
+      );
 
       for (const feed of feeds) {
         const feedDocRef = doc(feedsRef);
@@ -128,13 +142,21 @@ export class RecipeService {
       // Note: In production, you'd use a Cloud Function for recursive deletes.
       // For now, we load and delete individually.
       const snapshot = await new Promise<RecipeFeed[]>((resolve) => {
-        collectionData(feedsQuery, { idField: 'id' }).subscribe((feeds) => {
-          resolve(feeds as RecipeFeed[]);
-        });
+        collectionData(feedsQuery, { idField: 'id' })
+          .pipe(take(1))
+          .subscribe((feeds) => {
+            resolve(feeds as RecipeFeed[]);
+          });
       });
 
       for (const feed of snapshot) {
-        const feedDocRef = doc(this.firestore, 'recipes', recipeId, 'feeds', feed.id!);
+        const feedDocRef = doc(
+          this.firestore,
+          'recipes',
+          recipeId,
+          'feeds',
+          feed.id!,
+        );
         batch.delete(feedDocRef);
       }
 

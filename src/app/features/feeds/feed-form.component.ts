@@ -1,7 +1,16 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
+import {
+  ReactiveFormsModule,
+  FormBuilder,
+  FormGroup,
+  Validators,
+} from '@angular/forms';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogRef,
+  MatDialogModule,
+} from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -14,20 +23,32 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { FeedService } from '../../core/services/feed.service';
 import { Feed, FeedCategory } from '../../core/models/feed.model';
 
-/** Well-known nutrient codes for the form */
+/** Measured nutrient columns from the source spreadsheet (derived values are computed, not entered). */
 const NUTRIENT_FIELDS = [
-  { code: 'proteina', labelIt: 'Proteina Grezza', labelEn: 'Crude Protein', unit: '% SS' },
-  { code: 'ee', labelIt: 'Estratto Etereo', labelEn: 'Ether Extract', unit: '% SS' },
+  {
+    code: 'proteina',
+    labelIt: 'Proteina Grezza',
+    labelEn: 'Crude Protein',
+    unit: '% SS',
+  },
+  {
+    code: 'ee',
+    labelIt: 'Estratto Etereo',
+    labelEn: 'Ether Extract',
+    unit: '% SS',
+  },
   { code: 'amido', labelIt: 'Amido', labelEn: 'Starch', unit: '% SS' },
-  { code: 'aNDF', labelIt: 'aNDF', labelEn: 'aNDF', unit: '% SS' },
-  { code: 'ADF', labelIt: 'ADF', labelEn: 'ADF', unit: '% SS' },
-  { code: 'ADL', labelIt: 'ADL (Lignina)', labelEn: 'ADL (Lignin)', unit: '% SS' },
+  { code: 'zuccheri', labelIt: 'Zuccheri', labelEn: 'Sugars', unit: '% SS' },
   { code: 'ceneri', labelIt: 'Ceneri', labelEn: 'Ash', unit: '% SS' },
-  { code: 'Ca', labelIt: 'Calcio', labelEn: 'Calcium', unit: '% SS' },
-  { code: 'P', labelIt: 'Fosforo', labelEn: 'Phosphorus', unit: '% SS' },
-  { code: 'UFL', labelIt: 'UFL', labelEn: 'UFL', unit: '/kg SS' },
-  { code: 'NFC', labelIt: 'Carboidrati Non Fibrosi', labelEn: 'Non-Fiber Carbohydrates', unit: '% SS' },
-  { code: 'peNDF', labelIt: 'peNDF', labelEn: 'peNDF', unit: '% SS' },
+  { code: 'aNDF', labelIt: 'aNDFom', labelEn: 'aNDFom', unit: '% SS' },
+  { code: 'uNDF', labelIt: 'uNDFom', labelEn: 'uNDFom', unit: '% SS' },
+  { code: 'ADF', labelIt: 'ADF', labelEn: 'ADF', unit: '% SS' },
+  {
+    code: 'ADL',
+    labelIt: 'ADL (Lignina)',
+    labelEn: 'ADL (Lignin)',
+    unit: '% SS',
+  },
 ];
 
 @Component({
@@ -49,7 +70,11 @@ const NUTRIENT_FIELDS = [
   ],
   template: `
     <h2 mat-dialog-title>
-      {{ data.mode === 'add' ? ('FEEDS.ADD' | translate) : ('FEEDS.EDIT' | translate) }}
+      {{
+        data.mode === 'add'
+          ? ('FEEDS.ADD' | translate)
+          : ('FEEDS.EDIT' | translate)
+      }}
     </h2>
 
     <mat-dialog-content class="dialog-content">
@@ -64,8 +89,12 @@ const NUTRIENT_FIELDS = [
           <mat-form-field appearance="outline" class="flex-1">
             <mat-label>{{ 'FEEDS.CATEGORY' | translate }}</mat-label>
             <mat-select formControlName="category" id="feed-category">
-              <mat-option value="forage">{{ 'FEEDS.FORAGE' | translate }}</mat-option>
-              <mat-option value="concentrate">{{ 'FEEDS.CONCENTRATE' | translate }}</mat-option>
+              <mat-option value="forage">{{
+                'FEEDS.FORAGE' | translate
+              }}</mat-option>
+              <mat-option value="concentrate">{{
+                'FEEDS.CONCENTRATE' | translate
+              }}</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
@@ -73,13 +102,25 @@ const NUTRIENT_FIELDS = [
         <div class="form-row">
           <mat-form-field appearance="outline" class="flex-1">
             <mat-label>{{ 'FEEDS.PRICE_PER_KG' | translate }}</mat-label>
-            <input matInput type="number" formControlName="pricePerKg" step="0.001" id="feed-price" />
+            <input
+              matInput
+              type="number"
+              formControlName="pricePerKg"
+              step="0.001"
+              id="feed-price"
+            />
             <span matPrefix>€&nbsp;</span>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="flex-1">
             <mat-label>{{ 'FEEDS.MOISTURE' | translate }}</mat-label>
-            <input matInput type="number" formControlName="moisturePct" step="0.1" id="feed-moisture" />
+            <input
+              matInput
+              type="number"
+              formControlName="moisturePct"
+              step="0.1"
+              id="feed-moisture"
+            />
             <span matSuffix>%</span>
           </mat-form-field>
 
@@ -93,7 +134,9 @@ const NUTRIENT_FIELDS = [
         <mat-divider></mat-divider>
 
         <!-- Nutrients -->
-        <h3 class="section-label">{{ 'FEEDS.NUTRIENTS' | translate }} (% SS / DM basis)</h3>
+        <h3 class="section-label">
+          {{ 'FEEDS.NUTRIENTS' | translate }} (% SS / DM basis)
+        </h3>
 
         <div class="nutrients-grid" formGroupName="nutrients">
           @for (nutrient of nutrientFields; track nutrient.code) {
@@ -114,7 +157,9 @@ const NUTRIENT_FIELDS = [
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>{{ 'FEEDS.CANCEL' | translate }}</button>
+      <button mat-button mat-dialog-close>
+        {{ 'FEEDS.CANCEL' | translate }}
+      </button>
       <button
         mat-flat-button
         color="primary"
@@ -148,8 +193,12 @@ const NUTRIENT_FIELDS = [
       align-items: flex-start;
     }
 
-    .flex-1 { flex: 1; }
-    .flex-2 { flex: 2; }
+    .flex-1 {
+      flex: 1;
+    }
+    .flex-2 {
+      flex: 2;
+    }
 
     .toggle-wrapper {
       display: flex;
@@ -217,7 +266,10 @@ export class FeedFormComponent {
     this.form = this.fb.group({
       name: [this.data.feed?.name ?? '', Validators.required],
       category: [this.data.feed?.category ?? 'forage', Validators.required],
-      pricePerKg: [this.data.feed?.pricePerKg ?? 0, [Validators.required, Validators.min(0)]],
+      pricePerKg: [
+        this.data.feed?.pricePerKg ?? 0,
+        [Validators.required, Validators.min(0)],
+      ],
       moisturePct: [
         this.data.feed?.moisturePct ?? 0,
         [Validators.required, Validators.min(0), Validators.max(100)],

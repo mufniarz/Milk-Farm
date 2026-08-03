@@ -1,4 +1,9 @@
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import {
+  ApplicationConfig,
+  isDevMode,
+  provideZoneChangeDetection,
+} from '@angular/core';
+import { provideServiceWorker } from '@angular/service-worker';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
@@ -7,12 +12,11 @@ import { provideAuth, getAuth } from '@angular/fire/auth';
 import { provideFirestore, getFirestore } from '@angular/fire/firestore';
 import { provideFunctions, getFunctions } from '@angular/fire/functions';
 import { provideTranslateService } from '@ngx-translate/core';
-import { TranslateHttpLoader, TRANSLATE_HTTP_LOADER_CONFIG } from '@ngx-translate/http-loader';
+import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
+import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
 
 import { routes } from './app.routes';
 import { environment } from '../environments/environment';
-
-export const httpLoaderFactory = (): TranslateHttpLoader => new TranslateHttpLoader();
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -29,12 +33,21 @@ export const appConfig: ApplicationConfig = {
 
     // i18n
     provideTranslateService({
+      loader: provideTranslateHttpLoader({
+        prefix: './assets/i18n/',
+        suffix: '.json',
+      }),
+      fallbackLang: 'en',
       lang: 'it',
-      loader: httpLoaderFactory,
     }),
-    {
-      provide: TRANSLATE_HTTP_LOADER_CONFIG,
-      useValue: { prefix: './assets/i18n/', suffix: '.json' },
-    },
+
+    // Charts
+    provideCharts(withDefaultRegisterables()),
+
+    // PWA / service worker (enabled in production builds only)
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };

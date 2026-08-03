@@ -10,6 +10,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { RecipeService } from '../../core/services/recipe.service';
+import { ExportService } from '../../core/services/export.service';
 import { Recipe } from '../../core/models/recipe.model';
 
 @Component({
@@ -31,7 +32,12 @@ import { Recipe } from '../../core/models/recipe.model';
     <div class="recipe-list-page">
       <div class="page-header">
         <h1 class="page-title">{{ 'RECIPES.TITLE' | translate }}</h1>
-        <button mat-flat-button color="primary" routerLink="/recipes/new" id="new-recipe-btn">
+        <button
+          mat-flat-button
+          color="primary"
+          routerLink="/recipes/new"
+          id="new-recipe-btn"
+        >
           <mat-icon>add</mat-icon>
           {{ 'RECIPES.NEW' | translate }}
         </button>
@@ -66,24 +72,40 @@ import { Recipe } from '../../core/models/recipe.model';
               <mat-card-content>
                 <div class="recipe-stats">
                   <div class="recipe-stat">
-                    <span class="stat-label">{{ 'RECIPES.TOTAL_DM' | translate }}</span>
-                    <span class="stat-value">{{ recipe.totalDM | number:'1.1-1' }} kg</span>
+                    <span class="stat-label">{{
+                      'RECIPES.TOTAL_DM' | translate
+                    }}</span>
+                    <span class="stat-value"
+                      >{{ recipe.totalDM | number: '1.1-1' }} kg</span
+                    >
                   </div>
                   <div class="recipe-stat">
-                    <span class="stat-label">{{ 'RECIPES.TOTAL_COST' | translate }}</span>
-                    <span class="stat-value">€{{ recipe.cost | number:'1.2-2' }}</span>
+                    <span class="stat-label">{{
+                      'RECIPES.TOTAL_COST' | translate
+                    }}</span>
+                    <span class="stat-value"
+                      >€{{ recipe.cost | number: '1.2-2' }}</span
+                    >
                   </div>
                   <div class="recipe-stat">
-                    <span class="stat-label">{{ 'RECIPES.TOTAL_AS_FED' | translate }}</span>
-                    <span class="stat-value">{{ recipe.totalAsFed | number:'1.1-1' }} kg</span>
+                    <span class="stat-label">{{
+                      'RECIPES.TOTAL_AS_FED' | translate
+                    }}</span>
+                    <span class="stat-value"
+                      >{{ recipe.totalAsFed | number: '1.1-1' }} kg</span
+                    >
                   </div>
                 </div>
               </mat-card-content>
 
               <mat-card-actions align="end">
-                <button mat-button [routerLink]="['/recipes', recipe.id]" color="primary">
+                <button
+                  mat-button
+                  [routerLink]="['/recipes', recipe.id]"
+                  color="primary"
+                >
                   <mat-icon>edit</mat-icon>
-                  Open
+                  {{ 'RECIPES.OPEN' | translate }}
                 </button>
                 <button mat-icon-button [matMenuTriggerFor]="menu">
                   <mat-icon>more_vert</mat-icon>
@@ -93,7 +115,24 @@ import { Recipe } from '../../core/models/recipe.model';
                     <mat-icon>content_copy</mat-icon>
                     {{ 'RECIPES.DUPLICATE' | translate }}
                   </button>
-                  <button mat-menu-item (click)="deleteRecipe(recipe)" class="delete-item">
+                  <button
+                    mat-menu-item
+                    (click)="exportRecipe(recipe)"
+                    [disabled]="exportingId() === recipe.id"
+                  >
+                    <mat-icon>download</mat-icon>
+                    {{
+                      (exportingId() === recipe.id
+                        ? 'RECIPES.EXPORTING'
+                        : 'RECIPES.EXPORT'
+                      ) | translate
+                    }}
+                  </button>
+                  <button
+                    mat-menu-item
+                    (click)="deleteRecipe(recipe)"
+                    class="delete-item"
+                  >
                     <mat-icon color="warn">delete</mat-icon>
                     {{ 'FEEDS.DELETE' | translate }}
                   </button>
@@ -111,8 +150,14 @@ import { Recipe } from '../../core/models/recipe.model';
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .page-header {
@@ -136,7 +181,9 @@ import { Recipe } from '../../core/models/recipe.model';
 
     .recipe-card {
       border-radius: 16px !important;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
     }
 
     .recipe-card:hover {
@@ -218,11 +265,13 @@ import { Recipe } from '../../core/models/recipe.model';
 })
 export class RecipeListComponent implements OnInit {
   private recipeService = inject(RecipeService);
+  private exportService = inject(ExportService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
 
   recipes = signal<Recipe[]>([]);
   loading = signal(true);
+  exportingId = signal<string | null>(null);
 
   ngOnInit(): void {
     this.recipeService.getRecipes().subscribe((recipes) => {
@@ -238,10 +287,33 @@ export class RecipeListComponent implements OnInit {
 
   async duplicateRecipe(recipe: Recipe): Promise<void> {
     try {
-      await this.recipeService.duplicateRecipe(recipe.id!, `${recipe.name} (copy)`);
-      this.snackBar.open('Recipe duplicated', '', { duration: 3000 });
+      await this.recipeService.duplicateRecipe(
+        recipe.id!,
+        `${recipe.name} (copy)`,
+      );
+      this.snackBar.open(this.translate.instant('RECIPES.DUPLICATED'), '', {
+        duration: 3000,
+      });
     } catch (e) {
-      this.snackBar.open('Failed to duplicate', '', { duration: 3000 });
+      this.snackBar.open(
+        this.translate.instant('RECIPES.DUPLICATE_FAILED'),
+        '',
+        { duration: 3000 },
+      );
+    }
+  }
+
+  async exportRecipe(recipe: Recipe): Promise<void> {
+    this.exportingId.set(recipe.id!);
+    try {
+      const full = await this.recipeService.getRecipeWithFeeds(recipe.id!);
+      await this.exportService.exportRecipeToExcel(full ?? recipe);
+    } catch (e) {
+      this.snackBar.open(this.translate.instant('RECIPES.EXPORT_FAILED'), '', {
+        duration: 3000,
+      });
+    } finally {
+      this.exportingId.set(null);
     }
   }
 
@@ -249,7 +321,9 @@ export class RecipeListComponent implements OnInit {
     const msg = this.translate.instant('RECIPES.DELETE_CONFIRM');
     if (confirm(msg)) {
       await this.recipeService.deleteRecipe(recipe.id!);
-      this.snackBar.open('Recipe deleted', '', { duration: 3000 });
+      this.snackBar.open(this.translate.instant('RECIPES.DELETED'), '', {
+        duration: 3000,
+      });
     }
   }
 }

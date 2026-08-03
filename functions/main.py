@@ -4,9 +4,15 @@ Milk Farm — Cloud Functions (Python 3.11)
 Hosts the LP solver endpoint for automatic ration optimization
 and the Excel export function for recipe downloads.
 """
+import base64
+import io
+
 from firebase_functions import https_fn, options
 from firebase_admin import initialize_app
-from pulp import LpProblem, LpMinimize, LpVariable, lpSum, value, PULP_CBC_CMD, constants
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+
+from solver import solve_ration
 
 initialize_app()
 
@@ -59,117 +65,173 @@ def optimize_ration(req: https_fn.CallableRequest):
       "message": "Optimal solution found"
     }
     """
-    data = req.data
-    feeds = data.get("feeds", [])
-    targets = data.get("targets", [])
-    constraints = data.get("constraints", {})
-
-    if not feeds:
-        return {"status": "error", "message": "No feeds provided"}
-
-    # ─── Build LP Problem ────────────────────────────────────────────────
-    prob = LpProblem("TMR_Optimization", LpMinimize)
-
-    # Decision variables: kg as-fed for each feed (non-negative)
-    x = {}
-    for f in feeds:
-        x[f["id"]] = LpVariable(f"x_{f['id']}", lowBound=0)
-
-    # Objective: minimize total cost
-    prob += lpSum(f["pricePerKg"] * x[f["id"]] for f in feeds), "TotalCost"
-
-    # Total DM expression (used in constraints)
-    total_dm = lpSum(f["dmFactor"] * x[f["id"]] for f in feeds)
-
-    # ─── Total DM Constraint ─────────────────────────────────────────────
-    if "totalDM" in constraints and constraints["totalDM"] is not None:
-        prob += total_dm == constraints["totalDM"], "FixedTotalDM"
-    else:
-        # Ensure at least some DM in the ration
-        prob += total_dm >= 1.0, "MinimumDM"
-
-    # ─── Nutrient Constraints (on DM basis) ──────────────────────────────
-    # For each nutrient: min <= (weighted sum / totalDM) <= max
-    # Rearranged to avoid division: min * totalDM <= weighted sum <= max * totalDM
-    for t in targets:
-        code = t["code"]
-        nutrient_sum = lpSum(
-            f["nutrients"].get(code, 0) * f["dmFactor"] * x[f["id"]]
-            for f in feeds
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
         )
 
-        if t.get("min") is not None:
-            prob += nutrient_sum >= t["min"] * total_dm, f"Min_{code}"
-
-        if t.get("max") is not None:
-            prob += nutrient_sum <= t["max"] * total_dm, f"Max_{code}"
-
-    # ─── Forage Ratio Constraints ────────────────────────────────────────
-    forage_dm = lpSum(
-        f["dmFactor"] * x[f["id"]] for f in feeds if f.get("category") == "forage"
+    data = req.data
+    return solve_ration(
+        data.get("feeds", []),
+        data.get("targets", []),
+        data.get("constraints", {}),
     )
 
-    if constraints.get("minForageRatio") is not None:
-        prob += forage_dm >= constraints["minForageRatio"] * total_dm, "MinForageRatio"
 
-    if constraints.get("maxForageRatio") is not None:
-        prob += forage_dm <= constraints["maxForageRatio"] * total_dm, "MaxForageRatio"
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=60,
+    region="europe-west1",
+)
+def export_recipe(req: https_fn.CallableRequest):
+    """
+    Build an .xlsx workbook for a saved recipe and return it as base64 so the
+    client can trigger a direct download.
 
-    # ─── Solve ───────────────────────────────────────────────────────────
-    prob.solve(PULP_CBC_CMD(msg=0, timeLimit=10))
+    Input payload (req.data):
+    {
+      "recipe": {"name", "animalGroupId", "totalAsFed", "totalDM", "cost",
+                 "nutrientAnalysis": {...}},
+      "feeds": [{"feedName", "category", "pricePerKg", "kgAsFed", "kgDM",
+                 "moisturePct", "cost"}, ...],
+      "nutrients": [{"code", "label", "unit"}, ...],
+      "targets": [{"code", "min", "max"}, ...]
+    }
 
-    if prob.status != constants.LpStatusOptimal:
-        return {
-            "status": "infeasible",
-            "message": "No feasible solution found. Try relaxing nutrient targets or adding more feeds.",
-        }
+    Produces a workbook mirroring the source spreadsheet layout:
+    FORAGGI / CONCENTRATI feed tables, then "valori stimati su s.s." next to
+    the "valori ideali" target ranges.
 
-    # ─── Build Result ────────────────────────────────────────────────────
-    result_feeds = []
-    total_cost = 0.0
-    total_as_fed = 0.0
-    result_total_dm = 0.0
+    Returns: {"filename": "...", "contentBase64": "...", "mimeType": "..."}
+    """
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
 
-    for f in feeds:
-        qty = x[f["id"]].varValue or 0.0
-        if qty < 0.001:
-            continue
+    data = req.data or {}
+    recipe = data.get("recipe", {})
+    feeds = data.get("feeds", [])
+    nutrients = data.get("nutrients", [])
+    targets = {t["code"]: t for t in data.get("targets", [])}
 
-        kg_dm = f["dmFactor"] * qty
-        cost = f["pricePerKg"] * qty
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Razione"
 
-        result_feeds.append({
-            "feedId": f["id"],
-            "feedName": f.get("name", ""),
-            "kgAsFed": round(qty, 3),
-            "kgDM": round(kg_dm, 3),
-            "cost": round(cost, 4),
-        })
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="4ECCA3")
+    section_font = Font(bold=True, color="FFFFFF")
+    section_fill = PatternFill("solid", fgColor="2B7A5B")
+    title_font = Font(bold=True, size=14)
+    bold = Font(bold=True)
 
-        total_cost += cost
-        total_as_fed += qty
-        result_total_dm += kg_dm
+    ws["A1"] = recipe.get("name", "Razione")
+    ws["A1"].font = title_font
+    ws["A2"] = f"Gruppo animale: {recipe.get('animalGroupId', '')}"
 
-    # Compute resulting nutrient analysis (% DM)
-    nutrient_analysis = {}
-    if result_total_dm > 0:
-        all_codes = set()
-        for f in feeds:
-            all_codes.update(f.get("nutrients", {}).keys())
+    feed_headers = ["Prodotto", "Prezzo €/kg", "Kg t.q.", "Kg s.s.", "Umidità %", "Costo €"]
 
-        for code in all_codes:
-            weighted_sum = sum(
-                f["nutrients"].get(code, 0) * f["dmFactor"] * (x[f["id"]].varValue or 0.0)
-                for f in feeds
-            )
-            nutrient_analysis[code] = round(weighted_sum / result_total_dm, 4)
+    def write_section(title, entries, start_row):
+        """Write a FORAGGI/CONCENTRATI section; return (next_row, subtotals)."""
+        r = start_row
+        sec = ws.cell(row=r, column=1, value=title)
+        sec.font = section_font
+        sec.fill = section_fill
+        for col in range(2, len(feed_headers) + 1):
+            ws.cell(row=r, column=col).fill = section_fill
+        r += 1
+        for col, label in enumerate(feed_headers, start=1):
+            cell = ws.cell(row=r, column=col, value=label)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+        r += 1
+
+        sub_tq = sub_ss = sub_cost = 0.0
+        for e in entries:
+            ws.cell(row=r, column=1, value=e.get("feedName", ""))
+            ws.cell(row=r, column=2, value=round(e.get("pricePerKg", 0), 3))
+            ws.cell(row=r, column=3, value=round(e.get("kgAsFed", 0), 3))
+            ws.cell(row=r, column=4, value=round(e.get("kgDM", 0), 3))
+            ws.cell(row=r, column=5, value=round(e.get("moisturePct", 0), 1))
+            ws.cell(row=r, column=6, value=round(e.get("cost", 0), 4))
+            sub_tq += e.get("kgAsFed", 0)
+            sub_ss += e.get("kgDM", 0)
+            sub_cost += e.get("cost", 0)
+            r += 1
+
+        ws.cell(row=r, column=1, value=f"Totale {title.lower()}").font = bold
+        ws.cell(row=r, column=3, value=round(sub_tq, 3)).font = bold
+        ws.cell(row=r, column=4, value=round(sub_ss, 3)).font = bold
+        ws.cell(row=r, column=6, value=round(sub_cost, 4)).font = bold
+        return r + 2, (sub_tq, sub_ss, sub_cost)
+
+    forages = [f for f in feeds if f.get("category") == "forage"]
+    concentrates = [f for f in feeds if f.get("category") == "concentrate"]
+
+    row = 4
+    row, _ = write_section("FORAGGI", forages, row)
+    row, _ = write_section("CONCENTRATI", concentrates, row)
+
+    # ── Grand totals ──
+    ws.cell(row=row, column=1, value="TOTALE RAZIONE").font = bold
+    ws.cell(row=row, column=3, value=round(recipe.get("totalAsFed", 0), 3)).font = bold
+    ws.cell(row=row, column=4, value=round(recipe.get("totalDM", 0), 3)).font = bold
+    ws.cell(row=row, column=6, value=round(recipe.get("cost", 0), 4)).font = bold
+    row += 2
+
+    # ── valori stimati su s.s. | valori ideali ──
+    analysis = recipe.get("nutrientAnalysis") or {}
+    est_headers = ["Nutriente", "valori stimati su s.s.", "valori ideali", "u.m."]
+    for col, label in enumerate(est_headers, start=1):
+        cell = ws.cell(row=row, column=col, value=label)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    row += 1
+
+    def format_range(t):
+        if not t:
+            return "-"
+        tmin, tmax = t.get("min"), t.get("max")
+        if tmin is not None and tmax is not None:
+            return f"{tmin} - {tmax}"
+        if tmin is not None:
+            return f">{tmin}"
+        if tmax is not None:
+            return f"<{tmax}"
+        return "-"
+
+    # Preserve the master nutrient ordering; fall back to any extra codes.
+    ordered = [n for n in nutrients if n["code"] in analysis]
+    seen = {n["code"] for n in ordered}
+    for code in analysis:
+        if code not in seen:
+            ordered.append({"code": code, "label": code, "unit": ""})
+
+    for n in ordered:
+        code = n["code"]
+        ws.cell(row=row, column=1, value=n.get("label", code))
+        ws.cell(row=row, column=2, value=round(analysis.get(code, 0), 2))
+        ws.cell(row=row, column=3, value=format_range(targets.get(code)))
+        ws.cell(row=row, column=4, value=n.get("unit", ""))
+        row += 1
+
+    for column_cells in ws.columns:
+        length = max((len(str(c.value)) for c in column_cells if c.value is not None), default=10)
+        ws.column_dimensions[column_cells[0].column_letter].width = length + 2
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    safe_name = "".join(c for c in recipe.get("name", "ration") if c.isalnum() or c in " -_").strip() or "ration"
 
     return {
-        "status": "optimal",
-        "feeds": result_feeds,
-        "totalCost": round(total_cost, 4),
-        "totalDM": round(result_total_dm, 3),
-        "totalAsFed": round(total_as_fed, 3),
-        "nutrientAnalysis": nutrient_analysis,
-        "message": "Optimal solution found",
+        "filename": f"{safe_name}.xlsx",
+        "contentBase64": base64.b64encode(buffer.read()).decode("ascii"),
+        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }

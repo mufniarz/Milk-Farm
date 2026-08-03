@@ -31,19 +31,31 @@ export interface OptimizationConstraints {
   totalDM?: number;
   minForageRatio?: number;
   maxForageRatio?: number;
+  minMoisturePct?: number;
+  maxMoisturePct?: number;
 }
 
 /**
  * Result from the optimize_ration Cloud Function.
  */
 export interface OptimizationResult {
-  status: 'optimal' | 'infeasible' | 'error';
+  status: 'optimal' | 'relaxed' | 'infeasible' | 'error';
   feeds?: OptimizationResultFeed[];
   totalCost?: number;
   totalDM?: number;
   totalAsFed?: number;
   nutrientAnalysis?: Record<string, number>;
+  /** Present when status is 'relaxed': nutrients that remain out of range. */
+  warnings?: OptimizationWarning[];
   message: string;
+}
+
+export interface OptimizationWarning {
+  code: string;
+  value: number;
+  min: number | null;
+  max: number | null;
+  issue: 'below_min' | 'above_max';
 }
 
 export interface OptimizationResultFeed {
@@ -68,11 +80,11 @@ export class OptimizationService {
   async optimize(
     feeds: Feed[],
     targets: NutrientTarget[],
-    constraints?: OptimizationConstraints
+    constraints?: OptimizationConstraints,
   ): Promise<OptimizationResult> {
     const callable = httpsCallable<OptimizationRequest, OptimizationResult>(
       this.functions,
-      'optimize_ration'
+      'optimize_ration',
     );
 
     // Transform feeds into the format expected by the Cloud Function

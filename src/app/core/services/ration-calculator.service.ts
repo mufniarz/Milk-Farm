@@ -36,7 +36,7 @@ export class RationCalculatorService {
 
     // Calculate DM for each feed
     const dmQuantities = feeds.map(
-      (f, i) => quantities[i] * (1 - f.moisturePct / 100)
+      (f, i) => quantities[i] * (1 - f.moisturePct / 100),
     );
 
     const totalDM = dmQuantities.reduce((sum, dm) => sum + dm, 0);
@@ -70,7 +70,7 @@ export class RationCalculatorService {
     // Calculate total cost
     const totalCost = feeds.reduce(
       (sum, f, i) => sum + f.pricePerKg * quantities[i],
-      0
+      0,
     );
 
     // Calculate overall moisture
@@ -82,16 +82,41 @@ export class RationCalculatorService {
     }, 0);
     const forageRatio = totalDM > 0 ? forageDM / totalDM : 0;
 
+    // Derived nutrients computed from the blended ration (override any averaged values).
+    this.computeDerivedNutrients(nutrients);
+    nutrients['umidita'] = moisturePct;
+    nutrients['foraggiPct'] = forageRatio * 100;
+    nutrients['concentratiPct'] = 100 - forageRatio * 100;
+
     return {
       totalDM: Math.round(totalDM * 1000) / 1000,
       totalAsFed: Math.round(totalAsFed * 1000) / 1000,
       nutrients: Object.fromEntries(
-        Object.entries(nutrients).map(([k, v]) => [k, Math.round(v * 10000) / 10000])
+        Object.entries(nutrients).map(([k, v]) => [
+          k,
+          Math.round(v * 10000) / 10000,
+        ]),
       ),
       totalCost: Math.round(totalCost * 10000) / 10000,
       moisturePct: Math.round(moisturePct * 100) / 100,
       forageRatio: Math.round(forageRatio * 10000) / 10000,
     };
+  }
+
+  /**
+   * Compute derived nutrients from the blended ration and merge them into the
+   * nutrient map. Order matters: NFC is computed before pectine, which depends
+   * on it. All values are percentages on a dry-matter basis.
+   */
+  private computeDerivedNutrients(nutrients: Record<string, number>): void {
+    const g = (code: string): number => nutrients[code] ?? 0;
+    const aNDF = g('aNDF');
+
+    nutrients['NFC'] = 100 - (g('proteina') + g('ee') + g('ceneri') + aNDF);
+    nutrients['emicellulosa'] = aNDF - g('ADF');
+    nutrients['pectine'] = nutrients['NFC'] - g('amido') - g('zuccheri');
+    nutrients['ADF_aNDF'] = aNDF > 0 ? (g('ADF') / aNDF) * 100 : 0;
+    nutrients['uNDF_aNDF'] = aNDF > 0 ? (g('uNDF') / aNDF) * 100 : 0;
   }
 
   /**
@@ -101,7 +126,7 @@ export class RationCalculatorService {
   evaluateNutrientStatus(
     value: number,
     min: number | null,
-    max: number | null
+    max: number | null,
   ): 'good' | 'warning' | 'danger' {
     if (min !== null && value < min) {
       // How far below minimum?

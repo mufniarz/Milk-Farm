@@ -29,12 +29,7 @@ import { AuthService } from './core/services/auth.service';
   template: `
     @if (authService.isAuthenticated()) {
       <mat-sidenav-container class="app-container">
-        <mat-sidenav
-          #sidenav
-          mode="side"
-          [opened]="true"
-          class="app-sidenav"
-        >
+        <mat-sidenav #sidenav mode="side" [opened]="true" class="app-sidenav">
           <div class="sidenav-header">
             <div class="logo-container">
               <mat-icon class="logo-icon">agriculture</mat-icon>
@@ -43,7 +38,11 @@ import { AuthService } from './core/services/auth.service';
           </div>
 
           <mat-nav-list>
-            <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link">
+            <a
+              mat-list-item
+              routerLink="/dashboard"
+              routerLinkActive="active-link"
+            >
               <mat-icon matListItemIcon>dashboard</mat-icon>
               <span matListItemTitle>{{ 'NAV.DASHBOARD' | translate }}</span>
             </a>
@@ -51,7 +50,11 @@ import { AuthService } from './core/services/auth.service';
               <mat-icon matListItemIcon>grass</mat-icon>
               <span matListItemTitle>{{ 'NAV.FEEDS' | translate }}</span>
             </a>
-            <a mat-list-item routerLink="/recipes" routerLinkActive="active-link">
+            <a
+              mat-list-item
+              routerLink="/recipes"
+              routerLinkActive="active-link"
+            >
               <mat-icon matListItemIcon>science</mat-icon>
               <span matListItemTitle>{{ 'NAV.RECIPES' | translate }}</span>
             </a>
@@ -69,7 +72,11 @@ import { AuthService } from './core/services/auth.service';
 
         <mat-sidenav-content class="app-content">
           <mat-toolbar class="app-toolbar">
-            <button mat-icon-button (click)="sidenav.toggle()" class="menu-toggle">
+            <button
+              mat-icon-button
+              (click)="sidenav.toggle()"
+              class="menu-toggle"
+            >
               <mat-icon>menu</mat-icon>
             </button>
 
@@ -119,7 +126,8 @@ import { AuthService } from './core/services/auth.service';
 
     .app-sidenav {
       width: 260px;
-      background: var(--mdc-filled-button-container-color, #1a1a2e);
+      background: #f5f7fa;
+      color: #1a1a2e;
       border-right: none;
       display: flex;
       flex-direction: column;
@@ -127,7 +135,7 @@ import { AuthService } from './core/services/auth.service';
 
     .sidenav-header {
       padding: 24px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
 
     .logo-container {
@@ -140,19 +148,27 @@ import { AuthService } from './core/services/auth.service';
       font-size: 32px;
       width: 32px;
       height: 32px;
-      color: #4ecca3;
+      color: #2b7a5b;
     }
 
     .logo-text {
       font-size: 22px;
       font-weight: 700;
-      color: #ffffff;
+      color: #1a1a2e;
       letter-spacing: -0.5px;
+    }
+
+    .app-sidenav mat-nav-list a {
+      color: #1a1a2e !important;
+    }
+
+    .app-sidenav mat-nav-list a.active-link {
+      background: rgba(78, 204, 163, 0.22) !important;
     }
 
     .sidenav-footer {
       margin-top: auto;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
     }
 
     .app-toolbar {

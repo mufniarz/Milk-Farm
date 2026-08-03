@@ -1,4 +1,13 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  signal,
+  computed,
+  AfterViewInit,
+  ViewChild,
+  NgZone,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -17,13 +26,22 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { BaseChartDirective } from 'ng2-charts';
 import { FeedService } from '../../core/services/feed.service';
 import { RecipeService } from '../../core/services/recipe.service';
-import { OptimizationService, OptimizationConstraints } from '../../core/services/optimization.service';
-import { RationCalculatorService, RationResult } from '../../core/services/ration-calculator.service';
+import {
+  OptimizationService,
+  OptimizationConstraints,
+} from '../../core/services/optimization.service';
+import {
+  RationCalculatorService,
+  RationResult,
+} from '../../core/services/ration-calculator.service';
 import { Feed } from '../../core/models/feed.model';
 import { AnimalGroupId } from '../../core/models/recipe.model';
 import { NutrientTarget } from '../../core/models/nutrient.model';
+import { TARGET_RANGES } from '../../core/data/initial-data';
+import { ChartData, ChartType } from 'chart.js';
 
 interface RecipeFeedEntry {
   feed: Feed;
@@ -31,19 +49,7 @@ interface RecipeFeedEntry {
   selected: boolean;
 }
 
-/** Default nutrient targets for lactating cows (placeholder) */
-const DEFAULT_TARGETS: NutrientTarget[] = [
-  { nutrientCode: 'proteina', minValue: 15.0, maxValue: 17.5, isActive: true },
-  { nutrientCode: 'ee', minValue: 3.0, maxValue: 5.5, isActive: true },
-  { nutrientCode: 'amido', minValue: 24.0, maxValue: 30.0, isActive: true },
-  { nutrientCode: 'aNDF', minValue: 28.0, maxValue: 36.0, isActive: true },
-  { nutrientCode: 'ADF', minValue: 17.0, maxValue: 23.0, isActive: true },
-  { nutrientCode: 'NFC', minValue: 35.0, maxValue: 42.0, isActive: true },
-  { nutrientCode: 'ceneri', minValue: null, maxValue: 8.0, isActive: true },
-  { nutrientCode: 'Ca', minValue: 0.6, maxValue: 1.0, isActive: true },
-  { nutrientCode: 'P', minValue: 0.35, maxValue: 0.5, isActive: true },
-];
-
+/** Nutrient targets are loaded per animal group from the Excel-derived TARGET_RANGES. */
 @Component({
   selector: 'mf-recipe-builder',
   standalone: true,
@@ -64,6 +70,7 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
     MatSnackBarModule,
     MatExpansionModule,
     MatTooltipModule,
+    BaseChartDirective,
     TranslatePipe,
   ],
   template: `
@@ -90,11 +97,23 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="flex-1">
-                  <mat-label>{{ 'RECIPES.ANIMAL_GROUP' | translate }}</mat-label>
-                  <mat-select [(ngModel)]="animalGroupId" id="animal-group-select">
-                    <mat-option value="lactating">{{ 'RECIPES.LACTATING' | translate }}</mat-option>
-                    <mat-option value="dry">{{ 'RECIPES.DRY' | translate }}</mat-option>
-                    <mat-option value="heifer">{{ 'RECIPES.HEIFER' | translate }}</mat-option>
+                  <mat-label>{{
+                    'RECIPES.ANIMAL_GROUP' | translate
+                  }}</mat-label>
+                  <mat-select
+                    [(ngModel)]="animalGroupId"
+                    (selectionChange)="onAnimalGroupChange()"
+                    id="animal-group-select"
+                  >
+                    <mat-option value="lactating">{{
+                      'RECIPES.LACTATING' | translate
+                    }}</mat-option>
+                    <mat-option value="dry">{{
+                      'RECIPES.DRY' | translate
+                    }}</mat-option>
+                    <mat-option value="heifer">{{
+                      'RECIPES.HEIFER' | translate
+                    }}</mat-option>
                   </mat-select>
                 </mat-form-field>
               </div>
@@ -108,17 +127,42 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
 
                 <div class="config-row">
                   <mat-form-field appearance="outline" class="flex-1">
-                    <mat-label>{{ 'RECIPES.TOTAL_DM_CONSTRAINT' | translate }}</mat-label>
-                    <input matInput type="number" [(ngModel)]="constraints.totalDM" step="0.1" />
+                    <mat-label>{{
+                      'RECIPES.TOTAL_DM_CONSTRAINT' | translate
+                    }}</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      [(ngModel)]="constraints.totalDM"
+                      step="0.1"
+                    />
                     <span matSuffix>kg</span>
                   </mat-form-field>
                   <mat-form-field appearance="outline" class="flex-1">
-                    <mat-label>{{ 'RECIPES.MIN_FORAGE_RATIO' | translate }}</mat-label>
-                    <input matInput type="number" [(ngModel)]="constraints.minForageRatio" step="0.01" min="0" max="1" />
+                    <mat-label>{{
+                      'RECIPES.MIN_FORAGE_RATIO' | translate
+                    }}</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      [(ngModel)]="constraints.minForageRatio"
+                      step="0.01"
+                      min="0"
+                      max="1"
+                    />
                   </mat-form-field>
                   <mat-form-field appearance="outline" class="flex-1">
-                    <mat-label>{{ 'RECIPES.MAX_FORAGE_RATIO' | translate }}</mat-label>
-                    <input matInput type="number" [(ngModel)]="constraints.maxForageRatio" step="0.01" min="0" max="1" />
+                    <mat-label>{{
+                      'RECIPES.MAX_FORAGE_RATIO' | translate
+                    }}</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      [(ngModel)]="constraints.maxForageRatio"
+                      step="0.01"
+                      min="0"
+                      max="1"
+                    />
                   </mat-form-field>
                 </div>
               </mat-expansion-panel>
@@ -136,7 +180,11 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
               @if (feedEntries().length === 0) {
                 <p class="muted-text">{{ 'FEEDS.NO_FEEDS' | translate }}</p>
               } @else {
-                <table mat-table [dataSource]="feedEntries()" class="feeds-table">
+                <table
+                  mat-table
+                  [dataSource]="feedEntries()"
+                  class="feeds-table"
+                >
                   <!-- Checkbox -->
                   <ng-container matColumnDef="select">
                     <th mat-header-cell *matHeaderCellDef></th>
@@ -151,10 +199,15 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
 
                   <!-- Name -->
                   <ng-container matColumnDef="name">
-                    <th mat-header-cell *matHeaderCellDef>{{ 'RECIPES.FEED_NAME' | translate }}</th>
+                    <th mat-header-cell *matHeaderCellDef>
+                      {{ 'RECIPES.FEED_NAME' | translate }}
+                    </th>
                     <td mat-cell *matCellDef="let entry">
                       <span class="feed-name">{{ entry.feed.name }}</span>
-                      <span class="category-badge" [class]="entry.feed.category">
+                      <span
+                        class="category-badge"
+                        [class]="entry.feed.category"
+                      >
                         {{ entry.feed.category === 'forage' ? 'F' : 'C' }}
                       </span>
                     </td>
@@ -162,7 +215,9 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
 
                   <!-- Quantity -->
                   <ng-container matColumnDef="quantity">
-                    <th mat-header-cell *matHeaderCellDef>{{ 'RECIPES.QUANTITY_KG' | translate }}</th>
+                    <th mat-header-cell *matHeaderCellDef>
+                      {{ 'RECIPES.QUANTITY_KG' | translate }}
+                    </th>
                     <td mat-cell *matCellDef="let entry">
                       <mat-form-field appearance="outline" class="qty-field">
                         <input
@@ -182,12 +237,12 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
                   <ng-container matColumnDef="price">
                     <th mat-header-cell *matHeaderCellDef>€/kg</th>
                     <td mat-cell *matCellDef="let entry">
-                      {{ entry.feed.pricePerKg | number:'1.3-3' }}
+                      {{ entry.feed.pricePerKg | number: '1.3-3' }}
                     </td>
                   </ng-container>
 
                   <tr mat-header-row *matHeaderRowDef="feedColumns"></tr>
-                  <tr mat-row *matRowDef="let row; columns: feedColumns;"></tr>
+                  <tr mat-row *matRowDef="let row; columns: feedColumns"></tr>
                 </table>
               }
             </mat-card-content>
@@ -226,33 +281,85 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
               </mat-card-header>
               <mat-card-content>
                 @if (optimizationMessage()) {
-                  <div class="optimization-message" [class]="optimizationStatus()">
-                    <mat-icon>{{ optimizationStatus() === 'optimal' ? 'check_circle' : 'warning' }}</mat-icon>
+                  <div
+                    class="optimization-message"
+                    [class]="optimizationStatus()"
+                  >
+                    <mat-icon>{{
+                      optimizationStatus() === 'optimal'
+                        ? 'check_circle'
+                        : 'warning'
+                    }}</mat-icon>
                     {{ optimizationMessage() }}
                   </div>
                 }
 
                 <div class="results-summary">
                   <div class="result-item">
-                    <span class="result-label">{{ 'RECIPES.TOTAL_DM' | translate }}</span>
-                    <span class="result-value">{{ rationResult()!.totalDM | number:'1.2-2' }} kg</span>
+                    <span class="result-label">{{
+                      'RECIPES.TOTAL_DM' | translate
+                    }}</span>
+                    <span class="result-value"
+                      >{{ rationResult()!.totalDM | number: '1.2-2' }} kg</span
+                    >
                   </div>
                   <div class="result-item">
-                    <span class="result-label">{{ 'RECIPES.TOTAL_AS_FED' | translate }}</span>
-                    <span class="result-value">{{ rationResult()!.totalAsFed | number:'1.2-2' }} kg</span>
+                    <span class="result-label">{{
+                      'RECIPES.TOTAL_AS_FED' | translate
+                    }}</span>
+                    <span class="result-value"
+                      >{{
+                        rationResult()!.totalAsFed | number: '1.2-2'
+                      }}
+                      kg</span
+                    >
                   </div>
                   <div class="result-item">
-                    <span class="result-label">{{ 'RECIPES.TOTAL_COST' | translate }}</span>
-                    <span class="result-value highlight">€{{ rationResult()!.totalCost | number:'1.2-4' }}</span>
+                    <span class="result-label">{{
+                      'RECIPES.TOTAL_COST' | translate
+                    }}</span>
+                    <span class="result-value highlight"
+                      >€{{ rationResult()!.totalCost | number: '1.2-4' }}</span
+                    >
                   </div>
                   <div class="result-item">
-                    <span class="result-label">{{ 'RECIPES.FORAGE_RATIO' | translate }}</span>
-                    <span class="result-value">{{ rationResult()!.forageRatio | percent:'1.1-1' }}</span>
+                    <span class="result-label">{{
+                      'RECIPES.FORAGE_RATIO' | translate
+                    }}</span>
+                    <span class="result-value">{{
+                      rationResult()!.forageRatio | percent: '1.1-1'
+                    }}</span>
                   </div>
                   <div class="result-item">
-                    <span class="result-label">{{ 'RECIPES.MOISTURE_PCT' | translate }}</span>
-                    <span class="result-value">{{ rationResult()!.moisturePct | number:'1.1-1' }}%</span>
+                    <span class="result-label">{{
+                      'RECIPES.MOISTURE_PCT' | translate
+                    }}</span>
+                    <span class="result-value"
+                      >{{
+                        rationResult()!.moisturePct | number: '1.1-1'
+                      }}%</span
+                    >
                   </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Radar Chart: Nutrient Profile -->
+            <mat-card appearance="outlined" class="panel-card chart-card">
+              <mat-card-header>
+                <mat-card-title>
+                  <mat-icon>scatter_plot</mat-icon>
+                  {{ 'RECIPES.NUTRIENT_PROFILE' | translate }}
+                </mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="chart-container">
+                  <canvas
+                    baseChart
+                    [type]="'radar'"
+                    [data]="radarChartData"
+                    [options]="radarChartOptions"
+                  ></canvas>
                 </div>
               </mat-card-content>
             </mat-card>
@@ -268,12 +375,18 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
               <mat-card-content>
                 <div class="nutrient-bars">
                   @for (target of targets; track target.nutrientCode) {
-                    @if (rationResult()!.nutrients[target.nutrientCode] !== undefined) {
+                    @if (
+                      rationResult()!.nutrients[target.nutrientCode] !==
+                      undefined
+                    ) {
                       <div class="nutrient-row">
                         <div class="nutrient-label">
                           <span>{{ target.nutrientCode }}</span>
                           <span class="nutrient-value">
-                            {{ rationResult()!.nutrients[target.nutrientCode] | number:'1.2-2' }}
+                            {{
+                              rationResult()!.nutrients[target.nutrientCode]
+                                | number: '1.2-2'
+                            }}
                           </span>
                         </div>
                         <div class="nutrient-bar-container">
@@ -283,9 +396,13 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
                             [class]="getNutrientStatus(target)"
                           ></mat-progress-bar>
                           <div class="target-range-label">
-                            {{ target.minValue !== null ? target.minValue : '—' }}
+                            {{
+                              target.minValue !== null ? target.minValue : '—'
+                            }}
                             –
-                            {{ target.maxValue !== null ? target.maxValue : '—' }}
+                            {{
+                              target.maxValue !== null ? target.maxValue : '—'
+                            }}
                           </div>
                         </div>
                         <mat-icon
@@ -293,7 +410,13 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
                           [class]="getNutrientStatus(target)"
                           [matTooltip]="getNutrientStatus(target)"
                         >
-                          {{ getNutrientStatus(target) === 'good' ? 'check_circle' : getNutrientStatus(target) === 'warning' ? 'warning' : 'error' }}
+                          {{
+                            getNutrientStatus(target) === 'good'
+                              ? 'check_circle'
+                              : getNutrientStatus(target) === 'warning'
+                                ? 'warning'
+                                : 'error'
+                          }}
                         </mat-icon>
                       </div>
                     }
@@ -329,8 +452,14 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .page-header {
@@ -368,7 +497,10 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
       flex-wrap: wrap;
     }
 
-    .flex-1 { flex: 1; min-width: 120px; }
+    .flex-1 {
+      flex: 1;
+      min-width: 120px;
+    }
 
     .constraints-panel {
       margin-top: 12px;
@@ -440,6 +572,11 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
       color: #c62828;
     }
 
+    .optimization-message.relaxed {
+      background: rgba(255, 152, 0, 0.12);
+      color: #e65100;
+    }
+
     .results-summary {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -466,6 +603,17 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
 
     .result-value.highlight {
       color: #4ecca3;
+    }
+
+    /* Radar chart */
+    .chart-card mat-card-content {
+      padding: 16px !important;
+    }
+
+    .chart-container {
+      display: flex;
+      justify-content: center;
+      padding: 8px 0;
     }
 
     /* Nutrient traffic-light bars */
@@ -521,9 +669,15 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
       height: 20px;
     }
 
-    .status-icon.good { color: #4caf50; }
-    .status-icon.warning { color: #ff9800; }
-    .status-icon.danger { color: #f44336; }
+    .status-icon.good {
+      color: #4caf50;
+    }
+    .status-icon.warning {
+      color: #ff9800;
+    }
+    .status-icon.danger {
+      color: #f44336;
+    }
 
     .save-btn {
       width: 100%;
@@ -546,7 +700,7 @@ const DEFAULT_TARGETS: NutrientTarget[] = [
     }
   `,
 })
-export class RecipeBuilderComponent implements OnInit {
+export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   private feedService = inject(FeedService);
   private recipeService = inject(RecipeService);
   private optimizationService = inject(OptimizationService);
@@ -555,29 +709,52 @@ export class RecipeBuilderComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private translate = inject(TranslateService);
+  private ngZone = inject(NgZone);
+
+  @ViewChild(BaseChartDirective) chart?: BaseChartDirective;
 
   feedColumns = ['select', 'name', 'quantity', 'price'];
 
   recipeName = '';
   animalGroupId: AnimalGroupId = 'lactating';
   constraints: OptimizationConstraints = {};
-  targets: NutrientTarget[] = DEFAULT_TARGETS;
+  targets: NutrientTarget[] = TARGET_RANGES['lactating'];
 
   feedEntries = signal<RecipeFeedEntry[]>([]);
   rationResult = signal<RationResult | null>(null);
   optimizing = signal(false);
   saving = signal(false);
   optimizationMessage = signal('');
-  optimizationStatus = signal<'optimal' | 'infeasible' | ''>('');
+  optimizationStatus = signal<'optimal' | 'relaxed' | 'infeasible' | ''>('');
+
+  // Chart data
+  radarChartType: ChartType = 'radar';
+  radarChartData: ChartData<'radar'> = { labels: [], datasets: [] };
+  radarChartOptions: any = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      r: {
+        min: 0,
+        ticks: { display: false },
+        grid: { color: 'rgba(0, 0, 0, 0.08)' },
+        pointLabels: { font: { size: 12 } },
+        angleLines: { color: 'rgba(0, 0, 0, 0.08)' },
+      },
+    },
+    plugins: {
+      legend: { display: false },
+    },
+  };
 
   selectedFeeds = computed(() =>
-    this.feedEntries().filter((e) => e.selected && e.kgAsFed > 0)
+    this.feedEntries().filter((e) => e.selected && e.kgAsFed > 0),
   );
 
   ngOnInit(): void {
     this.feedService.getAvailableFeeds().subscribe((feeds) => {
       this.feedEntries.set(
-        feeds.map((f) => ({ feed: f, kgAsFed: 0, selected: false }))
+        feeds.map((f) => ({ feed: f, kgAsFed: 0, selected: false })),
       );
     });
 
@@ -588,11 +765,58 @@ export class RecipeBuilderComponent implements OnInit {
     }
   }
 
+  ngAfterViewInit(): void {
+    this.updateRadarChart();
+  }
+
+  /** Switch the active nutrient targets when the animal group changes. */
+  onAnimalGroupChange(): void {
+    this.targets = TARGET_RANGES[this.animalGroupId] ?? [];
+    this.updateRadarChart();
+  }
+
+  private updateRadarChart(): void {
+    const result = this.rationResult();
+    if (!result) return;
+
+    const labels = this.targets.map((t) => t.nutrientCode);
+    const values = labels.map((code) => result.nutrients[code] ?? 0);
+
+    const maxRange = Math.max(
+      ...this.targets.map(
+        (t) => t.maxValue ?? (t.minValue ? t.minValue * 2 : 100),
+      ),
+      ...values,
+    );
+
+    const c = this.chart;
+    if (!c) return;
+
+    this.ngZone.runOutsideAngular(() => {
+      c.chart!.data.labels = labels;
+      c.chart!.data.datasets = [
+        {
+          label: this.translate.instant('RECIPES.CURRENT_RATION'),
+          data: values,
+          backgroundColor: 'rgba(78, 204, 163, 0.2)',
+          borderColor: '#4ecca3',
+          borderWidth: 2,
+          pointBackgroundColor: '#4ecca3',
+          pointRadius: 4,
+        },
+      ];
+      (c.chart!.options as any).scales.r.min = 0;
+      (c.chart!.options as any).scales.r.max = Math.ceil(maxRange * 1.1);
+      c.chart!.update();
+    });
+  }
+
   private async loadRecipe(id: string): Promise<void> {
     const recipe = await this.recipeService.getRecipeWithFeeds(id);
     if (recipe) {
       this.recipeName = recipe.name;
       this.animalGroupId = recipe.animalGroupId;
+      this.targets = TARGET_RANGES[this.animalGroupId] ?? [];
 
       // Match recipe feeds to available feeds
       if (recipe.feeds) {
@@ -611,9 +835,12 @@ export class RecipeBuilderComponent implements OnInit {
   }
 
   recalculate(): void {
-    const selected = this.feedEntries().filter((e) => e.selected && e.kgAsFed > 0);
+    const selected = this.feedEntries().filter(
+      (e) => e.selected && e.kgAsFed > 0,
+    );
     if (selected.length === 0) {
       this.rationResult.set(null);
+      this.radarChartData = { labels: [], datasets: [] };
       return;
     }
 
@@ -622,6 +849,7 @@ export class RecipeBuilderComponent implements OnInit {
 
     const result = this.calculator.calculateRation(feeds, quantities);
     this.rationResult.set(result);
+    this.updateRadarChart();
   }
 
   async optimize(): Promise<void> {
@@ -636,7 +864,7 @@ export class RecipeBuilderComponent implements OnInit {
       const result = await this.optimizationService.optimize(
         feeds,
         this.targets,
-        this.constraints
+        this.constraints,
       );
 
       if (result.status === 'optimal' && result.feeds) {
@@ -650,7 +878,10 @@ export class RecipeBuilderComponent implements OnInit {
         }
         // Deselect feeds with 0 quantity
         for (const entry of entries) {
-          if (entry.selected && !result.feeds.find((rf) => rf.feedId === entry.feed.id)) {
+          if (
+            entry.selected &&
+            !result.feeds.find((rf) => rf.feedId === entry.feed.id)
+          ) {
             entry.kgAsFed = 0;
           }
         }
@@ -659,15 +890,29 @@ export class RecipeBuilderComponent implements OnInit {
 
         this.optimizationStatus.set('optimal');
         this.optimizationMessage.set(this.translate.instant('RECIPES.OPTIMAL'));
+      } else if (result.status === 'relaxed' && result.feeds) {
+        // Apply the closest feasible ration and surface which targets are unmet.
+        const entries = this.feedEntries();
+        for (const entry of entries) {
+          const rf = result.feeds.find((r) => r.feedId === entry.feed.id);
+          entry.kgAsFed = rf ? rf.kgAsFed : 0;
+        }
+        this.feedEntries.set([...entries]);
+        this.recalculate();
+
+        this.optimizationStatus.set('relaxed');
+        this.optimizationMessage.set(this.translate.instant('RECIPES.RELAXED'));
       } else {
         this.optimizationStatus.set('infeasible');
         this.optimizationMessage.set(
-          result.message || this.translate.instant('RECIPES.INFEASIBLE')
+          result.message || this.translate.instant('RECIPES.INFEASIBLE'),
         );
       }
     } catch (e: any) {
       this.optimizationStatus.set('infeasible');
-      this.optimizationMessage.set(e.message || 'Optimization failed');
+      this.optimizationMessage.set(
+        e.message || this.translate.instant('RECIPES.OPTIMIZE_FAILED'),
+      );
     } finally {
       this.optimizing.set(false);
     }
@@ -682,7 +927,9 @@ export class RecipeBuilderComponent implements OnInit {
     this.saving.set(true);
 
     try {
-      const selected = this.feedEntries().filter((e) => e.selected && e.kgAsFed > 0);
+      const selected = this.feedEntries().filter(
+        (e) => e.selected && e.kgAsFed > 0,
+      );
       const recipeFeeds = selected.map((e) => ({
         feedId: e.feed.id!,
         feedName: e.feed.name,
@@ -701,13 +948,17 @@ export class RecipeBuilderComponent implements OnInit {
           cost: result.totalCost,
           nutrientAnalysis: result.nutrients,
         },
-        recipeFeeds
+        recipeFeeds,
       );
 
-      this.snackBar.open('Recipe saved!', '', { duration: 3000 });
+      this.snackBar.open(this.translate.instant('RECIPES.SAVED'), '', {
+        duration: 3000,
+      });
       this.router.navigate(['/recipes']);
     } catch (e) {
-      this.snackBar.open('Failed to save recipe', '', { duration: 3000 });
+      this.snackBar.open(this.translate.instant('RECIPES.SAVE_FAILED'), '', {
+        duration: 3000,
+      });
     } finally {
       this.saving.set(false);
     }
@@ -715,12 +966,17 @@ export class RecipeBuilderComponent implements OnInit {
 
   getNutrientBarValue(target: NutrientTarget): number {
     const value = this.rationResult()?.nutrients[target.nutrientCode] ?? 0;
-    const max = target.maxValue ?? (target.minValue ? target.minValue * 2 : 100);
+    const max =
+      target.maxValue ?? (target.minValue ? target.minValue * 2 : 100);
     return Math.min((value / max) * 100, 100);
   }
 
   getNutrientStatus(target: NutrientTarget): 'good' | 'warning' | 'danger' {
     const value = this.rationResult()?.nutrients[target.nutrientCode] ?? 0;
-    return this.calculator.evaluateNutrientStatus(value, target.minValue, target.maxValue);
+    return this.calculator.evaluateNutrientStatus(
+      value,
+      target.minValue,
+      target.maxValue,
+    );
   }
 }

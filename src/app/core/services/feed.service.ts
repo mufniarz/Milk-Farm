@@ -1,4 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import {
   Firestore,
   collection,
@@ -13,6 +14,7 @@ import {
   writeBatch,
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
+import { filter, switchMap } from 'rxjs/operators';
 import { Feed } from '../models/feed.model';
 import { AuthService } from './auth.service';
 
@@ -24,33 +26,39 @@ export class FeedService {
   /** Loading state */
   readonly loading = signal(false);
 
+  // Emits only once farmId is resolved; re-emits on re-login.
+  private readonly farmId$ = toObservable(this.authService.farmId).pipe(
+    filter((id) => !!id),
+  );
+
   /**
    * Get all feeds for the current farm as an observable stream.
    */
   getFeeds(): Observable<Feed[]> {
-    const farmId = this.authService.farmId();
-    const feedsRef = collection(this.firestore, 'feeds');
-    const q = query(
-      feedsRef,
-      where('farmId', '==', farmId),
-      orderBy('name', 'asc')
+    return this.farmId$.pipe(
+      switchMap((farmId) => {
+        const q = query(
+          collection(this.firestore, 'feeds'),
+          where('farmId', '==', farmId),
+          orderBy('name', 'asc'),
+        );
+        return collectionData(q, { idField: 'id' }) as Observable<Feed[]>;
+      }),
     );
-    return collectionData(q, { idField: 'id' }) as Observable<Feed[]>;
   }
 
-  /**
-   * Get available feeds only (for recipe building).
-   */
   getAvailableFeeds(): Observable<Feed[]> {
-    const farmId = this.authService.farmId();
-    const feedsRef = collection(this.firestore, 'feeds');
-    const q = query(
-      feedsRef,
-      where('farmId', '==', farmId),
-      where('isAvailable', '==', true),
-      orderBy('name', 'asc')
+    return this.farmId$.pipe(
+      switchMap((farmId) => {
+        const q = query(
+          collection(this.firestore, 'feeds'),
+          where('farmId', '==', farmId),
+          where('isAvailable', '==', true),
+          orderBy('name', 'asc'),
+        );
+        return collectionData(q, { idField: 'id' }) as Observable<Feed[]>;
+      }),
     );
-    return collectionData(q, { idField: 'id' }) as Observable<Feed[]>;
   }
 
   /**

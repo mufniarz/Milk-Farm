@@ -19,6 +19,19 @@ import { FeedService } from '../../core/services/feed.service';
 import { Feed, FeedCategory } from '../../core/models/feed.model';
 import { FeedFormComponent } from './feed-form.component';
 
+/** Well-known nutrient codes used in the feed form */
+const NUTRIENT_CODES = [
+  'proteina',
+  'ee',
+  'amido',
+  'zuccheri',
+  'ceneri',
+  'aNDF',
+  'uNDF',
+  'ADF',
+  'ADL',
+];
+
 @Component({
   selector: 'mf-feed-list',
   standalone: true,
@@ -45,11 +58,20 @@ import { FeedFormComponent } from './feed-form.component';
       <div class="page-header">
         <h1 class="page-title">{{ 'FEEDS.TITLE' | translate }}</h1>
         <div class="header-actions">
-          <button mat-stroked-button (click)="importFeeds()" id="import-feeds-btn">
+          <button
+            mat-stroked-button
+            (click)="importFeeds()"
+            id="import-feeds-btn"
+          >
             <mat-icon>upload_file</mat-icon>
             {{ 'FEEDS.IMPORT_CSV' | translate }}
           </button>
-          <button mat-flat-button color="primary" (click)="openAddDialog()" id="add-feed-btn">
+          <button
+            mat-flat-button
+            color="primary"
+            (click)="openAddDialog()"
+            id="add-feed-btn"
+          >
             <mat-icon>add</mat-icon>
             {{ 'FEEDS.ADD' | translate }}
           </button>
@@ -60,16 +82,29 @@ import { FeedFormComponent } from './feed-form.component';
       <div class="filters-row">
         <mat-form-field appearance="outline" class="search-field">
           <mat-label>{{ 'FEEDS.SEARCH' | translate }}</mat-label>
-          <input matInput [(ngModel)]="searchQuery" (ngModelChange)="applyFilter()" id="feed-search" />
+          <input
+            matInput
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="applyFilter()"
+            id="feed-search"
+          />
           <mat-icon matPrefix>search</mat-icon>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="category-filter">
           <mat-label>{{ 'FEEDS.CATEGORY' | translate }}</mat-label>
-          <mat-select [(ngModel)]="categoryFilter" (ngModelChange)="applyFilter()" id="category-filter">
-            <mat-option value="all">All</mat-option>
-            <mat-option value="forage">{{ 'FEEDS.FORAGE' | translate }}</mat-option>
-            <mat-option value="concentrate">{{ 'FEEDS.CONCENTRATE' | translate }}</mat-option>
+          <mat-select
+            [(ngModel)]="categoryFilter"
+            (ngModelChange)="applyFilter()"
+            id="category-filter"
+          >
+            <mat-option value="all">{{ 'FEEDS.ALL' | translate }}</mat-option>
+            <mat-option value="forage">{{
+              'FEEDS.FORAGE' | translate
+            }}</mat-option>
+            <mat-option value="concentrate">{{
+              'FEEDS.CONCENTRATE' | translate
+            }}</mat-option>
           </mat-select>
         </mat-form-field>
       </div>
@@ -85,10 +120,17 @@ import { FeedFormComponent } from './feed-form.component';
         </div>
       } @else {
         <div class="table-container">
-          <table mat-table [dataSource]="filteredFeeds()" matSort (matSortChange)="sortData($event)">
+          <table
+            mat-table
+            [dataSource]="filteredFeeds()"
+            matSort
+            (matSortChange)="sortData($event)"
+          >
             <!-- Name Column -->
             <ng-container matColumnDef="name">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>{{ 'FEEDS.NAME' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'FEEDS.NAME' | translate }}
+              </th>
               <td mat-cell *matCellDef="let feed">
                 <span class="feed-name">{{ feed.name }}</span>
               </td>
@@ -96,29 +138,45 @@ import { FeedFormComponent } from './feed-form.component';
 
             <!-- Category Column -->
             <ng-container matColumnDef="category">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>{{ 'FEEDS.CATEGORY' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'FEEDS.CATEGORY' | translate }}
+              </th>
               <td mat-cell *matCellDef="let feed">
                 <span class="category-chip" [class]="feed.category">
-                  {{ feed.category === 'forage' ? ('FEEDS.FORAGE' | translate) : ('FEEDS.CONCENTRATE' | translate) }}
+                  {{
+                    feed.category === 'forage'
+                      ? ('FEEDS.FORAGE' | translate)
+                      : ('FEEDS.CONCENTRATE' | translate)
+                  }}
                 </span>
               </td>
             </ng-container>
 
             <!-- Price Column -->
             <ng-container matColumnDef="pricePerKg">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>{{ 'FEEDS.PRICE_PER_KG' | translate }}</th>
-              <td mat-cell *matCellDef="let feed">€{{ feed.pricePerKg | number:'1.3-3' }}</td>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'FEEDS.PRICE_PER_KG' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let feed">
+                €{{ feed.pricePerKg | number: '1.3-3' }}
+              </td>
             </ng-container>
 
             <!-- Moisture Column -->
             <ng-container matColumnDef="moisturePct">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>{{ 'FEEDS.MOISTURE' | translate }}</th>
-              <td mat-cell *matCellDef="let feed">{{ feed.moisturePct | number:'1.1-1' }}%</td>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'FEEDS.MOISTURE' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let feed">
+                {{ feed.moisturePct | number: '1.1-1' }}%
+              </td>
             </ng-container>
 
             <!-- Available Column -->
             <ng-container matColumnDef="isAvailable">
-              <th mat-header-cell *matHeaderCellDef>{{ 'FEEDS.AVAILABLE' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'FEEDS.AVAILABLE' | translate }}
+              </th>
               <td mat-cell *matCellDef="let feed">
                 <mat-slide-toggle
                   [checked]="feed.isAvailable"
@@ -130,20 +188,34 @@ import { FeedFormComponent } from './feed-form.component';
 
             <!-- Actions Column -->
             <ng-container matColumnDef="actions">
-              <th mat-header-cell *matHeaderCellDef>{{ 'COMMON.ACTIONS' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'COMMON.ACTIONS' | translate }}
+              </th>
               <td mat-cell *matCellDef="let feed">
-                <button mat-icon-button matTooltip="Edit" (click)="openEditDialog(feed)">
+                <button
+                  mat-icon-button
+                  matTooltip="Edit"
+                  (click)="openEditDialog(feed)"
+                >
                   <mat-icon>edit</mat-icon>
                 </button>
-                <button mat-icon-button matTooltip="Delete" color="warn" (click)="deleteFeed(feed)">
+                <button
+                  mat-icon-button
+                  matTooltip="Delete"
+                  color="warn"
+                  (click)="deleteFeed(feed)"
+                >
                   <mat-icon>delete</mat-icon>
                 </button>
               </td>
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;"
-                class="feed-row"></tr>
+            <tr
+              mat-row
+              *matRowDef="let row; columns: displayedColumns"
+              class="feed-row"
+            ></tr>
           </table>
         </div>
       }
@@ -155,8 +227,14 @@ import { FeedFormComponent } from './feed-form.component';
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .page-header {
@@ -264,7 +342,14 @@ export class FeedListComponent implements OnInit {
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
 
-  displayedColumns = ['name', 'category', 'pricePerKg', 'moisturePct', 'isAvailable', 'actions'];
+  displayedColumns = [
+    'name',
+    'category',
+    'pricePerKg',
+    'moisturePct',
+    'isAvailable',
+    'actions',
+  ];
 
   feeds = signal<Feed[]>([]);
   filteredFeeds = signal<Feed[]>([]);
@@ -322,7 +407,9 @@ export class FeedListComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result) => {
       if (result) {
-        this.snackBar.open('Feed added', '', { duration: 3000 });
+        this.snackBar.open(this.translate.instant('FEEDS.ADDED'), '', {
+          duration: 3000,
+        });
       }
     });
   }
@@ -335,7 +422,9 @@ export class FeedListComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result) => {
       if (result) {
-        this.snackBar.open('Feed updated', '', { duration: 3000 });
+        this.snackBar.open(this.translate.instant('FEEDS.UPDATED'), '', {
+          duration: 3000,
+        });
       }
     });
   }
@@ -348,20 +437,134 @@ export class FeedListComponent implements OnInit {
     const msg = this.translate.instant('FEEDS.DELETE_CONFIRM');
     if (confirm(msg)) {
       await this.feedService.deleteFeed(feed.id!);
-      this.snackBar.open('Feed deleted', '', { duration: 3000 });
+      this.snackBar.open(this.translate.instant('FEEDS.DELETED'), '', {
+        duration: 3000,
+      });
     }
   }
 
-  importFeeds(): void {
+  async importFeeds(): Promise<void> {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.csv,.xlsx,.xls';
     input.onchange = async (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      // CSV/Excel import logic will be implemented with xlsx library
-      this.snackBar.open('Import feature coming soon', '', { duration: 3000 });
+
+      try {
+        const feeds = await this.parseImportFile(file);
+        if (feeds.length === 0) {
+          this.snackBar.open(
+            this.translate.instant('FEEDS.IMPORT_NO_FEEDS'),
+            '',
+            { duration: 4000 },
+          );
+          return;
+        }
+        const count = await this.feedService.importFeeds(feeds);
+        this.snackBar.open(
+          this.translate.instant('FEEDS.IMPORTED_COUNT', { count }),
+          '',
+          { duration: 4000 },
+        );
+      } catch (e: any) {
+        this.snackBar.open(
+          this.translate.instant('FEEDS.IMPORT_FAILED', {
+            error: e.message || 'Unknown error',
+          }),
+          '',
+          { duration: 4000 },
+        );
+      } finally {
+        // Reset the file input so the same file can be re-imported
+        (input as HTMLInputElement).value = '';
+      }
     };
     input.click();
+  }
+
+  /**
+   * Parse a CSV or Excel file into Feed objects.
+   * Expected column headers (case-insensitive):
+   *   name, category, pricePerKg, moisturePct, isAvailable, <nutrient codes>
+   * Category: "forage" or "concentrate" (or "F"/"C")
+   * isAvailable: true/false (or "1"/"0")
+   */
+  private async parseImportFile(
+    file: File,
+  ): Promise<Omit<Feed, 'id' | 'farmId'>[]> {
+    // Dynamically import xlsx to avoid SSR issues
+    const XLSX = await import('xlsx');
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array' });
+
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows: Record<string, string | number | boolean | undefined>[] =
+      XLSX.utils.sheet_to_json(sheet);
+
+    const feeds: Omit<Feed, 'id' | 'farmId'>[] = [];
+
+    for (const row of rows) {
+      const name = String(
+        row['name'] || row['Name'] || row['NOME'] || '',
+      ).trim();
+      if (!name) continue;
+
+      // Parse category
+      let category: FeedCategory = 'forage';
+      const catRaw = String(
+        row['category'] ||
+          row['Category'] ||
+          row['Categoria'] ||
+          row['cat'] ||
+          'forage',
+      ).toLowerCase();
+      if (['concentrate', 'concentrato', 'C'].includes(catRaw)) {
+        category = 'concentrate';
+      }
+
+      const pricePerKg =
+        Number(
+          row['pricePerKg'] ||
+            row['price'] ||
+            row['Prezzo'] ||
+            row['pricePerKg'] ||
+            0,
+        ) || 0;
+      const moisturePct =
+        Number(
+          row['moisturePct'] ||
+            row['moisture'] ||
+            row['Umidita'] ||
+            row['moisturePct'] ||
+            0,
+        ) || 0;
+      const isAvailable =
+        row['isAvailable'] !== false &&
+        row['isAvailable'] !== '0' &&
+        row['isAvailable'] !== 'falsa' &&
+        row['isAvailable'] !== 'no';
+
+      // Parse nutrients from the row
+      const nutrients: Record<string, number> = {};
+      for (const code of NUTRIENT_CODES) {
+        const val = Number(row[code] || row[code.toUpperCase()] || 0);
+        if (!isNaN(val)) {
+          nutrients[code] = val;
+        }
+      }
+
+      feeds.push({
+        name,
+        category,
+        pricePerKg,
+        moisturePct,
+        isAvailable: !!isAvailable,
+        nutrients,
+      });
+    }
+
+    return feeds;
   }
 }
