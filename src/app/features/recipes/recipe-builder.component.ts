@@ -260,8 +260,10 @@ interface RecipeFeedEntry {
                   <mat-spinner diameter="20"></mat-spinner>
                   {{ 'RECIPES.OPTIMIZING' | translate }}
                 } @else {
-                  <mat-icon>auto_fix_high</mat-icon>
-                  {{ 'RECIPES.OPTIMIZE' | translate }}
+                  <span>
+                    <mat-icon>auto_fix_high</mat-icon>
+                    {{ 'RECIPES.OPTIMIZE' | translate }}
+                  </span>
                 }
               </button>
             </mat-card-actions>
@@ -437,8 +439,10 @@ interface RecipeFeedEntry {
               @if (saving()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
-                <mat-icon>save</mat-icon>
-                {{ 'RECIPES.SAVE' | translate }}
+                <span>
+                  <mat-icon>save</mat-icon>
+                  {{ 'RECIPES.SAVE' | translate }}
+                </span>
               }
             </button>
           }

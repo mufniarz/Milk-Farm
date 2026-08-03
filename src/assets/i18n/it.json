@@ -22,7 +22,14 @@
     "LOGIN_HERE": "Accedi qui",
     "ERROR_INVALID_CREDENTIALS": "Email o password non validi",
     "ERROR_EMAIL_IN_USE": "Email già in uso",
-    "ERROR_WEAK_PASSWORD": "La password deve avere almeno 6 caratteri"
+    "ERROR_WEAK_PASSWORD": "La password deve avere almeno 6 caratteri",
+    "FORGOT_PASSWORD": "Password dimenticata?",
+    "PASSWORD_RESET_SENT": "Un link per reimpostare la password è stato inviato alla tua email.",
+    "RESET_PASSWORD": "Reimposta password",
+    "SEND_RESET_LINK": "Invia link di reset",
+    "BACK_TO_LOGIN": "Torna al login",
+    "RESET_EMAIL_SENT": "Se esiste un account con questa email, riceverai un link per reimpostare la password a breve.",
+    "ENTER_EMAIL_FOR_RESET": "Inserisci il tuo indirizzo email e ti invieremo un link per reimpostare la password."
   },
   "DASHBOARD": {
     "WELCOME": "Benvenuto",
