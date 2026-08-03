@@ -22,7 +22,14 @@
     "LOGIN_HERE": "Login here",
     "ERROR_INVALID_CREDENTIALS": "Invalid email or password",
     "ERROR_EMAIL_IN_USE": "Email already in use",
-    "ERROR_WEAK_PASSWORD": "Password must be at least 6 characters"
+    "ERROR_WEAK_PASSWORD": "Password must be at least 6 characters",
+    "FORGOT_PASSWORD": "Forgot password?",
+    "PASSWORD_RESET_SENT": "A password reset link has been sent to your email.",
+    "RESET_PASSWORD": "Reset Password",
+    "SEND_RESET_LINK": "Send Reset Link",
+    "BACK_TO_LOGIN": "Back to Login",
+    "RESET_EMAIL_SENT": "If an account exists with that email, you'll receive a password reset link shortly.",
+    "ENTER_EMAIL_FOR_RESET": "Enter your email address and we'll send you a link to reset your password."
   },
   "DASHBOARD": {
     "WELCOME": "Welcome",

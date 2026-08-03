@@ -99,6 +99,10 @@ import { AuthService } from '../../core/services/auth.service';
                   {{ 'AUTH.LOGIN' | translate }}
                 }
               </button>
+
+              <a routerLink="/reset-password" class="forgot-password-link" id="login-forgot-password">
+                {{ 'AUTH.FORGOT_PASSWORD' | translate }}
+              </a>
             </form>
 
             <mat-divider class="auth-divider"></mat-divider>
@@ -228,6 +232,16 @@ import { AuthService } from '../../core/services/auth.service';
     .auth-link:hover {
       text-decoration: underline;
     }
+
+    .forgot-password-link {
+      justify-content: flex-start;
+      padding-left: 0;
+      color: #4ecca3 !important;
+      font-size: 13px;
+      margin-top: 4px;
+      height: auto;
+      cursor: pointer;
+    }
   `,
 })
 export class LoginComponent {
@@ -266,4 +280,5 @@ export class LoginComponent {
       this.loading.set(false);
     }
   }
+
 }
