@@ -126,8 +126,8 @@ import { AuthService } from './core/services/auth.service';
 
     .app-sidenav {
       width: 260px;
-      background: #f5f7fa;
-      color: #1a1a2e;
+      background: linear-gradient(180deg, #0f0c29 0%, #1a1a3e 100%);
+      color: #ffffff;
       border-right: none;
       display: flex;
       flex-direction: column;
@@ -135,7 +135,7 @@ import { AuthService } from './core/services/auth.service';
 
     .sidenav-header {
       padding: 24px 16px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .logo-container {
@@ -148,27 +148,36 @@ import { AuthService } from './core/services/auth.service';
       font-size: 32px;
       width: 32px;
       height: 32px;
-      color: #2b7a5b;
+      color: #4ecca3;
     }
 
     .logo-text {
       font-size: 22px;
       font-weight: 700;
-      color: #1a1a2e;
+      color: #ffffff;
       letter-spacing: -0.5px;
     }
 
     .app-sidenav mat-nav-list a {
-      color: #1a1a2e !important;
+      color: rgba(255, 255, 255, 0.78) !important;
+    }
+
+    .app-sidenav mat-nav-list a span[matListItemTitle] {
+      color: rgba(255, 255, 255, 0.78) !important;
+    }
+
+    .app-sidenav mat-nav-list a.active-link span[matListItemTitle] {
+      color: #ffffff !important;
     }
 
     .app-sidenav mat-nav-list a.active-link {
       background: rgba(78, 204, 163, 0.22) !important;
+      color: #ffffff !important;
     }
 
     .sidenav-footer {
       margin-top: auto;
-      border-top: 1px solid rgba(0, 0, 0, 0.08);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .app-toolbar {
