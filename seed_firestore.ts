@@ -26,7 +26,12 @@
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-import { Firestore, CollectionReference, DocumentReference } from '@google-cloud/firestore';
+import {
+  Firestore,
+  CollectionReference,
+  DocumentReference,
+  getDoc,
+} from '@google-cloud/firestore';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -88,6 +93,16 @@ async function setDoc(ref: DocumentReference, data: any): Promise<void> {
   await ref.set(data);
 }
 
+/** Merge data into an existing document, preserving fields that are not provided. */
+async function mergeDoc(
+  ref: DocumentReference,
+  data: Record<string, unknown>,
+): Promise<void> {
+  const snapshot = await getDoc(ref);
+  const existing = snapshot.exists ? snapshot.data() : {};
+  await ref.set({ ...existing, ...data }, { merge: true });
+}
+
 async function seed(): Promise<void> {
   console.log('🌱 Seeding Firestore from Excel-derived data...\n');
 
@@ -101,22 +116,24 @@ async function seed(): Promise<void> {
   // ── Farm + demo user ──
   const farmProvided = cli.farmId !== undefined;
   const uidProvided = cli.uid !== undefined;
+  const isNewFarm = !farmProvided;
+  const isNewUser = !uidProvided;
 
-  await setDoc(db.collection('farms').doc(farmId), {
+  await mergeDoc(db.collection('farms').doc(farmId), {
     id: farmId,
-    name: farmProvided ? 'Seeded Farm' : 'Demo Farm (Seed Data)',
+    name: isNewFarm ? 'Demo Farm (Seed Data)' : 'Seeded Farm',
     ownerUid: uid,
-    createdAt: new Date(),
+    createdAt: isNewFarm ? new Date() : undefined,
   });
   console.log(`✅ Farm: ${farmId}${farmProvided ? ' (existing)' : ' (created)'}`);
 
-  await setDoc(db.collection('users').doc(uid), {
+  await mergeDoc(db.collection('users').doc(uid), {
     uid,
-    displayName: 'Demo User',
-    email: 'demo@milkfarm.local',
+    displayName: isNewUser ? 'Demo User' : undefined,
+    email: isNewUser ? 'demo@milkfarm.local' : undefined,
     farmId,
     language: 'it',
-    createdAt: new Date(),
+    createdAt: isNewUser ? new Date() : undefined,
   });
   console.log(`✅ User: ${uid}${uidProvided ? ' (existing)' : ' (created)'}`);
 

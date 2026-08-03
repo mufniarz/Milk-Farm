@@ -93,7 +93,26 @@ export class AuthService {
    * Sign in with email and password.
    */
   async loginWithEmail(email: string, password: string): Promise<void> {
-    await signInWithEmailAndPassword(this.auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(
+      this.auth,
+      email,
+      password
+    );
+    const firebaseUser = userCredential.user;
+
+    // Sync real Firebase Auth info into Firestore profile
+    const userRef = doc(this.firestore, 'users', firebaseUser.uid);
+    await setDoc(
+      userRef,
+      {
+        uid: firebaseUser.uid,
+        displayName: firebaseUser.displayName || 'User',
+        email: firebaseUser.email || '',
+        lastLoginAt: new Date(),
+      },
+      { merge: true }
+    );
+
     this.router.navigate(['/dashboard']);
   }
 
