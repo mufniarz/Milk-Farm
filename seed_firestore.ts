@@ -30,7 +30,6 @@ import {
   Firestore,
   CollectionReference,
   DocumentReference,
-  getDoc,
 } from '@google-cloud/firestore';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -98,9 +97,18 @@ async function mergeDoc(
   ref: DocumentReference,
   data: Record<string, unknown>,
 ): Promise<void> {
-  const snapshot = await getDoc(ref);
+  const snapshot = await ref.get();
   const existing = snapshot.exists ? snapshot.data() : {};
-  await ref.set({ ...existing, ...data }, { merge: true });
+  // Filter out undefined values — Admin SDK rejects them
+  const merged = {
+    ...existing,
+  } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      (merged as Record<string, unknown>)[key] = value;
+    }
+  }
+  await ref.set(merged, { merge: true });
 }
 
 async function seed(): Promise<void> {
