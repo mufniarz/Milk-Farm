@@ -247,3 +247,27 @@ inventory, target overrides and milk records require `farmMembers`.
   implemented, the trigger + loading sheet + queue ship together after the
   target backfill. IOFC and the accuracy report are fully functional without
   the trigger.
+
+## Deployment record — 2026-11-25
+
+Deployed to the production project `nicola-milk-farm` (the only Firebase
+project configured; no staging project exists, so the staging rehearsal in
+the checklist could not be performed).
+
+- **Membership backfill:** dry run reported `3 would be created, 0 unchanged`
+  across 3 farms / 3 users; the real run created 3 memberships and verified
+  every farm has an owner and every user an active membership.
+- **Indexes:** deployed successfully. Two unnecessary single-field indexes
+  (`groups.animalGroupId` and `feedingTriggerFailures.status`) were removed
+  because Firestore rejects them; the `(status, deadAt)` collection-group
+  index for abandonment remains.
+- **Functions:** 13 deployed — the 11 callables, `on_feeding_confirmed`, and
+  the `scheduled_feeding_retry` scheduled function. The first trigger create
+  failed while the Eventarc service agent propagated; the scoped retry
+  succeeded. Cloud Scheduler was enabled automatically.
+- **Rules and hosting:** compatibility rules released and
+  `https://nicola-milk-farm.web.app` returns 200.
+- **Not yet verified in production:** authenticated smoke tests of the
+  loading sheet, trigger → queue path, and IOFC/milk flows; composite-index
+  build completion. These need a signed-in farm user and are the next
+  operational check.

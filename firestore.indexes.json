@@ -111,16 +111,6 @@
       ]
     },
     {
-      "collectionGroup": "groups",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "animalGroupId",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "feedings",
       "queryScope": "COLLECTION",
       "fields": [
@@ -173,16 +163,6 @@
         {
           "fieldPath": "date",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "feedingTriggerFailures",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
         }
       ]
     },
