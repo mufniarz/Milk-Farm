@@ -82,7 +82,7 @@ XDG_CONFIG_HOME=./.firebase-config FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
 directly under Node's type stripping; keep the extension. `scripts/backfill-members.mts`
 uses the same runner.
 
-`pytest` without the emulator skips the 19 callable/trigger tests. `npm run test:functions`
+`pytest` without the emulator skips the 21 callable/trigger tests. `npm run test:functions`
 runs the full suite through the emulator with `REQUIRE_EMULATOR=1`, so a missing
 emulator fails instead of silently skipping. The parity chain
 (workbook -> fixtures -> computed) is described in
@@ -198,10 +198,12 @@ inventory, target overrides and milk records require `farmMembers`.
   as not applicable. With no recipe and no snapshot the page shows n/a, never
   a zero feed cost; a record with a missing snapshot shows "incomplete
   snapshot" rather than falling back to today's herd. The record's
-  `headCountSnapshot` is the latest confirmed feeding's `animalCount` for the
-  group/date when one exists, otherwise the group head count; an "awaiting
-  feeding" warning shows when none is confirmed, and zero head renders
-  "0 head / IOFC not defined". The trend is the last seven records. The milk
+  `headCountSnapshot` is the **average** of the day's confirmed feedings'
+  `animalCount` (100 morning + 95 evening = 97.5), otherwise the group head
+  count; an "awaiting feeding" warning shows when none is confirmed, a
+  "refresh snapshot" action appears when a record saved before confirmation
+  can now lock the feeding average, and zero head renders "0 head / IOFC not
+  defined". The trend is the last seven records. The milk
   price is per record, with a farm-level default at
   `farms/{farmId}.milkPricePerKg` that owner/admin can save from the page
   (audited as `farm.milk_price_changed`); fat/protein are stored but not used
@@ -209,18 +211,27 @@ inventory, target overrides and milk records require `farmMembers`.
 - **Pre-deploy requirement:** the trigger failure queue is implemented; the
   SDK cannot enable retry (0.6.0 stable and 0.7.0rc0 both hardcode
   `retry=False`), so the trigger, loading sheet and queue must ship together.
-  A `dead` failure is a 24-hour human-attention SLA; resolved-document
-  retention (90-day TTL/cleanup) is a follow-up.
+  A `dead` failure is a 24-hour human-attention SLA; dead documents are
+  abandoned after 90 days with an audit, and resolved-document retention
+  (90-day TTL/cleanup) is a follow-up. The collection-group scan returns only
+  open failures, so its cost is bounded by open failures, not farms; a retry
+  slower than the 10-minute stale threshold can double-increment `retryCount`
+  but cannot double-post (the `inventoryPostedAt` guard).
 - **Failure queue:** `farms/{farmId}/feedingTriggerFailures/{feedingId}`
   is written when `on_feeding_confirmed` fails. A scheduled function every
-  five minutes claims pending/stale documents in a transaction (so scanners
-  cannot double-retry), retries up to five times, and marks `dead` with a
-  `feeding.trigger_dead` audit. Owner/admin can retry all pending/dead
-  failures from the loading sheet; success sets `resolved` and audits
-  `feeding.trigger_resolved`. The loading sheet shows the open count and a
-  per-feeding "Not posted" badge; the inventory page shows the count too.
-  Resolved documents need a 90-day TTL/cleanup follow-up; email is out of
-  scope for v1, and `dead` means "human attention within 24 hours".
+  five minutes claims **pending or stale retrying** documents in a
+  transaction, retries up to five times, and marks `dead` with a single
+  `feeding.trigger_dead` audit; `dead` is terminal for the scan and only a
+  manual retry can move it. Owner/admin can retry all pending/dead failures
+  from the loading sheet; success sets `resolved` and audits
+  `feeding.trigger_resolved`. A retry that finds `inventoryPostedAt` already
+  set resolves without posting again. Dead documents older than 90 days are
+  deleted with a `feeding.trigger_abandoned` audit (explicit write-off);
+  resolved retention is a follow-up. The loading sheet and inventory page show
+  the open count, and the loading sheet has a per-feeding "Not posted" badge.
+  Email is out of scope for v1; `dead` means "human attention within 24
+  hours". `attemptedAt` is the first attempt, `lastRetryAt` the latest; a
+  successful retry leaves `retryCount` unchanged.
 - **Deploy chain:** everything except the trigger **and the loading sheet**
   can ship first — feeds, recipes, targets, groups, inventory/ledger
   (manual), accuracy, IOFC and retroactive posting. With the queue

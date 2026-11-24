@@ -297,6 +297,10 @@
     "NO_RECORD": "Nessuna registrazione latte per questa data. Inserisci il latte del gruppo per calcolare l'IOFC.",
     "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere l'IOFC.",
     "AWAITING_FEEDING": "Nessun carico confermato per questa data: lo snapshot userà il numero di capi del gruppo. Conferma il carico e salva la registrazione latte.",
-    "ZERO_HEAD": "Gruppo con 0 capi: l'IOFC per vacca non è definito."
+    "ZERO_HEAD": "Gruppo con 0 capi: l'IOFC per vacca non è definito.",
+    "SNAPSHOT_REFRESH": "È disponibile un carico confermato: aggiorna lo snapshot del numero di capi.",
+    "SNAPSHOT_REFRESH_ACTION": "Aggiorna snapshot",
+    "SNAPSHOT_REFRESHED": "Snapshot aggiornato.",
+    "SNAPSHOT_REFRESH_FAILED": "Aggiornamento snapshot non riuscito."
   }
 }

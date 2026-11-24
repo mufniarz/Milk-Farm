@@ -98,8 +98,8 @@ describe('IofcComponent wiring', () => {
     component.milkKg = 3000;
 
     expect(component.milkPricePerKg).toBe(0.55);
-    // The latest feeding's 95 head, not the group's 100.
-    expect(component.result!.feedCostPerDay).toBeCloseTo(427.5, 6);
+    // Average of 100 and 95 = 97.5 head, not the group's 100.
+    expect(component.result!.feedCostPerDay).toBeCloseTo(438.75, 6);
   });
 
   it('uses the group head count and the per-head recipe cost', async () => {

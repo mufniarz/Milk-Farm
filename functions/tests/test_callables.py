@@ -16,6 +16,7 @@ or through:
 The module skips itself when FIRESTORE_EMULATOR_HOST is not set.
 """
 import os
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -1104,6 +1105,95 @@ def test_failure_exhaustion_marks_dead_and_audits():
     assert len(dead) == 1
     assert dead[0]["feedingId"] == "feeding-dead"
     assert dead[0]["retryCount"] == 5
+
+    # Dead is terminal for the scan; only a manual retry may claim it.
+    assert main._claim_failure(DB, "f1", "feeding-dead", "scan") is None
+    assert main._retry_one_failure(DB, "f1", "feeding-dead", "scan") is False
+    assert ref.get().to_dict()["status"] == "dead"
+
+
+def test_retry_resolves_an_already_posted_feeding():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-posted",
+        lines=_feeding_lines(loaded=(50,)),
+    )
+    # Simulate a committed trigger whose post-commit step failed: the ledger
+    # and inventoryPostedAt exist, and a pending failure doc is left behind.
+    main._post_feeding_inventory(DB, "f1", "feeding-posted")
+    for stale in (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .stream()
+    ):
+        stale.reference.delete()
+    _failure_doc("feeding-posted", status="pending", retry_count=1)
+    ledger_before = len(_ledger())
+
+    result = _handler(main.retry_feeding_failures)(
+        _Req("owner", {"farmId": "f1"})
+    )
+    assert result["resolved"] == 1
+    assert result["failed"] == 0
+    assert len(_ledger()) == ledger_before
+
+    failure = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .document("feeding-posted")
+        .get()
+        .to_dict()
+    )
+    assert failure["status"] == "resolved"
+    assert failure["retryCount"] == 1
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    assert (
+        len(
+            [
+                entry
+                for entry in audits
+                if entry["action"] == "feeding.confirm"
+                and entry["feedingId"] == "feeding-posted"
+            ]
+        )
+        == 1
+    )
+
+
+def test_dead_failure_is_abandoned_after_90_days():
+    _prepare_inventory(1000)
+    ref = _failure_doc("feeding-old", status="dead", retry_count=5)
+    ref.update(
+        {"deadAt": datetime.now(timezone.utc) - timedelta(days=91)}
+    )
+
+    assert main._abandon_dead_failure(DB, "f1", "feeding-old") is True
+    assert not ref.get().exists
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    abandoned = [
+        entry
+        for entry in audits
+        if entry["action"] == "feeding.trigger_abandoned"
+    ]
+    assert len(abandoned) == 1
+    assert abandoned[0]["feedingId"] == "feeding-old"
+    assert abandoned[0]["retryCount"] == 5
 
 
 def test_set_farm_milk_price_audits_and_denies_a_feeder():

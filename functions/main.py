@@ -1055,6 +1055,7 @@ def _post_feeding_inventory(db, farm_id, feeding_id):
 
 _FAILURE_RETRY_LIMIT = 5
 _FAILURE_STALE_SECONDS = 600
+_ABANDON_AFTER_DAYS = 90
 
 
 def _failure_ref(db, farm_id, feeding_id):
@@ -1214,6 +1215,47 @@ def _fail_retry(db, farm_id, feeding_id, error):
     apply(db.transaction())
 
 
+def _abandon_dead_failure(db, farm_id, feeding_id):
+    """Delete a dead failure after 90 days with an explicit write-off audit."""
+    ref = _failure_ref(db, farm_id, feeding_id)
+    now = datetime.now(timezone.utc)
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return False
+        data = snapshot.to_dict() or {}
+        if data.get("status") != "dead":
+            return False
+        dead_at = data.get("deadAt")
+        if dead_at is None:
+            return False
+        try:
+            age = now.timestamp() - dead_at.timestamp()
+        except Exception:
+            return False
+        if age < _ABANDON_AFTER_DAYS * 86400:
+            return False
+        transaction.delete(ref)
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "feeding.trigger_abandoned",
+                "farmId": farm_id,
+                "feedingId": feeding_id,
+                "retryCount": data.get("retryCount"),
+                "deadAt": dead_at,
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        return True
+
+    return apply(db.transaction())
+
+
 def _retry_one_failure(db, farm_id, feeding_id, instance_id, allow_dead=False):
     if _claim_failure(db, farm_id, feeding_id, instance_id, allow_dead) is None:
         return False
@@ -1280,6 +1322,18 @@ def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
         farm_id = data.get("farmId")
         if farm_id:
             _retry_one_failure(db, farm_id, doc.id, instance_id)
+
+    dead_docs = list(
+        db.collection_group("feedingTriggerFailures")
+        .where("status", "==", "dead")
+        .limit(50)
+        .stream()
+    )
+    for doc in dead_docs:
+        data = doc.to_dict() or {}
+        farm_id = data.get("farmId")
+        if farm_id:
+            _abandon_dead_failure(db, farm_id, doc.id)
 
 
 @https_fn.on_call(

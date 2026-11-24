@@ -297,6 +297,10 @@
     "NO_RECORD": "No milk record for this date. Enter the group's milk to calculate IOFC.",
     "RESTRICTED": "Only the owner, farm admin or consultant can view IOFC.",
     "AWAITING_FEEDING": "No confirmed feeding for this date yet: the snapshot will use the group head count. Confirm the feeding, then save the milk record.",
-    "ZERO_HEAD": "Group has 0 head: IOFC per cow is not defined."
+    "ZERO_HEAD": "Group has 0 head: IOFC per cow is not defined.",
+    "SNAPSHOT_REFRESH": "A confirmed feeding is now available: refresh the head-count snapshot.",
+    "SNAPSHOT_REFRESH_ACTION": "Refresh snapshot",
+    "SNAPSHOT_REFRESHED": "Snapshot refreshed.",
+    "SNAPSHOT_REFRESH_FAILED": "Snapshot refresh failed."
   }
 }

@@ -124,6 +124,19 @@ import { localDateKey } from '../../core/utils/loading-math';
             {{ 'IOFC.AWAITING_FEEDING' | translate }}
           </div>
         }
+        @if (snapshotRefreshAvailable) {
+          <div class="banner warning">
+            {{ 'IOFC.SNAPSHOT_REFRESH' | translate }}
+            <button
+              mat-button
+              color="primary"
+              (click)="refreshSnapshot()"
+              [disabled]="saving"
+            >
+              {{ 'IOFC.SNAPSHOT_REFRESH_ACTION' | translate }}
+            </button>
+          </div>
+        }
         @if (incompleteSnapshot) {
           <div class="banner warning">
             {{ 'IOFC.INCOMPLETE_SNAPSHOT' | translate }}
@@ -293,23 +306,24 @@ export class IofcComponent implements OnInit {
     return this.records.find((record) => record.date === this.date);
   }
 
-  private get feedingForDate(): Feeding | undefined {
-    // TMR groups can have more than one feeding a day; the latest confirmed
-    // feeding reflects the herd at the time the milk record is entered.
-    return this.feedings
-      .filter(
-        (feeding) =>
-          feeding.date === this.date && feeding.status === 'confirmed',
-      )
-      .sort(
-        (a, b) =>
-          (b.createdAt?.getTime?.() ?? 0) -
-          (a.createdAt?.getTime?.() ?? 0),
-      )[0];
+  private get confirmedFeedingsForDate(): Feeding[] {
+    return this.feedings.filter(
+      (feeding) =>
+        feeding.date === this.date && feeding.status === 'confirmed',
+    );
   }
 
   get hasFeedingForDate(): boolean {
-    return !!this.feedingForDate;
+    return this.confirmedFeedingsForDate.length > 0;
+  }
+
+  get snapshotRefreshAvailable(): boolean {
+    const record = this.recordForDate;
+    return (
+      !!record &&
+      record.hasFeedingSnapshot === false &&
+      this.hasFeedingForDate
+    );
   }
 
   get zeroHeadCount(): boolean {
@@ -321,7 +335,16 @@ export class IofcComponent implements OnInit {
   }
 
   private get headCountForEntry(): number {
-    return this.feedingForDate?.animalCount ?? this.group?.headCount ?? 0;
+    // The day's feed cost is per head per day; when the herd changes between
+    // feedings, use the average fed count, not the latest or the current
+    // group count. With no confirmed feeding, fall back to the group count.
+    const feedings = this.confirmedFeedingsForDate;
+    if (feedings.length === 0) return this.group?.headCount ?? 0;
+    const total = feedings.reduce(
+      (sum, feeding) => sum + feeding.animalCount,
+      0,
+    );
+    return total / feedings.length;
   }
 
   get incompleteSnapshot(): boolean {
@@ -465,6 +488,50 @@ export class IofcComponent implements OnInit {
     } else {
       this.milkKg = 0;
       this.milkPricePerKg = this.farmMilkPrice ?? 0.5;
+    }
+  }
+
+  async refreshSnapshot(): Promise<void> {
+    const group = this.group;
+    const record = this.recordForDate;
+    if (!group?.id || !record) return;
+    const feedCost =
+      record.feedCostPerHeadSnapshot ?? this.feedCostPerHead;
+    if (feedCost === null) {
+      this.snackBar.open(
+        this.translate.instant('IOFC.NO_COST'),
+        undefined,
+        { duration: 4000 },
+      );
+      return;
+    }
+    this.saving = true;
+    try {
+      await this.milkService.saveRecord({
+        herdGroupId: group.id,
+        date: record.date,
+        milkKg: record.milkKg,
+        milkPricePerKg: record.milkPricePerKg,
+        feedCostPerHeadSnapshot: feedCost,
+        headCountSnapshot: this.headCountForEntry,
+        hasFeedingSnapshot: true,
+      });
+      await this.loadRecords(group.id);
+      this.applyRecordForDate();
+      this.snackBar.open(
+        this.translate.instant('IOFC.SNAPSHOT_REFRESHED'),
+        undefined,
+        { duration: 3000 },
+      );
+    } catch (error) {
+      console.error('Failed to refresh milk snapshot', error);
+      this.snackBar.open(
+        this.translate.instant('IOFC.SNAPSHOT_REFRESH_FAILED'),
+        undefined,
+        { duration: 5000 },
+      );
+    } finally {
+      this.saving = false;
     }
   }
 
