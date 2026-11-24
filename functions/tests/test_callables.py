@@ -1137,3 +1137,34 @@ def test_set_farm_milk_price_audits_and_denies_a_feeder():
         _handler(main.set_farm_milk_price)(
             _Req("feeder_user", {"farmId": "f1", "milkPricePerKg": 0.6})
         )
+
+
+def test_bulk_retry_resolves_three_dead_failures():
+    _prepare_inventory(1000)
+    for index, loaded in enumerate((10, 20, 30), start=1):
+        feeding_id = f"feeding-bulk-{index}"
+        _create_feeding(
+            feeding_id=feeding_id,
+            lines=_feeding_lines(
+                line_ids=(f"bulk-line-{index}",), loaded=(loaded,)
+            ),
+        )
+        _failure_doc(feeding_id, status="dead", retry_count=5)
+
+    result = _handler(main.retry_feeding_failures)(
+        _Req("owner", {"farmId": "f1"})
+    )
+    assert result["resolved"] == 3
+    assert result["failed"] == 0
+    assert _on_hand("feed1")["onHandKgAsFed"] == 940
+
+    for index in (1, 2, 3):
+        failure = (
+            DB.collection("farms")
+            .document("f1")
+            .collection("feedingTriggerFailures")
+            .document(f"feeding-bulk-{index}")
+            .get()
+            .to_dict()
+        )
+        assert failure["status"] == "resolved"
