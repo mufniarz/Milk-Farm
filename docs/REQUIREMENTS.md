@@ -30,14 +30,14 @@ numbers.
 |---|---|---|
 | Type/build | `npx ng build` | pass |
 | Solver + export + golden ration | `pytest tests -q` | 18 passed (the 10 callable/trigger tests skip without the emulator) |
-| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 12 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting |
+| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 14 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting (single, overdrawn, duplicate-feed, dedup, cleared audit) |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading and accuracy math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 17 passed — 3 calculator parity + 6 loading math (incl. local date) + 8 accuracy (drafts excluded, pending included, corrections/anomalies flagged, aggregation, intake efficiency, Italian CSV) |
+| Client engine, loading and accuracy math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 18 passed — 3 calculator parity + 6 loading math (incl. local date) + 9 accuracy (drafts excluded, pending included, corrections/anomalies flagged, aggregation, intake efficiency incl. zero-loaded null, Italian CSV) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
-| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 13 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions |
+| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 14 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, feeder-own feedings only |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 30 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 12 callable/trigger) |
+| Full suite incl. callables | `npm run test:functions` | 32 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 14 callable/trigger/retroactive) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -157,7 +157,10 @@ The feeding document/trigger half is in place; the loading sheet is next.
   with the error, and retry from a scheduled/admin action; (b) if using the
   deploy-level option, `gcloud functions deploy on_feeding_confirmed --gen2
   --retry ...` is a full redeploy with the complete source/trigger config, not
-  a toggle. The `inventoryPostedAt` guard makes either path safe.
+  a toggle. The `inventoryPostedAt` guard makes either path safe. **The
+  failure queue is a pre-deploy requirement for the trigger, not a
+  post-deploy nice-to-have:** without retry, a transient failure silently
+  loses a feeding's inventory posting.
 
 ## I. Feeder accuracy report
 
@@ -189,9 +192,13 @@ The report is the first consumer of the ingestion/loading trail. Decisions:
   `100 x (1 - refused / loaded)` alongside deviation; the CSV keeps the
   per-line refusal.
 - **Access control.** The page shows a restricted message for feeder-role
-  users (owner/admin/consultant only). The Firestore rules still allow any
-  member to read feedings, so this is a UI restriction, not enforcement; a
-  callable/report collection is the eventual rule-level fix.
+  users (owner/admin/consultant only). The feedings read rule now also scopes
+  feeder-role accounts to documents whose `createdBy` is their own uid, so a
+  feeder cannot read colleagues' loads through the collection (the accuracy
+  page's `getFeedings` query carries the matching `createdBy` filter). A
+  server-side report callable is still the right consultant-scale path.
+- **Intake divide-by-zero.** `loaded = 0` yields `intakeEfficiencyPct: null`
+  (rendered `—`), consistent with `computeDeviationPct`.
 - **Identical feeder names.** Feeder identity is a name; two people called
   "Marco" aggregate. The report is where that becomes visible; a true feeder
   account is the eventual fix.
@@ -220,10 +227,26 @@ Implemented as a separate, auditable action:
   transaction, removes the posted lines from `inventorySkippedLines` /
   `inventorySkippedFeedIds`, and writes `inventory.retroactive` audit entries
   with `sourceFeedingId` and `sourceLineId`.
-- **Reconciliation.** After posting, the callable recomputes the item's
-  on-hand from the ledger, so an existing drift is corrected immediately.
+- **Overdraft.** The `inventory.retroactive` audit carries the per-line
+  `onHandBeforeKgAsFed`, `onHandAfterKgAsFed` and `overdrawn` boolean. The
+  feeding's own `inventoryOverdrawn` stays empty: the shortfall belongs to
+  the retroactive adjustment, not the original confirmation.
+- **Duplicate feeds.** A feeding with two skipped lines for the same feed
+  posts two per-line ledger entries and updates on-hand once with the
+  aggregate; the test asserts `-20` and `-30` entries and on-hand `50`.
+- **Dedup.** `inventorySkippedFeedIds` is a set; two skipped lines for one
+  feed produce a single array element (tested).
+- **Cleared audit.** Removing posted lines from `inventorySkippedLines` is
+  itself audited as `feeding.skipped_cleared` with
+  `clearedSkippedLineIds`, so the feeding mutation is not invisible.
+- **Reconciliation scope.** The callable reconciles the affected item from
+  its ledger; the nightly global reconciliation still runs and should agree.
+  Both `consumption` and `adjustment` entries count as on-hand deltas.
+- **Dates.** Ledger entries carry the original feeding's local `date`; their
+  `createdAt` timestamp and the audit `at` reflect the retroactive moment.
 - **Retry-safe.** Deterministic ledger ids mean a replay posts nothing twice;
-  the test asserts a second call returns `postedLines: 0`.
+  a second call returns `postedLines: 0, alreadyPosted: N`, so the operator
+  sees why nothing changed.
 - **UI.** The inventory page has a "Post skipped loads" action on the
   selected item; the callable reports how many lines it posted.
 

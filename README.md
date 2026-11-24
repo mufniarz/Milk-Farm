@@ -164,4 +164,17 @@ inventory and target overrides require `farmMembers`.
   not a toggle. The `inventoryPostedAt` guard makes retry safe when enabled.
 - Feeds that were loaded before they had an inventory item can be posted
   after the fact from the inventory page ("Post skipped loads"), which calls
-  `post_skipped_consumption` and audits each line as `inventory.retroactive`.
+  `post_skipped_consumption` and audits each line as `inventory.retroactive`
+  with before/after and an `overdrawn` flag. The feeding mutation is audited
+  as `feeding.skipped_cleared`; a second call returns `postedLines: 0,
+  alreadyPosted: N`. Ledger entries carry the original feeding date, while
+  their timestamps reflect the retroactive moment. Duplicate skipped lines
+  for one feed post per-line entries and update on-hand once.
+- Feeder-role accounts read only their own feedings at the rules level
+  (`createdBy == uid`), and the report UI is restricted to
+  owner/admin/consultant; a server-side report callable is the consultant-scale
+  path.
+- **Pre-deploy requirement:** the trigger failure queue/alert must exist
+  before the trigger is deployed. The SDK cannot enable retry (0.6.0 stable and
+  0.7.0rc0 both hardcode `retry=False`), so a transient failure otherwise
+  loses the inventory posting silently.

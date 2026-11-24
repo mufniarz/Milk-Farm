@@ -476,6 +476,7 @@ def test_feeding_trigger_posts_each_line_once():
     assert sorted(entry["deltaKgAsFed"] for entry in ledger) == [-100.0, -50.0]
     assert all(entry["type"] == "consumption" for entry in ledger)
     assert all(entry["sourceType"] == "feeding" for entry in ledger)
+    assert all(entry["date"] == "2026-11-24" for entry in ledger)
 
     feeding = (
         DB.collection("farms")
@@ -534,7 +535,11 @@ def test_feeding_trigger_ignores_drafts():
 def test_feeding_trigger_skips_an_untracked_feed():
     _prepare_inventory(1000)
     after = _create_feeding(
-        lines=_feeding_lines(feed_id="missing-feed", line_ids=("line-x",), loaded=(40,))
+        lines=_feeding_lines(
+            feed_id="missing-feed",
+            line_ids=("line-x", "line-y"),
+            loaded=(40, 10),
+        )
     )
 
     _trigger(_TriggerEvent(after, {"farmId": "f1", "feedingId": "feeding1"}))
@@ -550,7 +555,8 @@ def test_feeding_trigger_skips_an_untracked_feed():
         .to_dict()
     )
     assert feeding["inventorySkippedLines"] == [
-        {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
+        {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"},
+        {"lineId": "line-y", "feedId": "missing-feed", "feedName": "Silage"},
     ]
     assert feeding["inventorySkippedFeedIds"] == ["missing-feed"]
     assert feeding["inventoryOverdrawn"] == []
@@ -567,7 +573,8 @@ def test_feeding_trigger_skips_an_untracked_feed():
     )
     assert confirm_audit["inventoryPosted"] == []
     assert confirm_audit["skipped"] == [
-        {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
+        {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"},
+        {"lineId": "line-y", "feedId": "missing-feed", "feedName": "Silage"},
     ]
     assert confirm_audit["skippedFeedIds"] == ["missing-feed"]
 
@@ -731,6 +738,7 @@ def test_retroactive_posting_posts_skipped_lines_once():
     assert len(adjustments) == 1
     assert adjustments[0]["deltaKgAsFed"] == -40
     assert adjustments[0]["sourceType"] == "retroactive"
+    assert adjustments[0]["date"] == "2026-11-20"
 
     feeding = (
         DB.collection("farms")
@@ -755,12 +763,18 @@ def test_retroactive_posting_posts_skipped_lines_once():
     assert retro[0]["sourceFeedingId"] == "feeding-skip"
     assert retro[0]["sourceLineId"] == "sl1"
     assert retro[0]["deltaKgAsFed"] == -40
+    cleared = [
+        entry for entry in audits if entry["action"] == "feeding.skipped_cleared"
+    ]
+    assert len(cleared) == 1
+    assert cleared[0]["clearedSkippedLineIds"] == ["sl1"]
 
     # Replaying the callable must not double-post.
     again = _handler(main.post_skipped_consumption)(
         _Req("owner", {"farmId": "f1", "feedId": "feed2"})
     )
     assert again["postedLines"] == 0
+    assert again["alreadyPosted"] == 1
     assert _on_hand("feed2")["onHandKgAsFed"] == 60
     assert (
         len(
@@ -773,3 +787,178 @@ def test_retroactive_posting_posts_skipped_lines_once():
         )
         == 1
     )
+
+
+def test_retroactive_posting_flags_an_overdraft():
+    _prepare_inventory(1000)
+    DB.collection("feeds").document("feed2").set(
+        {
+            "name": "Hay",
+            "farmId": "f1",
+            "category": "forage",
+            "pricePerKg": 0.1,
+            "moisturePct": 10,
+            "isAvailable": True,
+            "nutrients": {},
+        }
+    )
+    _handler(main.upsert_inventory_item)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed2"})
+    )
+    _handler(main.record_delivery)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedId": "feed2",
+                "quantityKgAsFed": 20,
+                "unitCostPerKgAsFed": 0.1,
+                "idempotencyKey": "delivery-feed2-small",
+            },
+        )
+    )
+    DB.collection("farms").document("f1").collection("feedings").document(
+        "feeding-od"
+    ).set(
+        {
+            "farmId": "f1",
+            "date": "2026-11-20",
+            "herdGroupId": "g1",
+            "recipeId": "r1",
+            "animalCount": 100,
+            "feederId": "feeder-1",
+            "status": "confirmed",
+            "lines": [
+                {
+                    "lineId": "od1",
+                    "feedId": "feed2",
+                    "feedName": "Hay",
+                    "calledKgAsFed": 40,
+                    "loadedKgAsFed": 40,
+                    "costPerKgAsFed": 0.1,
+                }
+            ],
+            "refusedKgAsFed": 0,
+            "idempotencyKey": "od-1",
+            "createdBy": "owner",
+            "inventoryPostedAt": firestore.SERVER_TIMESTAMP,
+            "inventorySkippedLines": [
+                {"lineId": "od1", "feedId": "feed2", "feedName": "Hay"}
+            ],
+            "inventorySkippedFeedIds": ["feed2"],
+        }
+    )
+
+    result = _handler(main.post_skipped_consumption)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed2"})
+    )
+    assert result["onHandKgAsFed"] == -20
+    assert _on_hand("feed2")["onHandKgAsFed"] == -20
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    retro = [entry for entry in audits if entry["action"] == "inventory.retroactive"]
+    assert len(retro) == 1
+    assert retro[0]["onHandBeforeKgAsFed"] == 20
+    assert retro[0]["onHandAfterKgAsFed"] == -20
+    assert retro[0]["overdrawn"] is True
+
+
+def test_retroactive_posting_handles_two_skipped_lines_for_one_feed():
+    _prepare_inventory(1000)
+    DB.collection("feeds").document("feed2").set(
+        {
+            "name": "Hay",
+            "farmId": "f1",
+            "category": "forage",
+            "pricePerKg": 0.1,
+            "moisturePct": 10,
+            "isAvailable": True,
+            "nutrients": {},
+        }
+    )
+    _handler(main.upsert_inventory_item)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed2"})
+    )
+    _handler(main.record_delivery)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedId": "feed2",
+                "quantityKgAsFed": 100,
+                "unitCostPerKgAsFed": 0.1,
+                "idempotencyKey": "delivery-feed2-multi",
+            },
+        )
+    )
+    DB.collection("farms").document("f1").collection("feedings").document(
+        "feeding-multi"
+    ).set(
+        {
+            "farmId": "f1",
+            "date": "2026-11-20",
+            "herdGroupId": "g1",
+            "recipeId": "r1",
+            "animalCount": 100,
+            "feederId": "feeder-1",
+            "status": "confirmed",
+            "lines": [
+                {
+                    "lineId": "m1",
+                    "feedId": "feed2",
+                    "feedName": "Hay",
+                    "calledKgAsFed": 20,
+                    "loadedKgAsFed": 20,
+                    "costPerKgAsFed": 0.1,
+                },
+                {
+                    "lineId": "m2",
+                    "feedId": "feed2",
+                    "feedName": "Hay",
+                    "calledKgAsFed": 30,
+                    "loadedKgAsFed": 30,
+                    "costPerKgAsFed": 0.1,
+                },
+            ],
+            "refusedKgAsFed": 0,
+            "idempotencyKey": "multi-1",
+            "createdBy": "owner",
+            "inventoryPostedAt": firestore.SERVER_TIMESTAMP,
+            "inventorySkippedLines": [
+                {"lineId": "m1", "feedId": "feed2", "feedName": "Hay"},
+                {"lineId": "m2", "feedId": "feed2", "feedName": "Hay"},
+            ],
+            "inventorySkippedFeedIds": ["feed2"],
+        }
+    )
+
+    result = _handler(main.post_skipped_consumption)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed2"})
+    )
+    assert result["postedLines"] == 2
+    assert result["onHandKgAsFed"] == 50
+    assert _on_hand("feed2")["onHandKgAsFed"] == 50
+    adjustments = [
+        entry
+        for entry in _ledger()
+        if entry["itemId"] == "feed2" and entry["type"] == "adjustment"
+    ]
+    assert len(adjustments) == 2
+    assert sorted(entry["deltaKgAsFed"] for entry in adjustments) == [-30.0, -20.0]
+    assert all(entry["date"] == "2026-11-20" for entry in adjustments)
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding-multi")
+        .get()
+        .to_dict()
+    )
+    assert feeding["inventorySkippedLines"] == []
+    assert feeding["inventorySkippedFeedIds"] == []

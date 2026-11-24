@@ -37,6 +37,8 @@ export interface InventoryTransaction {
   unitCostPerKgAsFed: number;
   sourceType: 'manual' | 'feeding' | 'retroactive';
   sourceId: string;
+  /** The feeding's local date; the ledger timestamp is when it was written. */
+  date?: string;
   idempotencyKey: string;
   createdBy?: string;
   createdAt?: Date;

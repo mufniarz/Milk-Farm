@@ -51,13 +51,31 @@ export class FeedingService {
     return this.farmId$.pipe(
       switchMap((farmId) => {
         const ref = collection(this.firestore, 'farms', farmId, 'feedings');
-        const q = herdGroupId
-          ? query(
-              ref,
-              where('herdGroupId', '==', herdGroupId),
-              orderBy('createdAt', 'desc'),
-            )
-          : query(ref, orderBy('createdAt', 'desc'));
+        const role = this.farmContext.activeRole();
+        const uid = this.auth.currentUser()?.uid ?? '';
+        // A feeder account may read only its own feedings; the rules
+        // enforce the same condition, so the query must carry the filter.
+        const q =
+          role === 'feeder'
+            ? herdGroupId
+              ? query(
+                  ref,
+                  where('createdBy', '==', uid),
+                  where('herdGroupId', '==', herdGroupId),
+                  orderBy('createdAt', 'desc'),
+                )
+              : query(
+                  ref,
+                  where('createdBy', '==', uid),
+                  orderBy('createdAt', 'desc'),
+                )
+            : herdGroupId
+              ? query(
+                  ref,
+                  where('herdGroupId', '==', herdGroupId),
+                  orderBy('createdAt', 'desc'),
+                )
+              : query(ref, orderBy('createdAt', 'desc'));
         return collectionData(q, { idField: 'id' }) as Observable<Feeding[]>;
       }),
     );

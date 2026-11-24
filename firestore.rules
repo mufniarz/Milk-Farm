@@ -123,7 +123,18 @@ service cloud.firestore {
       // the document is immutable from the client and the inventory trigger
       // writes inventoryPostedAt with the Admin SDK.
       match /feedings/{feedingId} {
-        allow read: if isMember(farmId);
+        // A feeder account sees only the feedings it entered; owner,
+        // farmAdmin and consultant see the farm's feedings. The accuracy
+        // report is also restricted in the UI; a report callable is the
+        // eventual server-side aggregation path.
+        allow read: if isMember(farmId)
+          && (
+            hasRole(farmId, ['owner', 'farmAdmin', 'consultant'])
+            || (
+              hasRole(farmId, ['feeder'])
+              && resource.data.createdBy == request.auth.uid
+            )
+          );
         allow create: if hasRole(
           farmId,
           ['owner', 'farmAdmin', 'consultant', 'feeder']

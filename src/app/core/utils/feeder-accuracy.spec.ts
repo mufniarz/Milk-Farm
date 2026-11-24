@@ -100,6 +100,27 @@ describe('feeder accuracy math', () => {
     expect(summary.weekly[0].weekStart).toBe('2026-11-16');
   });
 
+  it('returns null intake efficiency when nothing was loaded', () => {
+    const rows = buildAccuracyRows([
+      feeding({
+        refusedKgAsFed: 5,
+        lines: [
+          {
+            lineId: 'z1',
+            feedId: 'hay',
+            feedName: 'Hay',
+            calledKgAsFed: 0,
+            loadedKgAsFed: 0,
+            costPerKgAsFed: 0.2,
+          },
+        ],
+      }),
+    ]);
+    const [summary] = summarizeByFeeder(rows);
+    expect(summary.loadedKgAsFed).toBe(0);
+    expect(summary.intakeEfficiencyPct).toBeNull();
+  });
+
   it('returns an empty summary for an empty window', () => {
     expect(summarizeByFeeder([])).toEqual([]);
   });

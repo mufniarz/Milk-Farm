@@ -989,6 +989,7 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
                     "sourceType": "feeding",
                     "sourceId": line_id,
                     "idempotencyKey": f"{farm_id}_{feeding_id}_{line_id}",
+                    "date": current_data.get("date"),
                     "createdBy": current_data.get("createdBy"),
                     "createdAt": firestore.SERVER_TIMESTAMP,
                     "note": f"feeding {feeding_id}",
@@ -1137,6 +1138,7 @@ def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
                     "sourceType": "retroactive",
                     "sourceId": line_id,
                     "idempotencyKey": f"{farm_id}_{feeding_id}_{line_id}",
+                    "date": current_data.get("date"),
                     "createdBy": uid,
                     "createdAt": firestore.SERVER_TIMESTAMP,
                     "note": f"retroactive feeding {feeding_id}",
@@ -1172,6 +1174,24 @@ def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
                 "inventorySkippedFeedIds": remaining_feed_ids,
             },
         )
+        cleared_ids = [
+            line.get("lineId") for line in matching if line.get("lineId")
+        ]
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "feeding.skipped_cleared",
+                "farmId": farm_id,
+                "feedingId": feeding_id,
+                "clearedSkippedLineIds": cleared_ids,
+                "remainingSkippedFeedIds": remaining_feed_ids,
+                "actorUid": uid,
+                "actorEmail": email,
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
         for line_id, line_before, line_after in audit_lines:
             _write_audit(
                 transaction,
@@ -1186,6 +1206,7 @@ def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
                     "deltaKgAsFed": -(line_before - line_after),
                     "onHandBeforeKgAsFed": line_before,
                     "onHandAfterKgAsFed": line_after,
+                    "overdrawn": line_after < 0,
                     "actorUid": uid,
                     "actorEmail": email,
                     "at": firestore.SERVER_TIMESTAMP,
@@ -1212,6 +1233,15 @@ def post_skipped_consumption(req: https_fn.CallableRequest):
     farm_id = _require_string(data, "farmId")
     feed_id = _require_string(data, "feedId")
     db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
+
+    transactions = db.collection("farms").document(farm_id).collection(
+        "inventoryTransactions"
+    )
+    already_posted = sum(
+        1
+        for entry in transactions.where("itemId", "==", feed_id).stream()
+        if (entry.to_dict() or {}).get("sourceType") == "retroactive"
+    )
 
     feedings = list(
         db.collection("farms")
@@ -1253,6 +1283,7 @@ def post_skipped_consumption(req: https_fn.CallableRequest):
     return {
         "ok": True,
         "postedLines": posted,
+        "alreadyPosted": already_posted,
         "feedings": touched,
         "onHandKgAsFed": total,
     }

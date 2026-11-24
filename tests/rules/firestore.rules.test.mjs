@@ -109,6 +109,15 @@ beforeEach(async () => {
       status: 'draft',
       lines: [],
       idempotencyKey: 'feeding-key-1',
+      createdBy: 'feeder',
+    });
+    await setDoc(doc(db, 'farms', 'f1', 'feedings', 'feeding-other'), {
+      farmId: 'f1',
+      herdGroupId: 'g1',
+      status: 'draft',
+      lines: [],
+      idempotencyKey: 'feeding-key-other',
+      createdBy: 'member',
     });
     await setDoc(doc(db, 'farms', 'f1', 'inventoryItems', 'feed1'), {
       feedId: 'feed1',
@@ -308,5 +317,21 @@ test('an outsider cannot read feeders', async () => {
   const other = dbFor('other');
   await assertFails(
     getDoc(doc(other, 'farms', 'f1', 'feeders', 'feeder1')),
+  );
+});
+
+
+test('a feeder account reads only the feedings it entered', async () => {
+  const feeder = dbFor('feeder');
+  await assertSucceeds(
+    getDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1')),
+  );
+  await assertFails(
+    getDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding-other')),
+  );
+
+  const member = dbFor('member');
+  await assertSucceeds(
+    getDoc(doc(member, 'farms', 'f1', 'feedings', 'feeding-other')),
   );
 });
