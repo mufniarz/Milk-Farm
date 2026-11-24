@@ -64,15 +64,27 @@ For more information on using the Angular CLI, including detailed command refere
 npm run verify   # parser diff + calculator smoke + i18n + build
 npx ng test --watch=false --browsers=ChromeHeadlessNoSandbox
 cd functions && ./venv/bin/python -m pytest -q
-# Callable transaction tests need the emulator:
-FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
-  ./venv/bin/python -m pytest tests/test_callables.py -q
-FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
+# Full suite including the callable tests (needs the emulator):
+npm run test:functions
+
+# Backfill verification against the emulator:
+node scripts/seed-emulator-backfill.cjs
+npm run backfill:members -- --dry-run
+npm run backfill:members
+# Add --negative to the seed to exercise the non-zero exit path:
+node scripts/seed-emulator-backfill.cjs --negative
+npm run backfill:members
+XDG_CONFIG_HOME=./.firebase-config FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
   npx firebase emulators:exec --only firestore --project demo-milk-farm "npm run test:rules"
 ```
 
 `scripts/check-calculator.mts` is ESM TypeScript (`.mts`) because it runs
-directly under Node's type stripping; keep the extension. The parity chain
+directly under Node's type stripping; keep the extension. `scripts/backfill-members.mts`
+uses the same runner.
+
+`pytest` without the emulator skips the 7 callable tests. `npm run test:functions`
+runs the full suite through the emulator with `REQUIRE_EMULATOR=1`, so a missing
+emulator fails instead of silently skipping. The parity chain
 (workbook -> fixtures -> computed) is described in
 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
@@ -80,10 +92,11 @@ directly under Node's type stripping; keep the extension. The parity chain
 
 1. Run the membership backfill: `npm run backfill:members -- --dry-run`, then
    run it for real and confirm zero uncovered farms and zero users with a
-   `farmId` but no active membership. **The backfill has not yet been executed
-   against any dataset.** Inspect the dry-run report before the real run, and
-   do not treat a zero exit as proof of coverage until the two counts are
-   independently verified.
+   `farmId` but no active membership. The script is verified against a seeded
+   emulator (dry-run matches the real run, the second run is a no-op, an
+   uncovered farm exits 1), but **it has not been run against the target
+   database**. Inspect the dry-run report before the real run, and confirm the
+   two counts independently.
 2. Deploy `firestore.indexes.json` (the `farmMembers(uid,status)` lookup is on
    the hot path).
 3. Deploy the five callables in `functions/main.py`.

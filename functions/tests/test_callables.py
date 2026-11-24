@@ -20,11 +20,15 @@ import os
 import pytest
 
 EMULATOR_HOST = os.environ.get("FIRESTORE_EMULATOR_HOST")
+REQUIRE_EMULATOR = os.environ.get("REQUIRE_EMULATOR") == "1"
 if not EMULATOR_HOST:
-    pytest.skip(
-        "Set FIRESTORE_EMULATOR_HOST (use the Firestore emulator) to run these tests.",
-        allow_module_level=True,
+    message = (
+        "SKIPPED: Firestore emulator not running — callable tests did not "
+        "execute. Set FIRESTORE_EMULATOR_HOST or run `npm run test:functions`."
     )
+    if REQUIRE_EMULATOR:
+        raise RuntimeError(message)
+    pytest.skip(message, allow_module_level=True)
 
 import firebase_admin  # noqa: E402
 from firebase_admin import firestore  # noqa: E402
@@ -355,3 +359,179 @@ def test_record_delivery_requires_an_inventory_item():
                 },
             )
         )
+
+
+# ── Feeding confirmation trigger ─────────────────────────────────────────────
+
+from firebase_functions.core import Change  # noqa: E402
+
+
+class _TriggerEvent:
+    def __init__(self, after, params):
+        self.data = Change(before=None, after=after)
+        self.params = params
+
+
+def _feeding_lines(feed_id="feed1", line_ids=("line-1",), loaded=(100,)):
+    return [
+        {
+            "lineId": line_id,
+            "feedId": feed_id,
+            "feedName": "Silage",
+            "calledKgAsFed": kg,
+            "loadedKgAsFed": kg,
+            "costPerKgAsFed": 0.12,
+        }
+        for line_id, kg in zip(line_ids, loaded)
+    ]
+
+
+def _create_feeding(feeding_id="feeding1", status="confirmed", lines=None):
+    ref = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document(feeding_id)
+    )
+    ref.set(
+        {
+            "farmId": "f1",
+            "date": "2026-11-24",
+            "herdGroupId": "group-1",
+            "recipeId": "recipe-1",
+            "animalCount": 100,
+            "feederId": "feeder-1",
+            "status": status,
+            "lines": lines or _feeding_lines(),
+            "refusedKgAsFed": 0,
+            "idempotencyKey": f"feeding-{feeding_id}",
+            "createdBy": "owner",
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        }
+    )
+    return ref.get()
+
+
+def _trigger(event):
+    return _handler(main.on_feeding_confirmed)(event)
+
+
+def _on_hand(feed_id="feed1"):
+    return (
+        DB.collection("farms")
+        .document("f1")
+        .collection("inventoryItems")
+        .document(feed_id)
+        .get()
+        .to_dict()
+    )
+
+
+def _ledger():
+    return [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("inventoryTransactions")
+        .stream()
+    ]
+
+
+def _consumption_ledger():
+    return [entry for entry in _ledger() if entry["type"] == "consumption"]
+
+
+def _prepare_inventory(quantity=1000):
+    seed()
+    _handler(main.upsert_inventory_item)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed1", "unitCostPerKgAsFed": 0.12})
+    )
+    _handler(main.record_delivery)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedId": "feed1",
+                "quantityKgAsFed": quantity,
+                "unitCostPerKgAsFed": 0.12,
+                "idempotencyKey": "delivery-seed",
+            },
+        )
+    )
+
+
+def test_feeding_trigger_posts_each_line_once():
+    _prepare_inventory(1000)
+    after = _create_feeding(
+        lines=_feeding_lines(
+            line_ids=("line-1", "line-2"), loaded=(100, 50)
+        )
+    )
+
+    _trigger(_TriggerEvent(after, {"farmId": "f1", "feedingId": "feeding1"}))
+
+    assert _on_hand()["onHandKgAsFed"] == 850
+    ledger = _consumption_ledger()
+    assert len(ledger) == 2
+    assert sorted(entry["deltaKgAsFed"] for entry in ledger) == [-100.0, -50.0]
+    assert all(entry["type"] == "consumption" for entry in ledger)
+    assert all(entry["sourceType"] == "feeding" for entry in ledger)
+
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding1")
+        .get()
+        .to_dict()
+    )
+    assert feeding["inventoryPostedAt"] is not None
+    assert feeding["inventoryPostedLines"] == 2
+    assert feeding["inventorySkippedLines"] == []
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    assert any(entry["action"] == "feeding.confirm" for entry in audits)
+
+    # A retry (the trigger fires again after its own update) must not
+    # double-deplete.
+    _trigger(_TriggerEvent(after, {"farmId": "f1", "feedingId": "feeding1"}))
+    assert _on_hand()["onHandKgAsFed"] == 850
+    assert len(_consumption_ledger()) == 2
+
+
+def test_feeding_trigger_ignores_drafts():
+    _prepare_inventory(1000)
+    after = _create_feeding(status="draft")
+
+    _trigger(_TriggerEvent(after, {"farmId": "f1", "feedingId": "feeding1"}))
+
+    assert _on_hand()["onHandKgAsFed"] == 1000
+    assert _consumption_ledger() == []
+
+
+def test_feeding_trigger_skips_an_untracked_feed():
+    _prepare_inventory(1000)
+    after = _create_feeding(
+        lines=_feeding_lines(feed_id="missing-feed", line_ids=("line-x",), loaded=(40,))
+    )
+
+    _trigger(_TriggerEvent(after, {"farmId": "f1", "feedingId": "feeding1"}))
+
+    assert _on_hand()["onHandKgAsFed"] == 1000
+    assert _consumption_ledger() == []
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding1")
+        .get()
+        .to_dict()
+    )
+    assert feeding["inventorySkippedLines"] == ["line-x"]
+    assert feeding["inventoryPostedAt"] is not None

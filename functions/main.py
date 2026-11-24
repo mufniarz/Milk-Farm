@@ -7,7 +7,7 @@ and the Excel export function for recipe downloads.
 import base64
 import io
 
-from firebase_functions import https_fn, options
+from firebase_functions import firestore_fn, https_fn, options
 from firebase_admin import firestore, initialize_app
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -861,3 +861,155 @@ def adjust_inventory(req: https_fn.CallableRequest):
 
     apply(db.transaction())
     return {"ok": True, "itemId": item_id}
+
+
+# ── Feeding confirmation trigger ────────────────────────────────────────────
+# Posts the loaded quantities to the inventory ledger exactly once. The
+# feeding document is the client's; the trigger is the only writer of
+# inventoryPostedAt. The ledger doc id is deterministic, and the feeding is
+# re-read inside the transaction, so a retry or a concurrent invocation
+# cannot double-count.
+
+
+@firestore_fn.on_document_written(
+    document="farms/{farmId}/feedings/{feedingId}",
+    memory=options.MemoryOption.MB_256,
+    region="europe-west1",
+)
+def on_feeding_confirmed(event: firestore_fn.Event) -> None:
+    """Consume the loaded kg of a confirmed feeding from inventory."""
+    after = event.data.after if event.data else None
+    if after is None or not after.exists:
+        return
+    feeding = after.to_dict() or {}
+    if feeding.get("status") != "confirmed":
+        return
+
+    farm_id = event.params.get("farmId")
+    feeding_id = event.params.get("feedingId")
+    if not farm_id or not feeding_id:
+        return
+
+    db = firestore.client()
+    feeding_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("feedings")
+        .document(feeding_id)
+    )
+
+    @firestore.transactional
+    def apply(transaction):
+        current = feeding_ref.get(transaction=transaction)
+        if not current.exists:
+            return
+        current_data = current.to_dict() or {}
+        if current_data.get("inventoryPostedAt"):
+            return
+        if current_data.get("status") != "confirmed":
+            return
+
+        # Read phase: every read must happen before any write in a
+        # Firestore transaction.
+        prepared = []
+        for line in current_data.get("lines") or []:
+            line_id = line.get("lineId")
+            feed_id = line.get("feedId")
+            loaded = float(line.get("loadedKgAsFed") or 0)
+            if not line_id or not feed_id or loaded <= 0:
+                continue
+            ledger_ref = (
+                db.collection("farms")
+                .document(farm_id)
+                .collection("inventoryTransactions")
+                .document(f"{farm_id}_{feeding_id}_{line_id}")
+            )
+            ledger_snap = ledger_ref.get(transaction=transaction)
+            item_ref = _inventory_item_ref(db, farm_id, feed_id)
+            item_snap = item_ref.get(transaction=transaction)
+            prepared.append((line, ledger_ref, ledger_snap, item_ref, item_snap))
+
+        # Write phase. Aggregate by feed before updating: two lines of the
+        # same feed share one item snapshot, so writing `before - loaded` per
+        # line would let the second update overwrite the first with a stale
+        # on-hand value.
+        item_updates = {}
+        ledger_writes = []
+        skipped = []
+        for line, ledger_ref, ledger_snap, item_ref, item_snap in prepared:
+            if ledger_snap.exists:
+                continue
+            line_id = line.get("lineId")
+            if not item_snap.exists:
+                # The feed is not tracked; post the rest and surface the
+                # skipped line on the feeding for the UI to explain.
+                skipped.append(line_id)
+                continue
+            feed_id = line.get("feedId")
+            item_data = item_snap.to_dict() or {}
+            loaded = float(line.get("loadedKgAsFed") or 0)
+            if feed_id not in item_updates:
+                item_updates[feed_id] = {
+                    "ref": item_ref,
+                    "before": float(item_data.get("onHandKgAsFed") or 0),
+                    "loaded": 0.0,
+                }
+            item_updates[feed_id]["loaded"] += loaded
+            ledger_writes.append((ledger_ref, line, item_data))
+
+        for update in item_updates.values():
+            transaction.update(
+                update["ref"],
+                {
+                    "onHandKgAsFed": update["before"] - update["loaded"],
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                },
+            )
+        for ledger_ref, line, item_data in ledger_writes:
+            line_id = line.get("lineId")
+            loaded = float(line.get("loadedKgAsFed") or 0)
+            transaction.set(
+                ledger_ref,
+                {
+                    "itemId": line.get("feedId"),
+                    "type": "consumption",
+                    "deltaKgAsFed": -loaded,
+                    "unitCostPerKgAsFed": float(
+                        item_data.get("unitCostPerKgAsFed") or 0
+                    ),
+                    "sourceType": "feeding",
+                    "sourceId": line_id,
+                    "idempotencyKey": f"{farm_id}_{feeding_id}_{line_id}",
+                    "createdBy": current_data.get("createdBy"),
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                    "note": f"feeding {feeding_id}",
+                },
+            )
+        posted = len(ledger_writes)
+
+        transaction.update(
+            feeding_ref,
+            {
+                "inventoryPostedAt": firestore.SERVER_TIMESTAMP,
+                "inventoryPostedLines": posted,
+                "inventorySkippedLines": skipped,
+            },
+        )
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "feeding.confirm",
+                "farmId": farm_id,
+                "feedingId": feeding_id,
+                "herdGroupId": current_data.get("herdGroupId"),
+                "postedLines": posted,
+                "skippedLines": skipped,
+                "actorUid": current_data.get("createdBy"),
+                "actorEmail": None,
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())

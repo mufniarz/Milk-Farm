@@ -106,6 +106,30 @@ service cloud.firestore {
         );
       }
 
+      // ── Feedings (draft by the barn, confirmed once) ──
+      // A feeding is created as a draft and may be edited only while the
+      // stored status is draft. Confirmation is one client update; after it
+      // the document is immutable from the client and the inventory trigger
+      // writes inventoryPostedAt with the Admin SDK.
+      match /feedings/{feedingId} {
+        allow read: if isMember(farmId);
+        allow create: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant', 'feeder']
+        )
+          && request.resource.data.farmId == farmId
+          && request.resource.data.status == 'draft';
+        allow update: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant', 'feeder']
+        )
+          && resource.data.status == 'draft'
+          && request.resource.data.farmId == resource.data.farmId
+          && request.resource.data.status in ['draft', 'confirmed'];
+        allow delete: if hasRole(farmId, ['owner', 'farmAdmin'])
+          && resource.data.status == 'draft';
+      }
+
       // ── Inventory (callable-written, member-readable) ──
       match /inventoryItems/{itemId} {
         allow read: if isMember(farmId);

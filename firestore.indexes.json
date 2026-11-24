@@ -119,6 +119,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "feedings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "herdGroupId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

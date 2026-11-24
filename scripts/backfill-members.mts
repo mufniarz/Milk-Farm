@@ -4,20 +4,21 @@
  *
  * Run this BEFORE deploying the compatibility rules:
  *
- *   npx ts-node --transpile-only scripts/backfill-members.ts --dry-run
- *   npx ts-node --transpile-only scripts/backfill-members.ts
+ *   node --no-warnings --experimental-strip-types scripts/backfill-members.mts --dry-run
+ *   node --no-warnings --experimental-strip-types scripts/backfill-members.mts
  *
- * The script is idempotent: existing member documents are merged, not
- * replaced, and `createdAt` is preserved. It exits non-zero if any farm is
- * left without an owner membership or any user with a farmId is left without
- * an active membership, so a failed run cannot be mistaken for a successful
- * one.
+ * The script is idempotent: existing member documents are left untouched, so
+ * a consultant grant or a revoked membership is never overwritten, and
+ * `createdAt` is preserved. It exits non-zero if any farm is left without an
+ * owner membership or any user with a farmId is left without an active
+ * membership, so a failed run cannot be mistaken for a successful one.
  *
  * Requires `firebase-service-account.json` in the repo root (gitignored).
  */
-import { Firestore, Timestamp } from '@google-cloud/firestore';
-import * as fs from 'fs';
-import * as path from 'path';
+import { Firestore } from '@google-cloud/firestore';
+import type { Timestamp } from '@google-cloud/firestore';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 const KEY_PATH = 'firebase-service-account.json';
 const keyFile = path.resolve(KEY_PATH);
@@ -35,6 +36,10 @@ const db = new Firestore({
 });
 
 const dryRun = process.argv.includes('--dry-run');
+
+// Each membership is processed once even though owners are visited by both
+// the owner loop and the user loop; otherwise the report double-counts them.
+const processedMembers = new Set<string>();
 
 interface FarmDoc {
   id: string;
@@ -64,32 +69,36 @@ async function mergeMember(
   farmId: string,
   uid: string,
   role: 'owner' | 'farmAdmin',
-): Promise<'created' | 'updated' | 'unchanged'> {
-  const ref = db.collection('farmMembers').doc(memberId(farmId, uid));
+): Promise<'created' | 'updated' | 'unchanged' | 'skipped'> {
+  const id = memberId(farmId, uid);
+  if (processedMembers.has(id)) return 'skipped';
+  processedMembers.add(id);
+  const ref = db.collection('farmMembers').doc(id);
   const snapshot = await ref.get();
-  const existing = snapshot.exists ? snapshot.data() : null;
-  if (
-    existing &&
-    existing['role'] === role &&
-    existing['status'] === 'active'
-  ) {
+  if (snapshot.exists) {
+    const existing = snapshot.data() ?? {};
+    if (role === 'owner' && existing['role'] !== 'owner') {
+      console.warn(
+        `⚠️  ${memberId(farmId, uid)} exists with role ${existing['role']}; ` +
+          'leaving it unchanged (expected owner). Fix manually if needed.',
+      );
+    }
+    // Never overwrite an existing role or status: a consultant grant or a
+    // revoked access must survive a backfill re-run.
     return 'unchanged';
   }
   if (!dryRun) {
-    await ref.set(
-      {
-        farmId,
-        uid,
-        role,
-        status: 'active',
-        invitedBy: existing?.['invitedBy'] ?? null,
-        createdAt: existing?.['createdAt'] ?? new Date(),
-        updatedAt: new Date(),
-      },
-      { merge: true },
-    );
+    await ref.set({
+      farmId,
+      uid,
+      role,
+      status: 'active',
+      invitedBy: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
   }
-  return existing ? 'updated' : 'created';
+  return 'created';
 }
 
 async function main(): Promise<void> {
@@ -116,7 +125,7 @@ async function main(): Promise<void> {
       continue;
     }
     const result = await mergeMember(farm.id, farm.ownerUid, 'owner');
-    counts[result]++;
+    if (result !== 'skipped') counts[result]++;
   }
 
   for (const user of users) {
@@ -124,7 +133,7 @@ async function main(): Promise<void> {
     const farm = farmById.get(user.farmId);
     const role = farm?.ownerUid === user.uid ? 'owner' : 'farmAdmin';
     const result = await mergeMember(user.farmId, user.uid, role);
-    counts[result]++;
+    if (result !== 'skipped') counts[result]++;
   }
 
   if (dryRun) {

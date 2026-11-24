@@ -67,4 +67,4 @@ jobs:
           FIREBASE_CLI_DISABLE_UPDATE_CHECK: 'true'
         run: |
           npx firebase emulators:exec --only firestore --project demo-milk-farm \
-            "npm run test:rules && cd functions && python -m pytest tests/test_callables.py -q"
+            "npm run test:rules && cd functions && REQUIRE_EMULATOR=1 python -m pytest tests/test_callables.py -q"

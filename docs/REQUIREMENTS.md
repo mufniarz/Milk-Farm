@@ -29,14 +29,15 @@ numbers.
 | Check | Command | Result |
 |---|---|---|
 | Type/build | `npx ng build` | pass |
-| Solver + export + golden ration | `pytest tests -q` | 18 passed (the 7 callable tests skip without the emulator) |
-| Callable transaction logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 7 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard |
+| Solver + export + golden ration | `pytest tests -q` | 18 passed (the 10 callable/trigger tests skip without the emulator) |
+| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 10 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped) |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
 | Client engine vs workbook (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 3 passed — 17 codes at 0.03 pp, totals at 0.01 kg / 0.001 €, moisture/forage |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
-| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 9 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership |
-| Membership backfill | `npm run backfill:members` | implemented and idempotent; **not run against the target database** because deploy access is locked. Run the dry-run, then the real run, and confirm zero uncovered farms/users before deploying compatibility rules. |
+| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 11 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability |
+| Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `3 created / 1 unchanged` matched the real run; second run was `0 created / 4 unchanged`; an uncovered farm exited 1. Existing consultant role was preserved. **Not run against the target database** because deploy access is locked. |
+| Full suite incl. callables | `npm run test:functions` | 28 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 10 callable/trigger) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -44,6 +45,44 @@ The callable integration tests caught a real defect: the clear-override path
 required `minValue`/`maxValue`, so reverting an override failed validation.
 `_validate_override` now requires at least one bound only when setting an
 override; the clear path accepts the nutrient code alone.
+
+The emulator backfill run caught two more: the script overwrote an existing
+consultant membership with `farmAdmin`, and its dry-run double-counted owner
+memberships. `mergeMember` now leaves existing roles/status untouched and each
+membership is counted once; the seeded consultant survives with
+`role=consultant`. `pytest` without the emulator still skips the callable
+tests; `npm run test:functions` sets `REQUIRE_EMULATOR=1` so a missing
+emulator fails instead of silently skipping.
+
+The feeding trigger tests caught a real defect: two lines of the same feed
+shared one item snapshot, so the second write overwrote the first with a stale
+on-hand value (1000 became 950 instead of 850). The trigger now aggregates by
+feed before updating; the two-line same-feed test depletes the full quantity
+and posts two ledger entries.
+
+## H. Feeding increment
+
+The feeding document/trigger half is in place; the loading sheet is next.
+
+- `farms/{farmId}/feedings/{feedingId}` is created as a draft and may be
+  edited only while the stored status is draft. Confirmation is one client
+  update; afterwards the document is immutable from the client.
+- `FeedingLine.lineId` is a per-line UUID, not the feed id, because the same
+  feed can appear twice in one load.
+- The `on_feeding_confirmed` trigger re-reads the feeding inside a
+  transaction, returns if `inventoryPostedAt` is already set, reads every
+  per-line ledger doc before writing, aggregates consumption per feed, writes
+  the ledger entries, then marks the feeding. Ledger ids are deterministic
+  (`{farmId}_{feedingId}_{lineId}`), so a retry or a concurrent invocation
+  cannot double-post.
+- Untracked feeds are skipped and recorded in `inventorySkippedLines`; the
+  rest of the load still posts. Every confirmation writes a `feeding.confirm`
+  audit entry.
+- The feeding rules allow owner/admin/consultant/feeder to create a draft and
+  update a draft; confirmed documents are client-immutable; delete is
+  owner/admin and draft-only.
+- `FeedingService` in the client creates drafts, confirms them, and lists
+  feedings by herd group.
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 

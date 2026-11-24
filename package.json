@@ -8,11 +8,12 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "seed": "npx ts-node --transpile-only -P tsconfig.seed.json seed_firestore.ts",
-    "backfill:members": "npx ts-node --transpile-only scripts/backfill-members.ts",
+    "backfill:members": "node --no-warnings --experimental-strip-types scripts/backfill-members.mts",
     "check:calculator": "node --no-warnings --experimental-strip-types scripts/check-calculator.mts",
     "check:i18n": "node scripts/check-i18n.cjs",
     "verify": "node scripts/parse-excel.cjs && git diff --exit-code && npm run check:calculator && npm run check:i18n && npm run build",
-    "test:rules": "node --test tests/rules/firestore.rules.test.mjs"
+    "test:rules": "node --test tests/rules/firestore.rules.test.mjs",
+    "test:functions": "XDG_CONFIG_HOME=./.firebase-config CI=true npx firebase emulators:exec --only firestore --project demo-milk-farm \"cd functions && REQUIRE_EMULATOR=1 ./venv/bin/python -m pytest tests -q\""
   },
   "private": true,
   "dependencies": {

@@ -66,6 +66,13 @@ beforeEach(async () => {
       status: 'active',
       invitedBy: null,
     });
+    await setDoc(doc(db, 'farmMembers', 'f1_feeder'), {
+      farmId: 'f1',
+      uid: 'feeder',
+      role: 'feeder',
+      status: 'active',
+      invitedBy: null,
+    });
     await setDoc(doc(db, 'feeds', 'feed1'), {
       name: 'Silage',
       farmId: 'f1',
@@ -90,6 +97,13 @@ beforeEach(async () => {
       headCount: 100,
       activeRecipeId: null,
       externalId: null,
+    });
+    await setDoc(doc(db, 'farms', 'f1', 'feedings', 'feeding1'), {
+      farmId: 'f1',
+      herdGroupId: 'g1',
+      status: 'draft',
+      lines: [],
+      idempotencyKey: 'feeding-key-1',
     });
     await setDoc(doc(db, 'farms', 'f1', 'inventoryItems', 'feed1'), {
       feedId: 'feed1',
@@ -218,4 +232,45 @@ test('inactive membership is denied', async () => {
   });
   const db = dbFor('member');
   await assertFails(getDoc(doc(db, 'feeds', 'feed1')));
+});
+
+
+test('a feeder can create and confirm a draft feeding once', async () => {
+  const feeder = dbFor('feeder');
+  await assertSucceeds(
+    getDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1')),
+  );
+  await assertSucceeds(
+    setDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding2'), {
+      farmId: 'f1',
+      herdGroupId: 'g1',
+      status: 'draft',
+      lines: [],
+      idempotencyKey: 'feeding-key-2',
+    }),
+  );
+  await assertSucceeds(
+    updateDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1'), {
+      status: 'confirmed',
+    }),
+  );
+  // Once confirmed, the client can no longer edit the feeding.
+  await assertFails(
+    updateDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1'), {
+      status: 'draft',
+    }),
+  );
+});
+
+test('an outsider cannot create a feeding', async () => {
+  const other = dbFor('other');
+  await assertFails(
+    setDoc(doc(other, 'farms', 'f1', 'feedings', 'feeding3'), {
+      farmId: 'f1',
+      herdGroupId: 'g1',
+      status: 'draft',
+      lines: [],
+      idempotencyKey: 'feeding-key-3',
+    }),
+  );
 });
