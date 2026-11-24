@@ -82,7 +82,7 @@ XDG_CONFIG_HOME=./.firebase-config FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
 directly under Node's type stripping; keep the extension. `scripts/backfill-members.mts`
 uses the same runner.
 
-`pytest` without the emulator skips the 7 callable tests. `npm run test:functions`
+`pytest` without the emulator skips the 18 callable/trigger tests. `npm run test:functions`
 runs the full suite through the emulator with `REQUIRE_EMULATOR=1`, so a missing
 emulator fails instead of silently skipping. The parity chain
 (workbook -> fixtures -> computed) is described in
@@ -97,13 +97,21 @@ emulator fails instead of silently skipping. The parity chain
    uncovered farm exits 1), but **it has not been run against the target
    database**. Inspect the dry-run report before the real run, and confirm the
    two counts independently.
-2. Deploy `firestore.indexes.json` (the `farmMembers(uid,status)` lookup is on
-   the hot path).
-3. Deploy the five callables in `functions/main.py`.
+2. Deploy `firestore.indexes.json`. It includes the hot-path
+   `farmMembers(uid,status)`, `feedings(inventorySkippedFeedIds,status)`,
+   `milkRecords(herdGroupId,date)`, and the collection-group
+   `feedingTriggerFailures(status)` index the scheduled retry needs.
+3. Deploy the functions in `functions/main.py`: the eight callables
+   (target overrides x2, inventory x3, retro posting, failure retry, farm milk
+   price), the `on_feeding_confirmed` trigger, and the
+   `scheduled_feeding_retry` scheduled function. The scheduled function
+   requires Cloud Scheduler; `firebase deploy --only functions` creates it.
 4. Deploy the compatibility rules and hosting in the same window.
+5. Deploy the trigger and the loading sheet only with the failure queue in the
+   same release; `dead` failures mean human attention within 24 hours.
 
 Do not deploy the new collections' rules before the backfill: groups,
-inventory and target overrides require `farmMembers`.
+inventory, target overrides and milk records require `farmMembers`.
 
 ## Feeding ledger
 
@@ -198,10 +206,11 @@ inventory and target overrides require `farmMembers`.
   `farms/{farmId}.milkPricePerKg` that owner/admin can save from the page
   (audited as `farm.milk_price_changed`); fat/protein are stored but not used
   by flat-price IOFC.
-- **Pre-deploy requirement:** the trigger failure queue/alert must exist
-  before the trigger is deployed. The SDK cannot enable retry (0.6.0 stable and
-  0.7.0rc0 both hardcode `retry=False`), so a transient failure otherwise
-  loses the inventory posting silently.
+- **Pre-deploy requirement:** the trigger failure queue is implemented; the
+  SDK cannot enable retry (0.6.0 stable and 0.7.0rc0 both hardcode
+  `retry=False`), so the trigger, loading sheet and queue must ship together.
+  A `dead` failure is a 24-hour human-attention SLA; resolved-document
+  retention (90-day TTL/cleanup) is a follow-up.
 - **Failure queue:** `farms/{farmId}/feedingTriggerFailures/{feedingId}`
   is written when `on_feeding_confirmed` fails. A scheduled function every
   five minutes claims pending/stale documents in a transaction (so scanners
