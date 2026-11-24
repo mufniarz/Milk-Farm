@@ -7,7 +7,7 @@ and the Excel export function for recipe downloads.
 import base64
 import io
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from firebase_functions import firestore_fn, https_fn, options, scheduler_fn
 from firebase_admin import firestore, initialize_app
@@ -1256,6 +1256,58 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
             feeding_data.get("inventoryPostedAt")
             or feeding_data.get("writeOffAt")
         )
+
+        # If a manual adjustment was recorded for one of the affected items
+        # after the failure, do not auto-write-off: the operator may have
+        # already handled the load. Escalate for a human decision instead.
+        if feeding.exists and not already_posted:
+            attempted_at = data.get("attemptedAt")
+            for feed_id in {
+                line.get("feedId")
+                for line in feeding_data.get("lines") or []
+                if line.get("feedId")
+            }:
+                adjustments = (
+                    db.collection("farms")
+                    .document(farm_id)
+                    .collection("inventoryTransactions")
+                    .where("itemId", "==", feed_id)
+                )
+                for entry in transaction.get(adjustments):
+                    entry_data = entry.to_dict() or {}
+                    if entry_data.get("type") != "adjustment":
+                        continue
+                    created_at = entry_data.get("createdAt")
+                    if (
+                        attempted_at is not None
+                        and created_at is not None
+                        and created_at < attempted_at
+                    ):
+                        continue
+                    transaction.update(
+                        ref,
+                        {
+                            "status": "needs-review",
+                            "reviewReason": "adjustment-detected",
+                            "reviewedAt": firestore.SERVER_TIMESTAMP,
+                            "lockedBy": None,
+                            "lockedAt": None,
+                        },
+                    )
+                    _write_audit(
+                        transaction,
+                        db,
+                        farm_id,
+                        {
+                            "action": "feeding.trigger_needs_review",
+                            "farmId": farm_id,
+                            "feedingId": feeding_id,
+                            "reason": "adjustment-detected",
+                            "at": firestore.SERVER_TIMESTAMP,
+                        },
+                    )
+                    return True
+
         prepared = []
         if feeding.exists and not already_posted:
             for line in feeding_data.get("lines") or []:
@@ -1438,9 +1490,13 @@ def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
         if farm_id:
             _retry_one_failure(db, farm_id, doc.id, instance_id)
 
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        days=_ABANDON_AFTER_DAYS
+    )
     dead_docs = list(
         db.collection_group("feedingTriggerFailures")
         .where("status", "==", "dead")
+        .where("deadAt", "<", cutoff)
         .limit(50)
         .stream()
     )
@@ -1493,7 +1549,12 @@ def retry_feeding_failures(req: https_fn.CallableRequest):
     region="europe-west1",
 )
 def mark_feeding_failure_handled(req: https_fn.CallableRequest):
-    """Close a failure the operator handled with a manual inventory adjustment."""
+    """Close a failure with a manual adjustment or an explicit acknowledgement.
+
+    `manual-adjustment` requires at least one adjustment ledger entry on the
+    feeding's items after the failure; `acknowledged-no-action` records the
+    operator's explicit decision to accept no ledger entry.
+    """
     if req.auth is None:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
@@ -1502,8 +1563,20 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
     data = req.data or {}
     farm_id = _require_string(data, "farmId")
     feeding_id = _require_string(data, "feedingId")
+    resolution = data.get("resolution", "manual-adjustment")
+    if resolution not in ("manual-adjustment", "acknowledged-no-action"):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="Unknown resolution.",
+        )
     db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
     ref = _failure_ref(db, farm_id, feeding_id)
+    feeding_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("feedings")
+        .document(feeding_id)
+    )
 
     @firestore.transactional
     def apply(transaction):
@@ -1515,19 +1588,58 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
             )
         current = snapshot.to_dict() or {}
         if current.get("status") == "resolved":
-            return
+            return {"alreadyResolved": True}
         if current.get("status") == "retrying":
             raise https_fn.HttpsError(
                 code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
                 message="A retry is in progress.",
             )
+        if resolution == "manual-adjustment":
+            feeding = feeding_ref.get(transaction=transaction)
+            feeding_data = feeding.to_dict() if feeding.exists else {}
+            attempted_at = current.get("attemptedAt")
+            found = False
+            for feed_id in {
+                line.get("feedId")
+                for line in feeding_data.get("lines") or []
+                if line.get("feedId")
+            }:
+                adjustments = (
+                    db.collection("farms")
+                    .document(farm_id)
+                    .collection("inventoryTransactions")
+                    .where("itemId", "==", feed_id)
+                )
+                for entry in transaction.get(adjustments):
+                    entry_data = entry.to_dict() or {}
+                    if entry_data.get("type") != "adjustment":
+                        continue
+                    created_at = entry_data.get("createdAt")
+                    if (
+                        attempted_at is not None
+                        and created_at is not None
+                        and created_at < attempted_at
+                    ):
+                        continue
+                    found = True
+                    break
+                if found:
+                    break
+            if not found:
+                raise https_fn.HttpsError(
+                    code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+                    message=(
+                        "Record an inventory adjustment before marking the "
+                        "failure handled, or use acknowledged-no-action."
+                    ),
+                )
         transaction.update(
             ref,
             {
                 "status": "resolved",
                 "resolvedAt": firestore.SERVER_TIMESTAMP,
                 "resolvedBy": req.auth.uid,
-                "resolution": "manual-adjustment",
+                "resolution": resolution,
                 "lockedBy": None,
                 "lockedAt": None,
             },
@@ -1541,13 +1653,14 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
                 "farmId": farm_id,
                 "feedingId": feeding_id,
                 "resolvedBy": req.auth.uid,
-                "reason": "manual-adjustment",
+                "reason": resolution,
                 "at": firestore.SERVER_TIMESTAMP,
             },
         )
+        return {"alreadyResolved": False}
 
-    apply(db.transaction())
-    return {"ok": True}
+    result = apply(db.transaction())
+    return {"ok": True, **result}
 
 
 # ── Retroactive posting ─────────────────────────────────────────────────────

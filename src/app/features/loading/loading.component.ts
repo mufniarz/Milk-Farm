@@ -230,13 +230,24 @@ import {
                   <mat-icon>error</mat-icon>
                   {{ 'LOADING.FAILED' | translate }}
                 </span>
-                @if (failure.status === 'dead' && canRetry) {
+                @if (
+                  (failure.status === 'dead' ||
+                    failure.status === 'needs-review') &&
+                  canRetry
+                ) {
                   <button
                     mat-button
-                    (click)="markHandled(failure)"
+                    (click)="markHandled(failure, 'manual-adjustment')"
                     [disabled]="saving"
                   >
                     {{ 'LOADING.MARK_HANDLED' | translate }}
+                  </button>
+                  <button
+                    mat-button
+                    (click)="markHandled(failure, 'acknowledged-no-action')"
+                    [disabled]="saving"
+                  >
+                    {{ 'LOADING.ACKNOWLEDGE' | translate }}
                   </button>
                 }
               }
@@ -531,10 +542,16 @@ export class LoadingComponent implements OnInit, OnDestroy {
     return this.failures.find((failure) => failure.feedingId === feedingId);
   }
 
-  async markHandled(failure: FeedingFailure): Promise<void> {
+  async markHandled(
+    failure: FeedingFailure,
+    resolution: 'manual-adjustment' | 'acknowledged-no-action',
+  ): Promise<void> {
     this.saving = true;
     try {
-      await this.failureService.markHandled(failure.feedingId);
+      await this.failureService.markHandled(
+        failure.feedingId,
+        resolution,
+      );
       this.snackBar.open(
         this.translate.instant('LOADING.MARKED_HANDLED'),
         undefined,

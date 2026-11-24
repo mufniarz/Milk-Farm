@@ -30,14 +30,14 @@ numbers.
 |---|---|---|
 | Type/build | `npx ng build` | pass |
 | Solver + export + golden ration | `pytest tests -q` | 18 passed (the 10 callable/trigger tests skip without the emulator) |
-| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 24 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting, failure queue (claim/lock/resolve, three-dead bulk retry, dead audit, already-posted/written-off/missing/draft reasons, manual handled, 90-day write-off), farm milk price |
+| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 27 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting, failure queue (claim/lock/resolve, three-dead bulk retry, dead audit, already-posted/written-off/missing/draft reasons, manual handled requires adjustment, acknowledge-no-action, adjustment-without-mark needs-review, 90-day write-off, cross-farm denial), farm milk price |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
 | Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 29 passed — 3 calculator parity + 6 loading math + 2 once-daily guard + 11 accuracy + 7 IOFC (3 math + 4 wiring) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 16 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, operator-only feedings, milk-record roles, failure-queue read-only |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 42 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 24 callable/trigger/failure/retroactive) |
+| Full suite incl. callables | `npm run test:functions` | 45 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 27 callable/trigger/failure/retroactive) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -316,14 +316,22 @@ sheet ship together.
 - **Bulk retry:** owner/admin `retry_feeding_failures` callable retries all
   `pending`/`dead` failures for a farm; the loading sheet has "Retry all".
   The same callable/terminal state is used for manual retries.
-- **Manual handling:** when the operator corrects the load with
-  `adjust_inventory`, they press "Mark handled" on the dead row. The
-  `mark_feeding_failure_handled` callable sets `status: resolved`,
-  `resolution: manual-adjustment`, `resolvedBy`/`resolvedAt` and audits
-  `feeding.trigger_resolved` with `reason: manual-adjustment`. A resolved
-  document is skipped by both the retry scan and abandonment, so a later
-  "Retry all" or the 90-day write-off cannot double-record a manually
-  adjusted load.
+- **Manual handling:** the `mark_feeding_failure_handled` callable accepts
+  `resolution: manual-adjustment` or `acknowledged-no-action`. Manual
+  adjustment **requires** a matching `adjustment` ledger entry on the
+  feeding's items after the failure; without one it refuses
+  (`FAILED_PRECONDITION`). `acknowledged-no-action` records the operator's
+  explicit decision to close the row with no ledger consequence. Both set
+  `status: resolved` and audit `feeding.trigger_resolved` with the resolution
+  as reason; a double-click returns `alreadyResolved: true` rather than an
+  error. A resolved document is skipped by the retry scan and abandonment.
+- **Adjustment without Mark handled:** at 90 days the abandonment path
+  queries the affected items for `adjustment` entries created after the
+  failure. If one exists, it does **not** write off; it sets
+  `status: needs-review`, `reviewReason: adjustment-detected`, audits
+  `feeding.trigger_needs_review`, and leaves the decision to a human. This
+  closes the silent manual-adjustment-then-write-off double-book. The scan
+  does not auto-retry `needs-review`.
 - **Terminal state:** success sets `status: resolved`, `resolvedBy`,
   `resolvedAt`, clears the lock, and writes `feeding.trigger_resolved`;
   a manual retry of a dead document therefore stops showing as failed.
@@ -356,7 +364,8 @@ sheet ship together.
   client-write-denied. The rule ships with the trigger/loading-sheet batch.
 - **Scheduled deploy:** `scheduled_feeding_retry` uses the `*/5 * * * *`
   decorator; enable `cloudscheduler.googleapis.com` before
-  `firebase deploy --only functions` or the schedule never runs.
+  `firebase deploy --only functions` or the schedule never runs. The dead
+  abandonment query uses the collection-group `(status, deadAt)` index.
 
 ## L. IOFC
 

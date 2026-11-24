@@ -248,7 +248,9 @@
     "WRITTEN_OFF": "Written off",
     "MARK_HANDLED": "Mark handled",
     "MARKED_HANDLED": "Feeding marked as handled manually.",
-    "MARK_HANDLED_FAILED": "Could not mark handled."
+    "MARK_HANDLED_FAILED": "Could not mark handled.",
+    "ACKNOWLEDGE": "No action",
+    "ACKNOWLEDGED": "Feeding closed without action."
   },
   "ACCURACY": {
     "TITLE": "Feeder accuracy",

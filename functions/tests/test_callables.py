@@ -1426,3 +1426,159 @@ def test_retry_reasons_for_written_off_missing_and_draft():
     assert reasons["feeding-missing"] == "missing-feeding"
     assert reasons["feeding-draft"] == "not-confirmed"
     assert len(_ledger()) == 1  # only the seed delivery
+
+
+def test_adjustment_without_mark_goes_needs_review_at_abandonment():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-nomark",
+        lines=_feeding_lines(loaded=(50,)),
+    )
+    ref = _failure_doc("feeding-nomark", status="dead", retry_count=5)
+    ref.update(
+        {"deadAt": datetime.now(timezone.utc) - timedelta(days=91)}
+    )
+    _handler(main.adjust_inventory)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "itemId": "feed1",
+                "deltaKgAsFed": -50,
+                "reason": "manual correction, forgot to mark handled",
+                "idempotencyKey": "manual-nomark",
+            },
+        )
+    )
+    ledger_before = len(_ledger())
+
+    assert main._abandon_dead_failure(DB, "f1", "feeding-nomark") is True
+    data = ref.get().to_dict()
+    assert data["status"] == "needs-review"
+    assert data["reviewReason"] == "adjustment-detected"
+    assert len(_ledger()) == ledger_before
+    assert _on_hand("feed1")["onHandKgAsFed"] == 950
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    assert any(
+        entry["action"] == "feeding.trigger_needs_review"
+        and entry["feedingId"] == "feeding-nomark"
+        for entry in audits
+    )
+
+
+def test_mark_handled_requires_adjustment_or_explicit_acknowledgement():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-require",
+        lines=_feeding_lines(loaded=(50,)),
+    )
+    _failure_doc("feeding-require", status="dead", retry_count=5)
+
+    with pytest.raises(https_fn.HttpsError):
+        _handler(main.mark_feeding_failure_handled)(
+            _Req(
+                "owner",
+                {
+                    "farmId": "f1",
+                    "feedingId": "feeding-require",
+                    "resolution": "manual-adjustment",
+                },
+            )
+        )
+
+    result = _handler(main.mark_feeding_failure_handled)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedingId": "feeding-require",
+                "resolution": "acknowledged-no-action",
+            },
+        )
+    )
+    assert result["ok"] is True
+    failure = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .document("feeding-require")
+        .get()
+        .to_dict()
+    )
+    assert failure["status"] == "resolved"
+    assert failure["resolution"] == "acknowledged-no-action"
+
+    # A double-click is benign.
+    again = _handler(main.mark_feeding_failure_handled)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedingId": "feeding-require",
+                "resolution": "acknowledged-no-action",
+            },
+        )
+    )
+    assert again["alreadyResolved"] is True
+
+
+def test_mark_handled_with_adjustment_and_cross_farm_denial():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-with-adjustment",
+        lines=_feeding_lines(loaded=(50,)),
+    )
+    _failure_doc("feeding-with-adjustment", status="dead", retry_count=5)
+    _handler(main.adjust_inventory)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "itemId": "feed1",
+                "deltaKgAsFed": -50,
+                "reason": "manual correction",
+                "idempotencyKey": "manual-with-adjustment",
+            },
+        )
+    )
+
+    result = _handler(main.mark_feeding_failure_handled)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedingId": "feeding-with-adjustment",
+                "resolution": "manual-adjustment",
+            },
+        )
+    )
+    assert result["ok"] is True
+    failure = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .document("feeding-with-adjustment")
+        .get()
+        .to_dict()
+    )
+    assert failure["status"] == "resolved"
+    assert failure["resolution"] == "manual-adjustment"
+
+    with pytest.raises(https_fn.HttpsError):
+        _handler(main.mark_feeding_failure_handled)(
+            _Req(
+                "outsider",
+                {
+                    "farmId": "f1",
+                    "feedingId": "feeding-with-adjustment",
+                    "resolution": "acknowledged-no-action",
+                },
+            )
+        )

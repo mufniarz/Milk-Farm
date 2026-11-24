@@ -41,7 +41,7 @@ export class FeedingFailureService {
         );
         const q = query(
           ref,
-          where('status', 'in', ['pending', 'retrying', 'dead']),
+          where('status', 'in', ['pending', 'retrying', 'needs-review', 'dead']),
         );
         return collectionData(q, { idField: 'id' }) as Observable<
           FeedingFailure[]
@@ -50,14 +50,18 @@ export class FeedingFailureService {
     );
   }
 
-  async markHandled(feedingId: string): Promise<void> {
+  async markHandled(
+    feedingId: string,
+    resolution: 'manual-adjustment' | 'acknowledged-no-action',
+  ): Promise<void> {
     const callable = httpsCallable<
-      { farmId: string; feedingId: string },
+      { farmId: string; feedingId: string; resolution: string },
       { ok: boolean }
     >(this.functions, 'mark_feeding_failure_handled');
     await callable({
       farmId: this.farmContext.activeFarmId(),
       feedingId,
+      resolution,
     });
   }
 

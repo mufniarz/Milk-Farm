@@ -4,11 +4,12 @@ export interface FeedingFailure {
   farmId: string;
   feedingId: string;
   error: string;
-  status: 'pending' | 'retrying' | 'resolved' | 'dead';
+  status: 'pending' | 'retrying' | 'needs-review' | 'resolved' | 'dead';
   retryCount: number;
   attemptedAt?: Date;
   lastRetryAt?: Date;
   deadAt?: Date;
   resolvedAt?: Date;
   resolvedBy?: string;
+  resolution?: 'manual-adjustment' | 'acknowledged-no-action';
 }

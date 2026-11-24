@@ -248,7 +248,9 @@
     "WRITTEN_OFF": "Scaricato in perdita",
     "MARK_HANDLED": "Segna gestito",
     "MARKED_HANDLED": "Carico segnato come gestito manualmente.",
-    "MARK_HANDLED_FAILED": "Operazione non riuscita."
+    "MARK_HANDLED_FAILED": "Operazione non riuscita.",
+    "ACKNOWLEDGE": "Nessuna azione",
+    "ACKNOWLEDGED": "Carico chiuso senza azione."
   },
   "ACCURACY": {
     "TITLE": "Precisione di caricamento",
