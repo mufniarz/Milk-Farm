@@ -102,6 +102,109 @@ describe('IofcComponent wiring', () => {
     expect(component.result!.feedCostPerDay).toBeCloseTo(438.75, 6);
   });
 
+  it('averages three feedings and excludes another date', async () => {
+    feedingList = [
+      {
+        id: 'f1',
+        farmId: 'f1',
+        date: '2026-11-20',
+        herdGroupId: 'g1',
+        feederId: 'feeder-1',
+        status: 'confirmed',
+        animalCount: 100,
+        createdAt: new Date('2026-11-20T06:00:00Z'),
+      },
+      {
+        id: 'f2',
+        farmId: 'f1',
+        date: '2026-11-20',
+        herdGroupId: 'g1',
+        feederId: 'feeder-1',
+        status: 'confirmed',
+        animalCount: 100,
+        createdAt: new Date('2026-11-20T12:00:00Z'),
+      },
+      {
+        id: 'f3',
+        farmId: 'f1',
+        date: '2026-11-20',
+        herdGroupId: 'g1',
+        feederId: 'feeder-1',
+        status: 'confirmed',
+        animalCount: 95,
+        createdAt: new Date('2026-11-20T18:00:00Z'),
+      },
+      {
+        id: 'old',
+        farmId: 'f1',
+        date: '2026-11-19',
+        herdGroupId: 'g1',
+        feederId: 'feeder-1',
+        status: 'confirmed',
+        animalCount: 80,
+        createdAt: new Date('2026-11-19T18:00:00Z'),
+      },
+    ] as Feeding[];
+    component.groups = [group(100)];
+    component.selectedGroupId = 'g1';
+    component.date = '2026-11-20';
+    await component.onGroupChange();
+    component.milkKg = 3000;
+
+    // 100 + 100 + 95 = 295 / 3 = 98.333 head; the 19th is excluded.
+    expect(component.result!.feedCostPerDay).toBeCloseTo(442.5, 6);
+  });
+
+  it('offers refresh when the feeding count changed', () => {
+    feedingList = [
+      {
+        id: 'f1',
+        farmId: 'f1',
+        date: '2026-11-20',
+        herdGroupId: 'g1',
+        feederId: 'feeder-1',
+        status: 'confirmed',
+        animalCount: 100,
+        createdAt: new Date('2026-11-20T06:00:00Z'),
+      },
+      {
+        id: 'f2',
+        farmId: 'f1',
+        date: '2026-11-20',
+        herdGroupId: 'g1',
+        feederId: 'feeder-1',
+        status: 'confirmed',
+        animalCount: 95,
+        createdAt: new Date('2026-11-20T18:00:00Z'),
+      },
+    ] as Feeding[];
+    component.feedings = feedingList;
+    component.date = '2026-11-20';
+    component.records = [
+      {
+        id: 'g1_2026-11-20',
+        farmId: 'f1',
+        herdGroupId: 'g1',
+        date: '2026-11-20',
+        milkKg: 3000,
+        milkPricePerKg: 0.5,
+        source: 'manual',
+        hasFeedingSnapshot: true,
+        feedingCountAtSnapshot: 2,
+      },
+    ];
+
+    expect(component.snapshotRefreshAvailable).toBeFalse();
+    component.records = [
+      { ...component.records[0], feedingCountAtSnapshot: 1 },
+    ];
+    expect(component.snapshotRefreshAvailable).toBeTrue();
+    component.records = [
+      { ...component.records[0], hasFeedingSnapshot: false },
+    ];
+    expect(component.snapshotRefreshAvailable).toBeTrue();
+  });
+
   it('uses the group head count and the per-head recipe cost', async () => {
     component.groups = [group(100)];
     component.selectedGroupId = 'g1';

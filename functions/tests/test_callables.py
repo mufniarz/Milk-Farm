@@ -1258,3 +1258,62 @@ def test_bulk_retry_resolves_three_dead_failures():
             .to_dict()
         )
         assert failure["status"] == "resolved"
+
+
+def test_abandonment_books_write_off_and_blocks_retry():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-writeoff",
+        lines=_feeding_lines(
+            line_ids=("w1", "w2"), loaded=(30, 20)
+        ),
+    )
+    ref = _failure_doc(
+        "feeding-writeoff", status="dead", retry_count=5
+    )
+    ref.update(
+        {"deadAt": datetime.now(timezone.utc) - timedelta(days=91)}
+    )
+
+    assert main._abandon_dead_failure(DB, "f1", "feeding-writeoff") is True
+    assert _on_hand("feed1")["onHandKgAsFed"] == 950
+
+    write_offs = [entry for entry in _ledger() if entry["type"] == "write_off"]
+    assert len(write_offs) == 2
+    assert sorted(entry["deltaKgAsFed"] for entry in write_offs) == [-30.0, -20.0]
+    assert all(entry["sourceType"] == "abandoned" for entry in write_offs)
+
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding-writeoff")
+        .get()
+        .to_dict()
+    )
+    assert feeding["writeOffAt"] is not None
+    assert not ref.get().exists
+
+    ledger_before = len(_ledger())
+    assert (
+        main._post_feeding_inventory(DB, "f1", "feeding-writeoff")
+        == "already-posted"
+    )
+    assert len(_ledger()) == ledger_before
+    assert _on_hand("feed1")["onHandKgAsFed"] == 950
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    abandoned = [
+        entry
+        for entry in audits
+        if entry["action"] == "feeding.trigger_abandoned"
+    ]
+    assert len(abandoned) == 1
+    assert abandoned[0]["writeOffKgAsFed"] == 50
+    assert sorted(abandoned[0]["writeOffLines"]) == ["w1", "w2"]

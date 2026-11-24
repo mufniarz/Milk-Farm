@@ -243,7 +243,9 @@
     "RETRY_ALL": "Retry all",
     "FAILED": "Not posted",
     "RETRY_DONE": "Retry finished",
-    "RETRY_FAILED": "Retry failed."
+    "RETRY_FAILED": "Retry failed.",
+    "ALREADY_CONFIRMED": "This group already has a confirmed load today. The ration is daily: a second confirmation would deplete inventory twice. Multi-feeding is not enabled yet.",
+    "WRITTEN_OFF": "Written off"
   },
   "ACCURACY": {
     "TITLE": "Feeder accuracy",

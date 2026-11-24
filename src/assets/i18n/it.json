@@ -243,7 +243,9 @@
     "RETRY_ALL": "Riprova tutti",
     "FAILED": "Non registrato",
     "RETRY_DONE": "Riprova completata",
-    "RETRY_FAILED": "Riprova non riuscita."
+    "RETRY_FAILED": "Riprova non riuscita.",
+    "ALREADY_CONFIRMED": "Questo gruppo ha già un carico confermato oggi. La razione è giornaliera: una seconda conferma scaricherebbe due volte l'inventario. Il multi-carico non è ancora disponibile.",
+    "WRITTEN_OFF": "Scaricato in perdita"
   },
   "ACCURACY": {
     "TITLE": "Precisione di caricamento",

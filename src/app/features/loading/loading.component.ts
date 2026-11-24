@@ -183,6 +183,11 @@ import {
                 <span>{{ 'LOADING.TOTAL_LOADED' | translate }}:
                   {{ totalLoaded() | number: '1.0-1' }} kg</span>
               </div>
+              @if (alreadyConfirmedToday) {
+                <div class="alert caution">
+                  {{ 'LOADING.ALREADY_CONFIRMED' | translate }}
+                </div>
+              }
               <div class="actions">
                 <button
                   mat-stroked-button
@@ -195,7 +200,9 @@ import {
                   mat-flat-button
                   color="primary"
                   (click)="save(true)"
-                  [disabled]="saving || !selectedFeederId"
+                  [disabled]="
+                    saving || !selectedFeederId || alreadyConfirmedToday
+                  "
                 >
                   {{ 'LOADING.CONFIRM' | translate }}
                 </button>
@@ -223,7 +230,14 @@ import {
                   {{ 'LOADING.FAILED' | translate }}
                 </span>
               }
-              @if (feeding.status === 'confirmed' && !feeding.inventoryPostedAt) {
+              @if (feeding.writeOffAt) {
+                <span class="overdrawn">
+                  <mat-icon>error</mat-icon>
+                  {{ 'LOADING.WRITTEN_OFF' | translate }}
+                </span>
+              } @else if (
+                feeding.status === 'confirmed' && !feeding.inventoryPostedAt
+              ) {
                 <span class="posting">
                   {{
                     (postingDelayed
@@ -490,6 +504,15 @@ export class LoadingComponent implements OnInit, OnDestroy {
     }
   }
 
+  get alreadyConfirmedToday(): boolean {
+    return this.feedings.some(
+      (feeding) =>
+        feeding.herdGroupId === this.selectedGroupId &&
+        feeding.date === this.today &&
+        feeding.status === 'confirmed',
+    );
+  }
+
   get canRetry(): boolean {
     const role = this.farmContext.activeRole();
     return role === 'owner' || role === 'farmAdmin';
@@ -642,6 +665,14 @@ export class LoadingComponent implements OnInit, OnDestroy {
   async save(confirm: boolean): Promise<void> {
     const group = this.groups.find((g) => g.id === this.selectedGroupId);
     if (!group || !group.id || !this.selectedFeederId || this.lines.length === 0) {
+      return;
+    }
+    if (confirm && this.alreadyConfirmedToday) {
+      this.snackBar.open(
+        this.translate.instant('LOADING.ALREADY_CONFIRMED'),
+        undefined,
+        { duration: 5000 },
+      );
       return;
     }
     if (

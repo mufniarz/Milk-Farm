@@ -891,12 +891,12 @@ def _post_feeding_inventory(db, farm_id, feeding_id):
     def apply(transaction):
         current = feeding_ref.get(transaction=transaction)
         if not current.exists:
-            return
+            return "missing"
         current_data = current.to_dict() or {}
-        if current_data.get("inventoryPostedAt"):
-            return
+        if current_data.get("inventoryPostedAt") or current_data.get("writeOffAt"):
+            return "already-posted"
         if current_data.get("status") != "confirmed":
-            return
+            return "not-confirmed"
 
         # Read phase: every read must happen before any write in a
         # Firestore transaction.
@@ -1049,6 +1049,7 @@ def _post_feeding_inventory(db, farm_id, feeding_id):
                 "at": firestore.SERVER_TIMESTAMP,
             },
         )
+        return "posted"
 
     return apply(db.transaction())
 
@@ -1095,7 +1096,9 @@ def _record_trigger_failure(db, farm_id, feeding_id, error):
     apply(db.transaction())
 
 
-def _resolve_trigger_failure(db, farm_id, feeding_id, resolved_by):
+def _resolve_trigger_failure(
+    db, farm_id, feeding_id, resolved_by, reason="trigger"
+):
     ref = _failure_ref(db, farm_id, feeding_id)
 
     @firestore.transactional
@@ -1125,6 +1128,7 @@ def _resolve_trigger_failure(db, farm_id, feeding_id, resolved_by):
                 "farmId": farm_id,
                 "feedingId": feeding_id,
                 "resolvedBy": resolved_by,
+                "reason": reason,
                 "at": firestore.SERVER_TIMESTAMP,
             },
         )
@@ -1216,8 +1220,14 @@ def _fail_retry(db, farm_id, feeding_id, error):
 
 
 def _abandon_dead_failure(db, farm_id, feeding_id):
-    """Delete a dead failure after 90 days with an explicit write-off audit."""
+    """Abandon a dead failure after 90 days and book the physical write-off."""
     ref = _failure_ref(db, farm_id, feeding_id)
+    feeding_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("feedings")
+        .document(feeding_id)
+    )
     now = datetime.now(timezone.utc)
 
     @firestore.transactional
@@ -1237,6 +1247,82 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
             return False
         if age < _ABANDON_AFTER_DAYS * 86400:
             return False
+
+        feeding = feeding_ref.get(transaction=transaction)
+        feeding_data = feeding.to_dict() if feeding.exists else {}
+        already_posted = bool(
+            feeding_data.get("inventoryPostedAt")
+            or feeding_data.get("writeOffAt")
+        )
+        prepared = []
+        if feeding.exists and not already_posted:
+            for line in feeding_data.get("lines") or []:
+                line_id = line.get("lineId")
+                feed_id = line.get("feedId")
+                loaded = float(line.get("loadedKgAsFed") or 0)
+                if not line_id or not feed_id or loaded <= 0:
+                    continue
+                item_ref = _inventory_item_ref(db, farm_id, feed_id)
+                item = item_ref.get(transaction=transaction)
+                ledger_ref = (
+                    db.collection("farms")
+                    .document(farm_id)
+                    .collection("inventoryTransactions")
+                    .document(f"{farm_id}_{feeding_id}_{line_id}_writeoff")
+                )
+                ledger = ledger_ref.get(transaction=transaction)
+                prepared.append(
+                    (line, feed_id, loaded, item_ref, item, ledger_ref, ledger)
+                )
+
+        item_before = {}
+        item_refs = {}
+        total_by_feed = {}
+        write_off_lines = []
+        for line, feed_id, loaded, item_ref, item, ledger_ref, ledger in prepared:
+            if ledger.exists or not item.exists:
+                continue
+            item_data = item.to_dict() or {}
+            if feed_id not in item_before:
+                item_before[feed_id] = float(
+                    item_data.get("onHandKgAsFed") or 0
+                )
+                item_refs[feed_id] = item_ref
+            transaction.set(
+                ledger_ref,
+                {
+                    "itemId": feed_id,
+                    "type": "write_off",
+                    "deltaKgAsFed": -loaded,
+                    "unitCostPerKgAsFed": float(
+                        line.get("costPerKgAsFed")
+                        or item_data.get("unitCostPerKgAsFed")
+                        or 0
+                    ),
+                    "sourceType": "abandoned",
+                    "sourceId": line.get("lineId"),
+                    "idempotencyKey": f"{farm_id}_{feeding_id}_{line.get('lineId')}_writeoff",
+                    "date": feeding_data.get("date"),
+                    "createdBy": "trigger_abandoned",
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                    "note": f"write-off feeding {feeding_id}",
+                },
+            )
+            total_by_feed[feed_id] = total_by_feed.get(feed_id, 0.0) + loaded
+            write_off_lines.append(line.get("lineId"))
+
+        for feed_id, total in total_by_feed.items():
+            transaction.update(
+                item_refs[feed_id],
+                {
+                    "onHandKgAsFed": item_before[feed_id] - total,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                },
+            )
+        if feeding.exists and not already_posted:
+            transaction.update(
+                feeding_ref, {"writeOffAt": firestore.SERVER_TIMESTAMP}
+            )
         transaction.delete(ref)
         _write_audit(
             transaction,
@@ -1248,6 +1334,9 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
                 "feedingId": feeding_id,
                 "retryCount": data.get("retryCount"),
                 "deadAt": dead_at,
+                "alreadyPosted": already_posted,
+                "writeOffLines": write_off_lines,
+                "writeOffKgAsFed": sum(total_by_feed.values()),
                 "at": firestore.SERVER_TIMESTAMP,
             },
         )
@@ -1260,11 +1349,14 @@ def _retry_one_failure(db, farm_id, feeding_id, instance_id, allow_dead=False):
     if _claim_failure(db, farm_id, feeding_id, instance_id, allow_dead) is None:
         return False
     try:
-        _post_feeding_inventory(db, farm_id, feeding_id)
+        result = _post_feeding_inventory(db, farm_id, feeding_id)
     except Exception as error:
         _fail_retry(db, farm_id, feeding_id, error)
         return False
-    _resolve_trigger_failure(db, farm_id, feeding_id, instance_id)
+    reason = (
+        "already-posted" if result == "already-posted" else "retry-succeeded"
+    )
+    _resolve_trigger_failure(db, farm_id, feeding_id, instance_id, reason)
     return True
 
 

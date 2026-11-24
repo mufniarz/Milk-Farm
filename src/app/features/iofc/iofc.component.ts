@@ -319,10 +319,11 @@ export class IofcComponent implements OnInit {
 
   get snapshotRefreshAvailable(): boolean {
     const record = this.recordForDate;
+    if (!record || !this.hasFeedingForDate) return false;
+    if (record.hasFeedingSnapshot === false) return true;
     return (
-      !!record &&
-      record.hasFeedingSnapshot === false &&
-      this.hasFeedingForDate
+      (record.feedingCountAtSnapshot ?? 0) !==
+      this.confirmedFeedingsForDate.length
     );
   }
 
@@ -515,6 +516,7 @@ export class IofcComponent implements OnInit {
         feedCostPerHeadSnapshot: feedCost,
         headCountSnapshot: this.headCountForEntry,
         hasFeedingSnapshot: true,
+        feedingCountAtSnapshot: this.confirmedFeedingsForDate.length,
       });
       await this.loadRecords(group.id);
       this.applyRecordForDate();
@@ -570,6 +572,7 @@ export class IofcComponent implements OnInit {
         feedCostPerHeadSnapshot: this.feedCostPerHead,
         headCountSnapshot: this.headCountForEntry,
         hasFeedingSnapshot: this.hasFeedingForDate,
+        feedingCountAtSnapshot: this.confirmedFeedingsForDate.length,
       });
       await this.loadRecords(group.id);
       this.applyRecordForDate();

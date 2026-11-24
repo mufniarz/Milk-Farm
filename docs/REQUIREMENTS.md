@@ -30,14 +30,14 @@ numbers.
 |---|---|---|
 | Type/build | `npx ng build` | pass |
 | Solver + export + golden ration | `pytest tests -q` | 18 passed (the 10 callable/trigger tests skip without the emulator) |
-| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 21 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting, failure queue (claim/lock/resolve, three-dead bulk retry, dead audit, already-posted replay, 90-day abandonment), farm milk price |
+| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 22 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting, failure queue (claim/lock/resolve, three-dead bulk retry, dead audit, already-posted replay, 90-day write-off), farm milk price |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 25 passed — 3 calculator parity + 6 loading math + 11 accuracy + 5 IOFC (3 math + 2 wiring) |
+| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 27 passed — 3 calculator parity + 6 loading math + 11 accuracy + 7 IOFC (3 math + 4 wiring) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 16 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, operator-only feedings, milk-record roles, failure-queue read-only |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 39 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 21 callable/trigger/failure/retroactive) |
+| Full suite incl. callables | `npm run test:functions` | 40 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 22 callable/trigger/failure/retroactive) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -321,22 +321,33 @@ sheet ship together.
   a manual retry of a dead document therefore stops showing as failed.
 - **Already-posted retry:** if the trigger committed the ledger and
   `inventoryPostedAt` but failed after it, the retry sees the guard, posts
-  nothing, and resolves the failure document. The test asserts one ledger
-  entry, one `feeding.confirm` audit and `retryCount` unchanged.
+  nothing, and resolves the failure document with
+  `feeding.trigger_resolved.reason = 'already-posted'` (a normal retry uses
+  `retry-succeeded`). The test asserts one ledger entry, one `feeding.confirm`
+  audit, `retryCount` unchanged, and the reason.
 - **Alerting:** the loading sheet shows the open-failure count and a
   per-feeding "Not posted" badge; the inventory page shows the count with a
   link to the loading sheet. A `dead` document means "needs human attention
   within 24 hours"; email is out of scope for v1.
-- **Retention:** resolved documents are retained (a 90-day TTL/cleanup is a
-  follow-up). Dead documents older than 90 days are deleted by the scheduled
-  scan with a `feeding.trigger_abandoned` audit; the missing consumption is an
-  explicit, auditable write-off, and the planned nightly reconciliation is the
-  backstop once it exists. `deadAt` is written on the dead transition.
+- **Retention and write-off:** resolved documents are retained (a 90-day TTL/
+  cleanup is a follow-up). Dead documents older than 90 days are abandoned by
+  the scheduled scan: per line it writes a `write_off` ledger entry
+  (`sourceType: 'abandoned'`, `deltaKgAsFed = -loaded`, deterministic
+  `..._{lineId}_writeoff` id), updates the item on-hand, sets `writeOffAt` on
+  the feeding, deletes the failure document, and writes
+  `feeding.trigger_abandoned` with the written-off lines/kg. The write-off is
+  the accounting event, not just a note; the nightly reconciliation (planned)
+  is a backstop, not the mechanism. `writeOffAt` also makes a later trigger or
+  retry a no-op. Skipped `inventorySkippedFeedIds` lines are a separate
+  surface and remain postable; abandonment only books the consumed lines.
 - **Replay semantics:** every retry reuses `_post_feeding_inventory` and the
   `inventoryPostedAt` guard plus deterministic ledger ids, so a retry after a
   partial failure is idempotent.
 - **Rules:** failure documents are readable by owner/admin/consultant and
-  client-write-denied.
+  client-write-denied. The rule ships with the trigger/loading-sheet batch.
+- **Scheduled deploy:** `scheduled_feeding_retry` uses the `*/5 * * * *`
+  decorator; enable `cloudscheduler.googleapis.com` before
+  `firebase deploy --only functions` or the schedule never runs.
 
 ## L. IOFC
 
@@ -381,11 +392,14 @@ The first Stage 2 item is in place:
 - **Preview vs saved.** A new-date preview uses current data (the day's
   feeding average if confirmed, otherwise the group count). Saving locks the
   feeding snapshot when one exists. A record saved before the feeding is
-  confirmed keeps `hasFeedingSnapshot: false` and the page shows a
-  "refresh snapshot available" action; refreshing re-locks the average count
-  so the fallback does not persist silently.
+  confirmed keeps `hasFeedingSnapshot: false`; the page also offers refresh
+  when `feedingCountAtSnapshot` differs from the current confirmed-feeding
+  count. Refresh is a direct milk-record update (`MilkService.saveRecord`) and
+  is covered by the owner/admin/consultant update rule; no refresh callable
+  exists. Tests cover the banner condition and a third feeding.
 - **Farm-default reload.** Saving the farm milk price updates the open IOFC
-  page; another browser session picks it up on the next mount.
+  page's default but never overwrites a per-record price the user has typed;
+  another browser session picks it up on the next mount.
 - **Wiring test.** `iofc.component.spec.ts` uses a real group (headCount 100
   and 50) and a recipe cost of EUR 4.50, asserting feed cost 450 and 225, so
   the group/head-count/per-head wiring is tested, not just the arithmetic.

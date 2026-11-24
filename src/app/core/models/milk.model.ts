@@ -22,6 +22,8 @@ export interface MilkRecord {
   headCountSnapshot?: number | null;
   /** True when the snapshot came from the day's confirmed feeding. */
   hasFeedingSnapshot?: boolean;
+  /** Number of confirmed feedings used for the snapshot. */
+  feedingCountAtSnapshot?: number | null;
   source: 'manual' | 'import';
   updatedAt?: Date;
 }

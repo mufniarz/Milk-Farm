@@ -373,10 +373,23 @@ test('milk records are owner/admin/consultant only', async () => {
       source: 'manual',
     }),
   );
+  // The refresh-snapshot action is a direct milk-record update.
+  await assertSucceeds(
+    updateDoc(doc(member, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20'), {
+      milkKg: 3100,
+      hasFeedingSnapshot: true,
+      feedingCountAtSnapshot: 1,
+    }),
+  );
 
   const feeder = dbFor('feeder');
   await assertFails(
     getDoc(doc(feeder, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20')),
+  );
+  await assertFails(
+    updateDoc(doc(feeder, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20'), {
+      milkKg: 3100,
+    }),
   );
 
   const other = dbFor('other');

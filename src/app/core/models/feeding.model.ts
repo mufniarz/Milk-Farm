@@ -38,6 +38,8 @@ export interface Feeding {
   correctsFeedingId?: string | null;
   /** Set by the inventory trigger; a client must never write it. */
   inventoryPostedAt?: Date | null;
+  /** Set when a dead failure was abandoned and its consumption written off. */
+  writeOffAt?: Date | null;
   inventoryPostedLines?: number;
   /** Unique feed ids for the skipped lines; the retroactive query uses this. */
   inventorySkippedFeedIds?: string[];

@@ -26,6 +26,7 @@ export interface SaveMilkRecordInput {
   feedCostPerHeadSnapshot?: number | null;
   headCountSnapshot?: number | null;
   hasFeedingSnapshot?: boolean;
+  feedingCountAtSnapshot?: number | null;
 }
 
 /** Daily milk records at `/farms/{farmId}/milkRecords`. */

@@ -82,7 +82,7 @@ XDG_CONFIG_HOME=./.firebase-config FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
 directly under Node's type stripping; keep the extension. `scripts/backfill-members.mts`
 uses the same runner.
 
-`pytest` without the emulator skips the 21 callable/trigger tests. `npm run test:functions`
+`pytest` without the emulator skips the 22 callable/trigger tests. `npm run test:functions`
 runs the full suite through the emulator with `REQUIRE_EMULATOR=1`, so a missing
 emulator fails instead of silently skipping. The parity chain
 (workbook -> fixtures -> computed) is described in
@@ -104,8 +104,10 @@ emulator fails instead of silently skipping. The parity chain
 3. Deploy the functions in `functions/main.py`: the eight callables
    (target overrides x2, inventory x3, retro posting, failure retry, farm milk
    price), the `on_feeding_confirmed` trigger, and the
-   `scheduled_feeding_retry` scheduled function. The scheduled function
-   requires Cloud Scheduler; `firebase deploy --only functions` creates it.
+   `scheduled_feeding_retry` scheduled function. Enable
+   `cloudscheduler.googleapis.com` first; the function uses the
+   `*/5 * * * *` schedule decorator, and `firebase deploy --only functions`
+   creates it. The failure-queue read rule ships in the same batch.
 4. Deploy the compatibility rules and hosting in the same window.
 5. Deploy the trigger and the loading sheet only with the failure queue in the
    same release; `dead` failures mean human attention within 24 hours.
@@ -212,11 +214,14 @@ inventory, target overrides and milk records require `farmMembers`.
   SDK cannot enable retry (0.6.0 stable and 0.7.0rc0 both hardcode
   `retry=False`), so the trigger, loading sheet and queue must ship together.
   A `dead` failure is a 24-hour human-attention SLA; dead documents are
-  abandoned after 90 days with an audit, and resolved-document retention
-  (90-day TTL/cleanup) is a follow-up. The collection-group scan returns only
-  open failures, so its cost is bounded by open failures, not farms; a retry
-  slower than the 10-minute stale threshold can double-increment `retryCount`
-  but cannot double-post (the `inventoryPostedAt` guard).
+  abandoned after 90 days with booked write-off lines and an audit, and
+  resolved-document retention (90-day TTL/cleanup) is a follow-up. The
+  scheduled function needs `cloudscheduler.googleapis.com` enabled and the
+  `*/5 * * * *` schedule decorator; `firebase deploy --only functions`
+  creates it. The collection-group scan returns only open failures, so its
+  cost is bounded by open failures, not farms; a retry slower than the
+  10-minute stale threshold can double-increment `retryCount` but cannot
+  double-post (the `inventoryPostedAt`/`writeOffAt` guards).
 - **Failure queue:** `farms/{farmId}/feedingTriggerFailures/{feedingId}`
   is written when `on_feeding_confirmed` fails. A scheduled function every
   five minutes claims **pending or stale retrying** documents in a
@@ -224,14 +229,18 @@ inventory, target overrides and milk records require `farmMembers`.
   `feeding.trigger_dead` audit; `dead` is terminal for the scan and only a
   manual retry can move it. Owner/admin can retry all pending/dead failures
   from the loading sheet; success sets `resolved` and audits
-  `feeding.trigger_resolved`. A retry that finds `inventoryPostedAt` already
-  set resolves without posting again. Dead documents older than 90 days are
-  deleted with a `feeding.trigger_abandoned` audit (explicit write-off);
-  resolved retention is a follow-up. The loading sheet and inventory page show
+  `feeding.trigger_resolved` (with `reason: already-posted` or
+  `retry-succeeded`). A retry that finds `inventoryPostedAt` already set
+  resolves without posting again. Dead documents older than 90 days are
+  abandoned: a `write_off` ledger entry per line, on-hand update, `writeOffAt`
+  on the feeding, and a `feeding.trigger_abandoned` audit — the write-off is
+  booked, not just noted. Resolved retention is a follow-up. The loading sheet and inventory page show
   the open count, and the loading sheet has a per-feeding "Not posted" badge.
   Email is out of scope for v1; `dead` means "human attention within 24
-  hours". `attemptedAt` is the first attempt, `lastRetryAt` the latest; a
-  successful retry leaves `retryCount` unchanged.
+  hours". `retryCount` counts failed attempts; `attemptedAt` is the first
+  attempt, `lastRetryAt` the latest; a successful retry leaves `retryCount`
+  unchanged. The failure-queue read rule ships with the trigger/loading-sheet
+  batch.
 - **Deploy chain:** everything except the trigger **and the loading sheet**
   can ship first — feeds, recipes, targets, groups, inventory/ledger
   (manual), accuracy, IOFC and retroactive posting. With the queue
