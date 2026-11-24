@@ -119,6 +119,14 @@ beforeEach(async () => {
       idempotencyKey: 'feeding-key-other',
       createdBy: 'member',
     });
+    await setDoc(doc(db, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20'), {
+      farmId: 'f1',
+      herdGroupId: 'g1',
+      date: '2026-11-20',
+      milkKg: 3000,
+      milkPricePerKg: 0.5,
+      source: 'manual',
+    });
     await setDoc(doc(db, 'farms', 'f1', 'inventoryItems', 'feed1'), {
       feedId: 'feed1',
       onHandKgAsFed: 1000,
@@ -333,5 +341,33 @@ test('a feeder account reads only the feedings it entered', async () => {
   const member = dbFor('member');
   await assertSucceeds(
     getDoc(doc(member, 'farms', 'f1', 'feedings', 'feeding-other')),
+  );
+});
+
+
+test('milk records are owner/admin/consultant only', async () => {
+  const member = dbFor('member');
+  await assertSucceeds(
+    getDoc(doc(member, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20')),
+  );
+  await assertSucceeds(
+    setDoc(doc(member, 'farms', 'f1', 'milkRecords', 'g1_2026-11-21'), {
+      farmId: 'f1',
+      herdGroupId: 'g1',
+      date: '2026-11-21',
+      milkKg: 3100,
+      milkPricePerKg: 0.5,
+      source: 'manual',
+    }),
+  );
+
+  const feeder = dbFor('feeder');
+  await assertFails(
+    getDoc(doc(feeder, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20')),
+  );
+
+  const other = dbFor('other');
+  await assertFails(
+    getDoc(doc(other, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20')),
   );
 });

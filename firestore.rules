@@ -152,6 +152,20 @@ service cloud.firestore {
           && resource.data.status == 'draft';
       }
 
+      // ── Milk records (economics: owner/admin/consultant only) ──
+      match /milkRecords/{recordId} {
+        allow read: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant']
+        );
+        allow create, update: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant']
+        )
+          && request.resource.data.farmId == farmId;
+        allow delete: if hasRole(farmId, ['owner', 'farmAdmin']);
+      }
+
       // ── Inventory (callable-written, member-readable) ──
       match /inventoryItems/{itemId} {
         allow read: if isMember(farmId);

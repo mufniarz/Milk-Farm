@@ -62,6 +62,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'iofc',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/iofc/iofc.component').then(
+        (m) => m.IofcComponent
+      ),
+  },
+  {
     path: 'accuracy',
     canActivate: [authGuard],
     loadComponent: () =>

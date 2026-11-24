@@ -174,6 +174,10 @@ inventory and target overrides require `farmMembers`.
   (`createdBy == uid`), and the report UI is restricted to
   owner/admin/consultant; a server-side report callable is the consultant-scale
   path.
+- IOFC lives at `/iofc`: milk records keyed by group and local date, feed
+  cost from the active recipe, IOFC/day, per cow, milk per cow and feed cost
+  per kg. Milk records are owner/admin/consultant only. Dry groups show IOFC
+  as not applicable.
 - **Pre-deploy requirement:** the trigger failure queue/alert must exist
   before the trigger is deployed. The SDK cannot enable retry (0.6.0 stable and
   0.7.0rc0 both hardcode `retry=False`), so a transient failure otherwise

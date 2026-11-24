@@ -60,6 +60,14 @@ import { AuthService } from './core/services/auth.service';
             </a>
             <a
               mat-list-item
+              routerLink="/iofc"
+              routerLinkActive="active-link"
+            >
+              <mat-icon matListItemIcon>trending_up</mat-icon>
+              <span matListItemTitle>{{ 'NAV.IOFC' | translate }}</span>
+            </a>
+            <a
+              mat-list-item
               routerLink="/accuracy"
               routerLinkActive="active-link"
             >

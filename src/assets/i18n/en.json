@@ -10,7 +10,8 @@
     "GROUPS": "Groups",
     "INVENTORY": "Inventory",
     "LOADING": "Loading",
-    "ACCURACY": "Accuracy"
+    "ACCURACY": "Accuracy",
+    "IOFC": "IOFC"
   },
   "AUTH": {
     "LOGIN": "Login",
@@ -261,5 +262,26 @@
     "WORST_TOOLTIP": "Mean absolute deviation, highest first; ties alphabetical.",
     "TREND_TOOLTIP": "Monday-start weeks; mean absolute deviation.",
     "RESTRICTED": "Only the owner, farm admin or consultant can view this report."
+  },
+  "IOFC": {
+    "TITLE": "Income over feed cost",
+    "SUBTITLE": "Daily margin per group: milk revenue minus feed cost.",
+    "GROUP": "Group",
+    "DATE": "Date",
+    "MILK_KG": "Milk (group kg)",
+    "MILK_PRICE": "Milk price (€/kg)",
+    "SAVE": "Save",
+    "SAVED": "Record saved.",
+    "SAVE_FAILED": "Could not save.",
+    "REVENUE": "Milk revenue",
+    "FEED_COST": "Feed cost",
+    "IOFC_DAY": "IOFC / day",
+    "IOFC_COW": "IOFC / cow / day",
+    "MILK_COW": "Milk / cow",
+    "FEED_PER_KG": "Feed cost / kg milk",
+    "TREND": "Recent days",
+    "NO_RECIPE": "This group has no active ration: feed cost is zero until you assign one.",
+    "DRY": "IOFC does not apply to dry groups.",
+    "EMPTY": "Select a group with a milk record."
   }
 }

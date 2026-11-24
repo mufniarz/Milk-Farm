@@ -33,9 +33,9 @@ numbers.
 | Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 14 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting (single, overdrawn, duplicate-feed, dedup, cleared audit) |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading and accuracy math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 18 passed — 3 calculator parity + 6 loading math (incl. local date) + 9 accuracy (drafts excluded, pending included, corrections/anomalies flagged, aggregation, intake efficiency incl. zero-loaded null, Italian CSV) |
+| Client engine, loading, accuracy and IOFC math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 21 passed — 3 calculator parity + 6 loading math + 9 accuracy + 3 IOFC |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
-| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 14 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, feeder-own feedings only |
+| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 15 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, feeder-own feedings only, milk-record roles |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
 | Full suite incl. callables | `npm run test:functions` | 32 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 14 callable/trigger/retroactive) |
 
@@ -249,6 +249,29 @@ Implemented as a separate, auditable action:
   sees why nothing changed.
 - **UI.** The inventory page has a "Post skipped loads" action on the
   selected item; the callable reports how many lines it posted.
+
+## K. IOFC
+
+The first Stage 2 item is in place:
+
+- **Milk records** at `/farms/{farmId}/milkRecords/{groupId}_{date}`:
+  whole-group daily `milkKg`, `milkPricePerKg`, optional fat/protein, and a
+  `feedCostPerHeadSnapshot`. The local calendar date is the record key.
+  Owner/admin/consultant can read/write; feeders cannot. The
+  `milkRecords(herdGroupId, date)` index is in place.
+- **Math** in `core/utils/iofc.ts`: revenue = `milkKg x price`; feed cost =
+  `headCount x per-head recipe cost`; IOFC = revenue - feed cost; per-cow,
+  milk-per-cow and feed-cost-per-kg derived. Zero milk yields a null
+  feed-cost-per-kg (rendered as `—`), not infinity.
+- **Acceptance:** 100 cows x 30 kg x EUR 0.50 = EUR 1,500 revenue; 100 x
+  EUR 4.50 = EUR 450 feed; IOFC EUR 1,050/day, EUR 10.50/cow/day,
+  EUR 0.15/kg feed cost. Covered by `iofc.spec.ts`.
+- **Dashboard** at `/iofc`: group, date, group milk and price; cards for
+  revenue, feed cost, IOFC/day, IOFC/cow, milk/cow and feed cost/kg; a
+  four-day trend from the stored records. Dry groups show IOFC as not
+  applicable; a group without an active recipe warns that feed cost is zero.
+- **Still to do in Stage 2:** what-if scenarios, sensitivity at +/-5/10% for
+  the top ingredients, saved scenario library, and the comparison export.
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 
