@@ -5,7 +5,10 @@
     "FEEDS": "Alimenti",
     "RECIPES": "Ricette",
     "LOGOUT": "Esci",
-    "SETTINGS": "Impostazioni"
+    "SETTINGS": "Impostazioni",
+    "TARGETS": "Obiettivi",
+    "GROUPS": "Gruppi",
+    "INVENTORY": "Scorte"
   },
   "AUTH": {
     "LOGIN": "Accedi",
@@ -138,5 +141,60 @@
     "NO": "No",
     "CLOSE": "Chiudi",
     "ACTIONS": "Azioni"
+  },
+  "TARGETS": {
+    "TITLE": "Obiettivi nutrizionali",
+    "SUBTITLE": "I range del workbook restano il riferimento. Puoi sostituirli per la tua azienda con una motivazione.",
+    "ANIMAL_GROUP": "Gruppo animale",
+    "NUTRIENT": "Nutriente",
+    "REFERENCE": "Riferimento",
+    "FARM": "Azienda",
+    "REASON": "Motivazione",
+    "MIN": "Min",
+    "MAX": "Max",
+    "REASON_PLACEHOLDER": "Perché questo range?",
+    "SAVE": "Salva",
+    "REVERT": "Ripristina",
+    "ADMIN_ONLY": "Solo il titolare o un amministratore può modificare gli obiettivi.",
+    "REASON_REQUIRED": "Inserisci una motivazione di almeno 10 caratteri.",
+    "SAVED": "Obiettivo aggiornato.",
+    "REVERTED": "Obiettivo ripristinato al riferimento.",
+    "SAVE_FAILED": "Salvataggio non riuscito."
+  },
+  "GROUPS": {
+    "TITLE": "Gruppi di animali",
+    "SUBTITLE": "Ogni gruppo ha un numero di capi e la razione attiva. Il numero di capi del gruppo è la fonte per costi e scorte.",
+    "NAME": "Nome gruppo",
+    "CATEGORY": "Categoria nutrizionale",
+    "HEAD_COUNT": "Numero capi",
+    "ACTIVE_RECIPE": "Razione attiva",
+    "NONE": "Nessuna",
+    "CREATE": "Crea gruppo",
+    "CREATED": "Gruppo creato.",
+    "EMPTY": "Nessun gruppo. Creane uno per collegare razione, costi e scorte."
+  },
+  "INVENTORY": {
+    "TITLE": "Scorte alimenti",
+    "SUBTITLE": "Giacenze in kg tal quale e copertura in giorni rispetto alla razione attiva dei gruppi.",
+    "FEED": "Alimento",
+    "REORDER_DAYS": "Soglia riordino (giorni)",
+    "LOCATION": "Posizione",
+    "UNIT_COST": "Costo €/kg t.q.",
+    "ADD_ITEM": "Aggiungi articolo",
+    "ON_HAND": "Giacenza",
+    "DAILY_USE": "Uso giornaliero",
+    "DAYS": "Giorni di copertura",
+    "UNTRACKED": "n/d",
+    "EMPTY": "Nessun articolo. Aggiungi un alimento per iniziare.",
+    "URGENT_ALERT": "alimenti sotto 5 giorni di copertura",
+    "CAUTION_ALERT": "alimenti tra 5 e 10 giorni di copertura",
+    "DELIVERY_QTY": "Quantità consegnata (kg t.q.)",
+    "NOTE": "Nota",
+    "RECORD_DELIVERY": "Registra consegna",
+    "ADJUST_DELTA": "Correzione (+/- kg t.q.)",
+    "REASON": "Motivo",
+    "ADJUST": "Correggi",
+    "DELIVERY_SAVED": "Consegna registrata.",
+    "ADJUST_SAVED": "Correzione registrata."
   }
 }

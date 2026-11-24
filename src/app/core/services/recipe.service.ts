@@ -18,16 +18,16 @@ import { Observable } from 'rxjs';
 import { filter, switchMap, take } from 'rxjs/operators';
 import { Recipe, AnimalGroupId } from '../models/recipe.model';
 import { RecipeFeed } from '../models/feed.model';
-import { AuthService } from './auth.service';
+import { FarmContextService } from './farm-context.service';
 
 @Injectable({ providedIn: 'root' })
 export class RecipeService {
   private firestore = inject(Firestore);
-  private authService = inject(AuthService);
+  private farmContext = inject(FarmContextService);
 
   readonly loading = signal(false);
 
-  private readonly farmId$ = toObservable(this.authService.farmId).pipe(
+  private readonly farmId$ = toObservable(this.farmContext.activeFarmId).pipe(
     filter((id) => !!id),
   );
 
@@ -95,7 +95,7 @@ export class RecipeService {
   ): Promise<string> {
     this.loading.set(true);
     try {
-      const farmId = this.authService.farmId();
+      const farmId = this.farmContext.activeFarmId();
 
       // Create recipe document
       const recipesRef = collection(this.firestore, 'recipes');

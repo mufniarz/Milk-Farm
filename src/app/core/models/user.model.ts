@@ -18,6 +18,32 @@ export interface UserProfile {
   lastLoginAt?: Date;
 }
 
+/** Roles a user can hold on a farm. */
+export type FarmRole = 'owner' | 'farmAdmin' | 'consultant' | 'feeder';
+
+/** Lifecycle of a farm membership. */
+export type FarmMemberStatus = 'invited' | 'active' | 'revoked';
+
+/**
+ * A user's membership in one farm. Stored in Firestore:
+ * `/farmMembers/{farmId}_{uid}`. The deterministic id keeps rule lookups to a
+ * single document get and lets a consultant belong to several farms.
+ */
+export interface FarmMember {
+  farmId: string;
+  uid: string;
+  role: FarmRole;
+  status: FarmMemberStatus;
+  invitedBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A membership together with the farm's display name, for the switcher. */
+export interface FarmMembership extends FarmMember {
+  farmName: string;
+}
+
 /**
  * Farm entity (could be a standalone collection or embedded in user profile).
  * For now, farmId is a simple string identifier.

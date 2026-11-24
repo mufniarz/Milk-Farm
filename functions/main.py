@@ -8,7 +8,7 @@ import base64
 import io
 
 from firebase_functions import https_fn, options
-from firebase_admin import initialize_app
+from firebase_admin import firestore, initialize_app
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
@@ -230,7 +230,13 @@ def build_recipe_workbook(recipe, feeds, nutrients, target_list):
 
     # ── valori stimati su s.s. | valori ideali ──
     analysis = recipe.get("nutrientAnalysis") or {}
-    est_headers = ["Nutriente", "valori stimati su s.s.", "valori ideali", "u.m."]
+    est_headers = [
+        "Nutriente",
+        "valori stimati su s.s.",
+        "valori ideali",
+        "u.m.",
+        "Origine",
+    ]
     for col, label in enumerate(est_headers, start=1):
         cell = ws.cell(row=row, column=col, value=label)
         cell.font = header_font
@@ -257,13 +263,36 @@ def build_recipe_workbook(recipe, feeds, nutrients, target_list):
         if code not in seen:
             ordered.append({"code": code, "label": code, "unit": ""})
 
+    overridden = []
     for n in ordered:
         code = n["code"]
+        target = targets.get(code) or {}
+        is_override = target.get("source") == "override"
+        if is_override:
+            overridden.append((n.get("label", code), target.get("reason")))
         ws.cell(row=row, column=1, value=n.get("label", code))
         ws.cell(row=row, column=2, value=round(analysis.get(code, 0), 2))
-        ws.cell(row=row, column=3, value=format_range(targets.get(code)))
+        ws.cell(row=row, column=3, value=format_range(target))
         ws.cell(row=row, column=4, value=n.get("unit", ""))
+        ws.cell(
+            row=row,
+            column=5,
+            value="aziendale" if is_override else "riferimento",
+        )
         row += 1
+
+    if overridden:
+        row += 1
+        ws.cell(
+            row=row,
+            column=1,
+            value="Nota: i valori ideali contrassegnati come \"aziendale\" sono override della singola azienda.",
+        ).font = Font(italic=True, size=9)
+        row += 1
+        for label, reason in overridden:
+            text = f"{label}: {reason or '-'}"
+            ws.cell(row=row, column=1, value=text).font = Font(italic=True, size=9)
+            row += 1
 
     for column_cells in ws.columns:
         length = max((len(str(c.value)) for c in column_cells if c.value is not None), default=10)
@@ -276,3 +305,535 @@ def build_recipe_workbook(recipe, feeds, nutrients, target_list):
     safe_name = "".join(c for c in recipe.get("name", "ration") if c.isalnum() or c in " -_").strip() or "ration"
 
     return f"{safe_name}.xlsx", buffer.read()
+
+
+# ── Target overrides ────────────────────────────────────────────────────────
+# Overrides are written through callables, not the client: the server checks
+# the farm role and writes the audit entry in the same transaction, so the
+# author and reason cannot be spoofed.
+
+_VALID_ANIMAL_GROUPS = {"lactating", "dry", "heifer"}
+_MIN_REASON_LENGTH = 10
+
+
+def _require_farm_admin(farm_id, uid):
+    db = firestore.client()
+    member = db.collection("farmMembers").document(f"{farm_id}_{uid}").get()
+    if not member.exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="No access to this farm.",
+        )
+    data = member.to_dict() or {}
+    if data.get("status") != "active" or data.get("role") not in (
+        "owner",
+        "farmAdmin",
+    ):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Farm admin role required.",
+        )
+    return db
+
+
+def _validate_override(data, require_reason=True):
+    farm_id = data.get("farmId")
+    animal_group_id = data.get("animalGroupId")
+    nutrient_code = data.get("nutrientCode")
+    if not isinstance(farm_id, str) or not farm_id:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="farmId is required.",
+        )
+    if animal_group_id not in _VALID_ANIMAL_GROUPS:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="Unknown animalGroupId.",
+        )
+    if not isinstance(nutrient_code, str) or not nutrient_code:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="nutrientCode is required.",
+        )
+    min_value = data.get("minValue")
+    max_value = data.get("maxValue")
+    for value in (min_value, max_value):
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, (int, float))
+        ):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message="minValue/maxValue must be numbers or null.",
+            )
+    if min_value is not None and max_value is not None and min_value > max_value:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="minValue must be <= maxValue.",
+        )
+    reason = data.get("reason")
+    if require_reason:
+        if not isinstance(reason, str) or len(reason.strip()) < _MIN_REASON_LENGTH:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message=f"A reason of at least {_MIN_REASON_LENGTH} characters is required.",
+            )
+        reason = reason.strip()
+    return farm_id, animal_group_id, nutrient_code, min_value, max_value, reason
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def set_target_override(req: https_fn.CallableRequest):
+    """Set one nutrient override for a farm and append an audit entry."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    farm_id, animal_group_id, nutrient_code, min_value, max_value, reason = (
+        _validate_override(req.data or {})
+    )
+    db = _require_farm_admin(farm_id, req.auth.uid)
+
+    override_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("targetOverrides")
+        .document(animal_group_id)
+    )
+    audit_ref = (
+        db.collection("farms").document(farm_id).collection("auditLog").document()
+    )
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = override_ref.get(transaction=transaction)
+        existing = snapshot.to_dict() if snapshot.exists else {}
+        nutrients = dict(existing.get("nutrients") or {})
+        before = nutrients.get(nutrient_code)
+        after = {
+            "minValue": min_value,
+            "maxValue": max_value,
+            "reason": reason,
+            "updatedBy": req.auth.uid,
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+        }
+        nutrients[nutrient_code] = after
+        transaction.set(
+            override_ref,
+            {
+                "groupId": animal_group_id,
+                "nutrients": nutrients,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+                "version": int(existing.get("version") or 0) + 1,
+            },
+            merge=True,
+        )
+        transaction.set(
+            audit_ref,
+            {
+                "action": "target.override.set",
+                "farmId": farm_id,
+                "animalGroupId": animal_group_id,
+                "nutrientCode": nutrient_code,
+                "before": before,
+                "after": after,
+                "reason": reason,
+                "actorUid": req.auth.uid,
+                "actorEmail": (req.auth.token or {}).get("email"),
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
+    return {
+        "ok": True,
+        "farmId": farm_id,
+        "animalGroupId": animal_group_id,
+        "nutrientCode": nutrient_code,
+        "minValue": min_value,
+        "maxValue": max_value,
+    }
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def clear_target_override(req: https_fn.CallableRequest):
+    """Revert one nutrient to the workbook reference range."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    farm_id, animal_group_id, nutrient_code, _, _, _ = _validate_override(
+        req.data or {}, require_reason=False
+    )
+    db = _require_farm_admin(farm_id, req.auth.uid)
+
+    override_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("targetOverrides")
+        .document(animal_group_id)
+    )
+    audit_ref = (
+        db.collection("farms").document(farm_id).collection("auditLog").document()
+    )
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = override_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return
+        existing = snapshot.to_dict() or {}
+        nutrients = dict(existing.get("nutrients") or {})
+        if nutrient_code not in nutrients:
+            return
+        before = nutrients.pop(nutrient_code)
+        if nutrients:
+            transaction.set(
+                override_ref,
+                {
+                    "groupId": animal_group_id,
+                    "nutrients": nutrients,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                    "version": int(existing.get("version") or 0) + 1,
+                },
+                merge=True,
+            )
+        else:
+            transaction.delete(override_ref)
+        transaction.set(
+            audit_ref,
+            {
+                "action": "target.override.clear",
+                "farmId": farm_id,
+                "animalGroupId": animal_group_id,
+                "nutrientCode": nutrient_code,
+                "before": before,
+                "after": None,
+                "reason": "reverted to reference",
+                "actorUid": req.auth.uid,
+                "actorEmail": (req.auth.token or {}).get("email"),
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
+    return {
+        "ok": True,
+        "farmId": farm_id,
+        "animalGroupId": animal_group_id,
+        "nutrientCode": nutrient_code,
+    }
+
+
+# ── Inventory ───────────────────────────────────────────────────────────────
+# One inventory item per feed: the document id is the feed id. The on-hand
+# cache and the append-only ledger entry are written in one transaction; the
+# ledger doc id is deterministic so a retry cannot double-count.
+
+_INVENTORY_ROLES = ("owner", "farmAdmin", "consultant")
+_INVENTORY_ADMIN_ROLES = ("owner", "farmAdmin")
+
+
+def _require_farm_role(farm_id, uid, allowed):
+    db = firestore.client()
+    member = db.collection("farmMembers").document(f"{farm_id}_{uid}").get()
+    if not member.exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="No access to this farm.",
+        )
+    data = member.to_dict() or {}
+    if data.get("status") != "active" or data.get("role") not in allowed:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Insufficient farm role.",
+        )
+    return db
+
+
+def _require_string(data, key, min_length=1):
+    value = data.get(key)
+    if not isinstance(value, str) or len(value.strip()) < min_length:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message=f"{key} is required.",
+        )
+    return value.strip()
+
+
+def _require_number(data, key, positive=False, allow_zero=True):
+    value = data.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message=f"{key} must be a number.",
+        )
+    if positive and value <= 0:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message=f"{key} must be positive.",
+        )
+    if not allow_zero and value == 0:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message=f"{key} must not be zero.",
+        )
+    return float(value)
+
+
+def _inventory_item_ref(db, farm_id, feed_id):
+    return (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("inventoryItems")
+        .document(feed_id)
+    )
+
+
+def _write_audit(transaction, db, farm_id, payload):
+    audit_ref = (
+        db.collection("farms").document(farm_id).collection("auditLog").document()
+    )
+    transaction.set(audit_ref, payload)
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def upsert_inventory_item(req: https_fn.CallableRequest):
+    """Create or update the per-feed inventory settings."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    farm_id = _require_string(data, "farmId")
+    feed_id = _require_string(data, "feedId")
+    db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
+
+    feed = db.collection("feeds").document(feed_id).get()
+    if not feed.exists or (feed.to_dict() or {}).get("farmId") != farm_id:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.NOT_FOUND,
+            message="Feed not found on this farm.",
+        )
+    feed_data = feed.to_dict() or {}
+
+    reorder_point_days = data.get("reorderPointDays", 7)
+    if isinstance(reorder_point_days, bool) or not isinstance(
+        reorder_point_days, (int, float)
+    ):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="reorderPointDays must be a number.",
+        )
+    unit_cost = data.get("unitCostPerKgAsFed", feed_data.get("pricePerKg", 0))
+    unit_cost = _require_number(
+        {"unitCostPerKgAsFed": unit_cost}, "unitCostPerKgAsFed"
+    )
+
+    item_ref = _inventory_item_ref(db, farm_id, feed_id)
+    existing = item_ref.get()
+    payload = {
+        "feedId": feed_id,
+        "feedName": feed_data.get("name", feed_id),
+        "reorderPointDays": max(0, int(reorder_point_days)),
+        "location": str(data.get("location") or ""),
+        "unitCostPerKgAsFed": unit_cost,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+    if not existing.exists:
+        payload["onHandKgAsFed"] = 0
+        payload["createdAt"] = firestore.SERVER_TIMESTAMP
+    item_ref.set(payload, merge=True)
+    return {"ok": True, "itemId": feed_id}
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def record_delivery(req: https_fn.CallableRequest):
+    """Add a delivery to the on-hand cache and the ledger in one transaction."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    farm_id = _require_string(data, "farmId")
+    feed_id = _require_string(data, "feedId")
+    quantity = _require_number(data, "quantityKgAsFed", positive=True)
+    unit_cost = _require_number(data, "unitCostPerKgAsFed")
+    idempotency_key = _require_string(data, "idempotencyKey", min_length=6)
+    db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ROLES)
+
+    item_ref = _inventory_item_ref(db, farm_id, feed_id)
+    ledger_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("inventoryTransactions")
+        .document(f"{farm_id}_delivery_{idempotency_key}")
+    )
+
+    @firestore.transactional
+    def apply(transaction):
+        item = item_ref.get(transaction=transaction)
+        if not item.exists:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+                message="Create the inventory item before recording a delivery.",
+            )
+        existing = ledger_ref.get(transaction=transaction)
+        if existing.exists:
+            return
+        item_data = item.to_dict() or {}
+        before = float(item_data.get("onHandKgAsFed") or 0)
+        after = before + quantity
+        transaction.update(
+            item_ref,
+            {
+                "onHandKgAsFed": after,
+                "unitCostPerKgAsFed": unit_cost,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        transaction.set(
+            ledger_ref,
+            {
+                "itemId": feed_id,
+                "type": "delivery",
+                "deltaKgAsFed": quantity,
+                "unitCostPerKgAsFed": unit_cost,
+                "sourceType": "manual",
+                "sourceId": idempotency_key,
+                "idempotencyKey": idempotency_key,
+                "createdBy": req.auth.uid,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "note": str(data.get("note") or ""),
+            },
+        )
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "inventory.delivery",
+                "farmId": farm_id,
+                "itemId": feed_id,
+                "before": before,
+                "after": after,
+                "reason": str(data.get("note") or "delivery"),
+                "actorUid": req.auth.uid,
+                "actorEmail": (req.auth.token or {}).get("email"),
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
+    return {"ok": True, "itemId": feed_id}
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def adjust_inventory(req: https_fn.CallableRequest):
+    """Apply a signed manual correction to on-hand stock."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    farm_id = _require_string(data, "farmId")
+    item_id = _require_string(data, "itemId")
+    delta = _require_number(data, "deltaKgAsFed", allow_zero=False)
+    reason = _require_string(data, "reason", min_length=3)
+    idempotency_key = _require_string(data, "idempotencyKey", min_length=6)
+    db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
+
+    item_ref = _inventory_item_ref(db, farm_id, item_id)
+    ledger_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("inventoryTransactions")
+        .document(f"{farm_id}_adjust_{idempotency_key}")
+    )
+
+    @firestore.transactional
+    def apply(transaction):
+        item = item_ref.get(transaction=transaction)
+        if not item.exists:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.NOT_FOUND,
+                message="Inventory item not found.",
+            )
+        existing = ledger_ref.get(transaction=transaction)
+        if existing.exists:
+            return
+        item_data = item.to_dict() or {}
+        before = float(item_data.get("onHandKgAsFed") or 0)
+        after = before + delta
+        if after < 0:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+                message="Adjustment would make on-hand stock negative.",
+            )
+        transaction.update(
+            item_ref,
+            {
+                "onHandKgAsFed": after,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        transaction.set(
+            ledger_ref,
+            {
+                "itemId": item_id,
+                "type": "adjustment",
+                "deltaKgAsFed": delta,
+                "unitCostPerKgAsFed": float(
+                    item_data.get("unitCostPerKgAsFed") or 0
+                ),
+                "sourceType": "manual",
+                "sourceId": idempotency_key,
+                "idempotencyKey": idempotency_key,
+                "createdBy": req.auth.uid,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "note": reason,
+            },
+        )
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "inventory.adjustment",
+                "farmId": farm_id,
+                "itemId": item_id,
+                "before": before,
+                "after": after,
+                "reason": reason,
+                "actorUid": req.auth.uid,
+                "actorEmail": (req.auth.token or {}).get("email"),
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
+    return {"ok": True, "itemId": item_id}

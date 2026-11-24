@@ -7,24 +7,39 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserFarmId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.farmId;
+    // Deterministic membership id: {farmId}_{uid}. A single document lookup
+    // keeps the rules simple and lets one user belong to several farms.
+    function isMember(farmId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/farmMembers/$(farmId + '_' + request.auth.uid))
+        && get(/databases/$(database)/documents/farmMembers/$(farmId + '_' + request.auth.uid)).data.status == 'active';
     }
 
-    function belongsToUserFarm(farmId) {
-      return isAuthenticated() && farmId == getUserFarmId();
+    function hasRole(farmId, roles) {
+      return isMember(farmId)
+        && get(/databases/$(database)/documents/farmMembers/$(farmId + '_' + request.auth.uid)).data.role in roles;
+    }
+
+    // Compatibility window while the farmMembers backfill rolls out.
+    // Remove this helper and every canAccessFarm() call once the backfill has
+    // been verified and strict rules are deployed.
+    function isLegacyFarmUser(farmId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.farmId == farmId;
+    }
+
+    function canAccessFarm(farmId) {
+      return isMember(farmId) || isLegacyFarmUser(farmId);
     }
 
     // ─── Nutrients (shared, read-only) ──────────────────────────────────
-    // Master nutrient list is shared across all farms.
-    // Only writable via Admin SDK / Firebase console.
     match /nutrients/{nutrientId} {
       allow read: if isAuthenticated();
       allow write: if false;
     }
 
     // ─── Animal Groups (shared, read-only) ──────────────────────────────
-    // Pre-defined animal groups with target ranges.
     match /animalGroups/{groupId} {
       allow read: if isAuthenticated();
       allow write: if false;
@@ -35,67 +50,116 @@ service cloud.firestore {
       }
     }
 
+    // ─── Farm Memberships ───────────────────────────────────────────────
+    // Reads: the member themselves, or a farm admin listing the farm's team.
+    // Writes: the owner may create their own owner membership when they
+    // create the farm; every other grant/revoke goes through a callable.
+    match /farmMembers/{memberId} {
+      allow read: if isAuthenticated()
+        && (resource.data.uid == request.auth.uid
+            || hasRole(resource.data.farmId, ['owner', 'farmAdmin']));
+
+      allow create: if isAuthenticated()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'owner'
+        && request.resource.data.status == 'active'
+        && memberId == request.resource.data.farmId + '_' + request.auth.uid
+        && get(/databases/$(database)/documents/farms/$(request.resource.data.farmId)).data.ownerUid == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
+    // ─── Farms ──────────────────────────────────────────────────────────
+    match /farms/{farmId} {
+      allow read: if isAuthenticated()
+        && (resource.data.ownerUid == request.auth.uid
+            || isMember(farmId)
+            || isLegacyFarmUser(farmId));
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isAuthenticated()
+        && (resource.data.ownerUid == request.auth.uid
+            || hasRole(farmId, ['owner', 'farmAdmin']))
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+
+      // ── Target overrides (callable-written, member-readable) ──
+      // The document id is the nutritional category (lactating/dry/heifer),
+      // not the herd group id.
+      match /targetOverrides/{animalGroupId} {
+        allow read: if isMember(farmId);
+        allow write: if false;
+      }
+
+      // ── Audit log (Admin SDK / callable writes only) ──
+      match /auditLog/{entryId} {
+        allow read: if hasRole(farmId, ['owner', 'farmAdmin']);
+        allow write: if false;
+      }
+
+      // ── Herd groups (subcollection: the path scopes the farm) ──
+      match /groups/{groupId} {
+        allow read: if isMember(farmId);
+        allow create, update, delete: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant']
+        );
+      }
+
+      // ── Inventory (callable-written, member-readable) ──
+      match /inventoryItems/{itemId} {
+        allow read: if isMember(farmId);
+        allow write: if false;
+      }
+      match /inventoryTransactions/{txId} {
+        allow read: if isMember(farmId);
+        allow write: if false;
+      }
+    }
+
     // ─── Feeds (per-farm) ───────────────────────────────────────────────
     match /feeds/{feedId} {
       allow read: if isAuthenticated()
-        && resource.data.farmId == getUserFarmId();
+        && canAccessFarm(resource.data.farmId);
       allow create: if isAuthenticated()
-        && request.resource.data.farmId == getUserFarmId();
+        && canAccessFarm(request.resource.data.farmId);
       allow delete: if isAuthenticated()
-        && resource.data.farmId == getUserFarmId();
+        && canAccessFarm(resource.data.farmId);
       // farmId is immutable: an update may never move a feed to another farm.
       allow update: if isAuthenticated()
-        && resource.data.farmId == getUserFarmId()
+        && canAccessFarm(resource.data.farmId)
         && request.resource.data.farmId == resource.data.farmId;
     }
 
     // ─── Recipes (per-farm) ─────────────────────────────────────────────
     match /recipes/{recipeId} {
       allow read: if isAuthenticated()
-        && resource.data.farmId == getUserFarmId();
+        && canAccessFarm(resource.data.farmId);
       allow create: if isAuthenticated()
-        && request.resource.data.farmId == getUserFarmId();
+        && canAccessFarm(request.resource.data.farmId);
       allow delete: if isAuthenticated()
-        && resource.data.farmId == getUserFarmId();
-      // farmId is immutable: an update may never move a recipe to another farm.
+        && canAccessFarm(resource.data.farmId);
       allow update: if isAuthenticated()
-        && resource.data.farmId == getUserFarmId()
+        && canAccessFarm(resource.data.farmId)
         && request.resource.data.farmId == resource.data.farmId;
 
-      // Recipe feed entries subcollection
       match /feeds/{feedEntryId} {
         allow read: if isAuthenticated()
-          && get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId == getUserFarmId();
+          && canAccessFarm(get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId);
         allow write: if isAuthenticated()
-          && get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId == getUserFarmId();
+          && canAccessFarm(get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId);
       }
     }
 
     // ─── User Profiles ──────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isAuthenticated() && request.auth.uid == userId;
-      // farmId may only be set to a farm the caller actually owns, so a
-      // profile write can never grant access to someone else's farm data.
       allow create: if isAuthenticated() && request.auth.uid == userId
         && get(/databases/$(database)/documents/farms/$(request.resource.data.farmId)).data.ownerUid == request.auth.uid;
       // farmId is immutable after creation — only non-farm profile fields
       // (displayName, language, ...) may be updated.
       allow update: if isAuthenticated() && request.auth.uid == userId
         && request.resource.data.farmId == resource.data.farmId;
-      allow delete: if false;
-    }
-
-    // ─── Farms ──────────────────────────────────────────────────────────
-    match /farms/{farmId} {
-      allow read: if isAuthenticated()
-        && resource.data.ownerUid == request.auth.uid;
-      allow create: if isAuthenticated()
-        && request.resource.data.ownerUid == request.auth.uid;
-      // ownerUid is immutable: a farm can never be handed to another account
-      // through a client write.
-      allow update: if isAuthenticated()
-        && resource.data.ownerUid == request.auth.uid
-        && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if false;
     }
   }

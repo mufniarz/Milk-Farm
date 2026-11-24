@@ -5,7 +5,10 @@
     "FEEDS": "Feeds",
     "RECIPES": "Recipes",
     "LOGOUT": "Logout",
-    "SETTINGS": "Settings"
+    "SETTINGS": "Settings",
+    "TARGETS": "Targets",
+    "GROUPS": "Groups",
+    "INVENTORY": "Inventory"
   },
   "AUTH": {
     "LOGIN": "Login",
@@ -138,5 +141,60 @@
     "NO": "No",
     "CLOSE": "Close",
     "ACTIONS": "Actions"
+  },
+  "TARGETS": {
+    "TITLE": "Nutrient targets",
+    "SUBTITLE": "The workbook ranges remain the reference. Replace one for your farm with a reason.",
+    "ANIMAL_GROUP": "Animal group",
+    "NUTRIENT": "Nutrient",
+    "REFERENCE": "Reference",
+    "FARM": "Farm",
+    "REASON": "Reason",
+    "MIN": "Min",
+    "MAX": "Max",
+    "REASON_PLACEHOLDER": "Why this range?",
+    "SAVE": "Save",
+    "REVERT": "Revert",
+    "ADMIN_ONLY": "Only the owner or a farm admin can change targets.",
+    "REASON_REQUIRED": "Enter a reason of at least 10 characters.",
+    "SAVED": "Target updated.",
+    "REVERTED": "Target reverted to the reference.",
+    "SAVE_FAILED": "Could not save."
+  },
+  "GROUPS": {
+    "TITLE": "Herd groups",
+    "SUBTITLE": "Each group has a head count and an active ration. The group's head count is the source of truth for costs and inventory.",
+    "NAME": "Group name",
+    "CATEGORY": "Nutritional category",
+    "HEAD_COUNT": "Head count",
+    "ACTIVE_RECIPE": "Active ration",
+    "NONE": "None",
+    "CREATE": "Create group",
+    "CREATED": "Group created.",
+    "EMPTY": "No groups yet. Create one to link a ration, costs and inventory."
+  },
+  "INVENTORY": {
+    "TITLE": "Feed inventory",
+    "SUBTITLE": "On-hand kg as fed and days of cover against the groups' active rations.",
+    "FEED": "Feed",
+    "REORDER_DAYS": "Reorder point (days)",
+    "LOCATION": "Location",
+    "UNIT_COST": "Cost €/kg as fed",
+    "ADD_ITEM": "Add item",
+    "ON_HAND": "On hand",
+    "DAILY_USE": "Daily use",
+    "DAYS": "Days of cover",
+    "UNTRACKED": "n/a",
+    "EMPTY": "No items yet. Add a feed to start.",
+    "URGENT_ALERT": "feeds under 5 days of cover",
+    "CAUTION_ALERT": "feeds between 5 and 10 days of cover",
+    "DELIVERY_QTY": "Delivered quantity (kg as fed)",
+    "NOTE": "Note",
+    "RECORD_DELIVERY": "Record delivery",
+    "ADJUST_DELTA": "Correction (+/- kg as fed)",
+    "REASON": "Reason",
+    "ADJUST": "Adjust",
+    "DELIVERY_SAVED": "Delivery recorded.",
+    "ADJUST_SAVED": "Correction recorded."
   }
 }

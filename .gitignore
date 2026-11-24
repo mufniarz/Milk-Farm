@@ -8,6 +8,7 @@
 
 # Node
 /node_modules
+/.npm-cache
 npm-debug.log
 yarn-error.log
 
@@ -43,6 +44,8 @@ firebase-service-account.json
 .firebaserc
 firebase.json
 firebase-debug.log
+firestore-debug.log
+ui-debug.log
 
 # Python virtual environment
 venv/

@@ -5,6 +5,12 @@ export interface GoldenRationEntry {
   kgAsFed: number;
 }
 
+export interface GoldenTotals {
+  totalAsFed: number;
+  totalDM: number;
+  totalCost: number;
+}
+
 export const GOLDEN_RATION_LACTATING: GoldenRationEntry[] = [
   {
     "name": "mais trinciato aziendale",
@@ -58,4 +64,22 @@ export const GOLDEN_ANALYSIS_LACTATING: Record<string, number> = {
   "emicellulosa": 15.25,
   "foraggiPct": 43.86,
   "concentratiPct": 56.14
+};
+
+export const GOLDEN_TOTALS_LACTATING: GoldenTotals = {
+  "totalAsFed": 48.3,
+  "totalDM": 23.10246,
+  "totalCost": 9.885
+};
+
+export const GOLDEN_TOTALS_DRY: GoldenTotals = {
+  "totalAsFed": 19.9,
+  "totalDM": 6.6545,
+  "totalCost": 2.176
+};
+
+export const GOLDEN_TOTALS_HEIFER: GoldenTotals = {
+  "totalAsFed": 10,
+  "totalDM": 7.06836,
+  "totalCost": 1.992
 };

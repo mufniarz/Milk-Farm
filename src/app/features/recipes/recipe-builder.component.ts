@@ -1,5 +1,6 @@
 import {
   Component,
+  effect,
   inject,
   OnInit,
   signal,
@@ -41,7 +42,12 @@ import {
 } from '../../core/services/ration-calculator.service';
 import { Feed } from '../../core/models/feed.model';
 import { AnimalGroupId } from '../../core/models/recipe.model';
-import { NutrientTarget } from '../../core/models/nutrient.model';
+import {
+  EffectiveNutrientTarget,
+  NutrientTarget,
+} from '../../core/models/nutrient.model';
+import { TargetService } from '../../core/services/target.service';
+import { FarmContextService } from '../../core/services/farm-context.service';
 import { TARGET_RANGES } from '../../core/data/initial-data';
 import { ChartData, ChartType } from 'chart.js';
 
@@ -443,7 +449,16 @@ interface RecipeFeedEntry {
                     ) {
                       <div class="nutrient-row">
                         <div class="nutrient-label">
-                          <span>{{ target.nutrientCode }}</span>
+                          <span class="nutrient-code">
+                            {{ target.nutrientCode }}
+                            @if (target.source === 'override') {
+                              <mat-icon
+                                class="override-badge"
+                                [matTooltip]="target.reason ?? ''"
+                                >edit</mat-icon
+                              >
+                            }
+                          </span>
                           <span class="nutrient-value">
                             {{
                               rationResult()!.nutrients[target.nutrientCode]
@@ -707,6 +722,19 @@ interface RecipeFeedEntry {
       font-size: 13px;
     }
 
+    .nutrient-code {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .override-badge {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+      color: #b26a00;
+    }
+
     .nutrient-value {
       font-weight: 600;
       font-size: 15px;
@@ -776,6 +804,8 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   private recipeService = inject(RecipeService);
   private optimizationService = inject(OptimizationService);
   private calculator = inject(RationCalculatorService);
+  private targetService = inject(TargetService);
+  private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -793,7 +823,7 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   /** Herd size the ration is mixed for; 1 keeps per-head figures. */
   animalCount = 1;
   constraints: OptimizationConstraints = {};
-  targets: NutrientTarget[] = TARGET_RANGES['lactating'];
+  targets: EffectiveNutrientTarget[] = this.referenceTargets('lactating');
 
   feedEntries = signal<RecipeFeedEntry[]>([]);
   rationResult = signal<RationResult | null>(null);
@@ -851,6 +881,15 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     return (this.rationResult()?.totalCost ?? 0) * (this.animalCount || 1);
   }
 
+  constructor() {
+    // Overrides can only be read once the active farm is known.
+    effect(() => {
+      if (this.farmContext.activeFarmId()) {
+        void this.loadTargets();
+      }
+    });
+  }
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
 
@@ -865,6 +904,8 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
         );
         if (id) {
           this.loadRecipe(id);
+        } else {
+          void this.loadTargets();
         }
       });
   }
@@ -875,7 +916,35 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
 
   /** Switch the active nutrient targets when the animal group changes. */
   onAnimalGroupChange(): void {
-    this.targets = TARGET_RANGES[this.animalGroupId] ?? [];
+    this.targets = this.referenceTargets(this.animalGroupId);
+    this.updateRadarChart();
+    void this.loadTargets();
+  }
+
+  /** Reference ranges with the source flag the template renders. */
+  private referenceTargets(groupId: AnimalGroupId): EffectiveNutrientTarget[] {
+    return (TARGET_RANGES[groupId] ?? []).map((target) => ({
+      ...target,
+      source: 'reference' as const,
+    }));
+  }
+
+  /**
+   * Load the farm's effective targets. A request token prevents a slow
+   * response for a previous animal group from overwriting the current one.
+   */
+  private targetLoadToken = 0;
+  private async loadTargets(): Promise<void> {
+    const token = ++this.targetLoadToken;
+    const groupId = this.animalGroupId;
+    const effective = await this.targetService.getEffectiveTargets(
+      this.farmContext.activeFarmId(),
+      groupId,
+    );
+    if (token !== this.targetLoadToken || groupId !== this.animalGroupId) {
+      return;
+    }
+    this.targets = effective;
     this.updateRadarChart();
   }
 
@@ -922,7 +991,8 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
       this.recipeName = recipe.name;
       this.animalGroupId = recipe.animalGroupId;
       this.animalCount = recipe.animalCount ?? 1;
-      this.targets = TARGET_RANGES[this.animalGroupId] ?? [];
+      this.targets = this.referenceTargets(this.animalGroupId);
+      void this.loadTargets();
 
       // Match recipe feeds to available feeds
       if (recipe.feeds) {

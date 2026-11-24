@@ -1,0 +1,182 @@
+{
+  "lactating": [
+    {
+      "nutrientCode": "umidita",
+      "minValue": 50,
+      "maxValue": 55,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "proteina",
+      "minValue": 14.5,
+      "maxValue": 16.5,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "ee",
+      "minValue": 4,
+      "maxValue": 5,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "amido",
+      "minValue": 22,
+      "maxValue": 28,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "zuccheri",
+      "minValue": 5,
+      "maxValue": 7,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "ceneri",
+      "minValue": 7.5,
+      "maxValue": 8.5,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "aNDF",
+      "minValue": 28,
+      "maxValue": 34,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "uNDF",
+      "minValue": 9,
+      "maxValue": 12,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "NFC",
+      "minValue": 38,
+      "maxValue": 44,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "ADF",
+      "minValue": 18,
+      "maxValue": 22,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "ADL",
+      "minValue": null,
+      "maxValue": 5,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "pectine",
+      "minValue": 5,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "ADF_aNDF",
+      "minValue": 60,
+      "maxValue": 65,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "uNDF_aNDF",
+      "minValue": 29,
+      "maxValue": 36.5,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "emicellulosa",
+      "minValue": 10,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "foraggiPct",
+      "minValue": 40,
+      "maxValue": 45,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "concentratiPct",
+      "minValue": 55,
+      "maxValue": 60,
+      "isActive": true
+    }
+  ],
+  "dry": [
+    {
+      "nutrientCode": "proteina",
+      "minValue": 12,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "amido",
+      "minValue": 11,
+      "maxValue": 12,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "aNDF",
+      "minValue": 50,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "ADF",
+      "minValue": 35,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "foraggiPct",
+      "minValue": 75,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "concentratiPct",
+      "minValue": null,
+      "maxValue": 25,
+      "isActive": true
+    }
+  ],
+  "heifer": [
+    {
+      "nutrientCode": "proteina",
+      "minValue": 14,
+      "maxValue": 15,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "amido",
+      "minValue": 12,
+      "maxValue": 15,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "aNDF",
+      "minValue": 25,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "NFC",
+      "minValue": 34,
+      "maxValue": 36,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "foraggiPct",
+      "minValue": 65,
+      "maxValue": null,
+      "isActive": true
+    },
+    {
+      "nutrientCode": "concentratiPct",
+      "minValue": null,
+      "maxValue": 35,
+      "isActive": true
+    }
+  ]
+}

@@ -16,18 +16,18 @@ import {
 import { Observable } from 'rxjs';
 import { filter, switchMap } from 'rxjs/operators';
 import { Feed } from '../models/feed.model';
-import { AuthService } from './auth.service';
+import { FarmContextService } from './farm-context.service';
 
 @Injectable({ providedIn: 'root' })
 export class FeedService {
   private firestore = inject(Firestore);
-  private authService = inject(AuthService);
+  private farmContext = inject(FarmContextService);
 
   /** Loading state */
   readonly loading = signal(false);
 
   // Emits only once farmId is resolved; re-emits on re-login.
-  private readonly farmId$ = toObservable(this.authService.farmId).pipe(
+  private readonly farmId$ = toObservable(this.farmContext.activeFarmId).pipe(
     filter((id) => !!id),
   );
 
@@ -67,7 +67,7 @@ export class FeedService {
   async addFeed(feed: Omit<Feed, 'id' | 'farmId'>): Promise<string> {
     this.loading.set(true);
     try {
-      const farmId = this.authService.farmId();
+      const farmId = this.farmContext.activeFarmId();
       const feedsRef = collection(this.firestore, 'feeds');
       const docRef = await addDoc(feedsRef, {
         ...feed,
@@ -115,7 +115,7 @@ export class FeedService {
   async importFeeds(feeds: Omit<Feed, 'id' | 'farmId'>[]): Promise<number> {
     this.loading.set(true);
     try {
-      const farmId = this.authService.farmId();
+      const farmId = this.farmContext.activeFarmId();
       const batch = writeBatch(this.firestore);
       const feedsRef = collection(this.firestore, 'feeds');
 

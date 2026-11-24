@@ -1,0 +1,985 @@
+{
+  "lactating": {
+    "sheet": "VACCHE DA LATTE",
+    "groupId": "lactating",
+    "feeds": [
+      {
+        "id": "f0",
+        "name": "mais trinciato aziendale",
+        "dmFactor": 0.23,
+        "nutrients": {
+          "proteina": 7.04,
+          "ee": 2.91,
+          "amido": 26.66,
+          "zuccheri": 0.07,
+          "ceneri": 4.56,
+          "aNDF": 44.76,
+          "uNDF": 10.35,
+          "ADF": 28.38,
+          "ADL": 3.17
+        },
+        "pricePerKg": 0.07,
+        "category": "forage"
+      },
+      {
+        "id": "f1",
+        "name": "fieno frumento",
+        "dmFactor": 0.911,
+        "nutrients": {
+          "proteina": 9.98,
+          "ee": 2.11,
+          "amido": 0.25,
+          "zuccheri": 9.6,
+          "ceneri": 5.54,
+          "aNDF": 62.41,
+          "uNDF": 19.03,
+          "ADF": 41.63,
+          "ADL": 5.51
+        },
+        "pricePerKg": 0.25,
+        "category": "forage"
+      },
+      {
+        "id": "f2",
+        "name": "frumento trinciato",
+        "dmFactor": 0.23,
+        "nutrients": {
+          "proteina": 9.26,
+          "ee": 2.29,
+          "amido": 4.26,
+          "zuccheri": 0,
+          "ceneri": 7.52,
+          "aNDF": 63.18,
+          "uNDF": 10,
+          "ADF": 37.53,
+          "ADL": 5.15
+        },
+        "pricePerKg": 0.09,
+        "category": "forage"
+      },
+      {
+        "id": "f3",
+        "name": "fieno fasciato 1 taglio aziendale",
+        "dmFactor": 0.768,
+        "nutrients": {
+          "proteina": 7.92,
+          "ee": 2.74,
+          "amido": 5.35,
+          "zuccheri": 7.5,
+          "ceneri": 2.86,
+          "aNDF": 62.12,
+          "uNDF": 66.98,
+          "ADF": 36.71,
+          "ADL": 2.23
+        },
+        "pricePerKg": 0.15,
+        "category": "forage"
+      },
+      {
+        "id": "f4",
+        "name": "fieno fasciato 2 taglio aziendale",
+        "dmFactor": 0.54,
+        "nutrients": {
+          "proteina": 13.12,
+          "ee": 1.95,
+          "amido": 0,
+          "zuccheri": 0,
+          "ceneri": 13.43,
+          "aNDF": 47.09,
+          "uNDF": 20.19,
+          "ADF": 33.06,
+          "ADL": 6.09
+        },
+        "pricePerKg": 0.15,
+        "category": "forage"
+      },
+      {
+        "id": "f5",
+        "name": "paglia",
+        "dmFactor": 0.891,
+        "nutrients": {
+          "proteina": 3.2,
+          "ee": 3,
+          "amido": 1,
+          "zuccheri": 7.95,
+          "ceneri": 8,
+          "aNDF": 65.75,
+          "uNDF": 50,
+          "ADF": 50.3,
+          "ADL": 9
+        },
+        "pricePerKg": 0.18,
+        "category": "forage"
+      },
+      {
+        "id": "f6",
+        "name": "medica",
+        "dmFactor": 0.911,
+        "nutrients": {
+          "proteina": 13.7,
+          "ee": 1.7,
+          "amido": 0,
+          "zuccheri": 2.5,
+          "ceneri": 7.3,
+          "aNDF": 47.2,
+          "uNDF": 18.2,
+          "ADF": 36.5,
+          "ADL": 7.8
+        },
+        "pricePerKg": 0.23,
+        "category": "forage"
+      },
+      {
+        "id": "f7",
+        "name": "fieno secco",
+        "dmFactor": 0.921,
+        "nutrients": {
+          "proteina": 8,
+          "ee": 1.6,
+          "amido": 0,
+          "zuccheri": 5.33,
+          "ceneri": 7.5,
+          "aNDF": 63,
+          "uNDF": 15.3,
+          "ADF": 40,
+          "ADL": 6.4
+        },
+        "pricePerKg": 0.25,
+        "category": "forage"
+      },
+      {
+        "id": "f8",
+        "name": "soia 70/30",
+        "dmFactor": 0.896,
+        "nutrients": {
+          "proteina": 45.25,
+          "ee": 7.59,
+          "amido": 6.46,
+          "zuccheri": 9.86,
+          "ceneri": 7.16,
+          "aNDF": 6.88,
+          "uNDF": 1.72,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.49,
+        "category": "concentrate"
+      },
+      {
+        "id": "f9",
+        "name": "mais 70/30",
+        "dmFactor": 0.879,
+        "nutrients": {
+          "proteina": 8.46,
+          "ee": 3.28,
+          "amido": 74.49,
+          "zuccheri": 2.3,
+          "ceneri": 1.41,
+          "aNDF": 12.11,
+          "uNDF": 3.03,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.3,
+        "category": "concentrate"
+      },
+      {
+        "id": "f10",
+        "name": "nucleo enzian",
+        "dmFactor": 0.928,
+        "nutrients": {
+          "proteina": 23.7,
+          "ee": 15.7,
+          "amido": 1.97,
+          "zuccheri": 4.54,
+          "ceneri": 32.72,
+          "aNDF": 7.56,
+          "uNDF": 1.89,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.8,
+        "category": "concentrate"
+      },
+      {
+        "id": "f11",
+        "name": "polpe di barbabietola",
+        "dmFactor": 0.88,
+        "nutrients": {
+          "proteina": 9.09,
+          "ee": 1.14,
+          "amido": 0,
+          "zuccheri": 7.39,
+          "ceneri": 4.55,
+          "aNDF": 20.45,
+          "uNDF": 5.11,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0,
+        "category": "concentrate"
+      },
+      {
+        "id": "f12",
+        "name": "melasso",
+        "dmFactor": 0.695,
+        "nutrients": {
+          "proteina": 9.78,
+          "ee": 0.13,
+          "amido": 0.1,
+          "zuccheri": 60.5,
+          "ceneri": 8,
+          "aNDF": 0.13,
+          "uNDF": 0.03,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.32,
+        "category": "concentrate"
+      },
+      {
+        "id": "f13",
+        "name": "mangime milk life progeo",
+        "dmFactor": 0.876,
+        "nutrients": {
+          "proteina": 20.5,
+          "ee": 4.14,
+          "amido": 35.64,
+          "zuccheri": 5.89,
+          "ceneri": 7.11,
+          "aNDF": 17.93,
+          "uNDF": 4.48,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.45,
+        "category": "concentrate"
+      }
+    ],
+    "quantities": [
+      {
+        "id": "f0",
+        "name": "mais trinciato aziendale",
+        "kgAsFed": 20
+      },
+      {
+        "id": "f2",
+        "name": "frumento trinciato",
+        "kgAsFed": 10
+      },
+      {
+        "id": "f7",
+        "name": "fieno secco",
+        "kgAsFed": 3.5
+      },
+      {
+        "id": "f8",
+        "name": "soia 70/30",
+        "kgAsFed": 3.5
+      },
+      {
+        "id": "f9",
+        "name": "mais 70/30",
+        "kgAsFed": 4.4
+      },
+      {
+        "id": "f10",
+        "name": "nucleo enzian",
+        "kgAsFed": 2
+      },
+      {
+        "id": "f12",
+        "name": "melasso",
+        "kgAsFed": 1
+      },
+      {
+        "id": "f13",
+        "name": "mangime milk life progeo",
+        "kgAsFed": 3.9
+      }
+    ],
+    "targets": [
+      {
+        "nutrientCode": "umidita",
+        "minValue": 50,
+        "maxValue": 55,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "proteina",
+        "minValue": 14.5,
+        "maxValue": 16.5,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "ee",
+        "minValue": 4,
+        "maxValue": 5,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "amido",
+        "minValue": 22,
+        "maxValue": 28,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "zuccheri",
+        "minValue": 5,
+        "maxValue": 7,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "ceneri",
+        "minValue": 7.5,
+        "maxValue": 8.5,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "aNDF",
+        "minValue": 28,
+        "maxValue": 34,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "uNDF",
+        "minValue": 9,
+        "maxValue": 12,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "NFC",
+        "minValue": 38,
+        "maxValue": 44,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "ADF",
+        "minValue": 18,
+        "maxValue": 22,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "ADL",
+        "minValue": null,
+        "maxValue": 5,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "pectine",
+        "minValue": 5,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "ADF_aNDF",
+        "minValue": 60,
+        "maxValue": 65,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "uNDF_aNDF",
+        "minValue": 29,
+        "maxValue": 36.5,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "emicellulosa",
+        "minValue": 10,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "foraggiPct",
+        "minValue": 40,
+        "maxValue": 45,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "concentratiPct",
+        "minValue": 55,
+        "maxValue": 60,
+        "isActive": true
+      }
+    ],
+    "analysis": {
+      "umidita": 52.17,
+      "proteina": 16.23,
+      "ee": 4.49,
+      "amido": 24.52,
+      "zuccheri": 5.54,
+      "ceneri": 7.83,
+      "aNDF": 30.24,
+      "uNDF": 6.75,
+      "NFC": 41.21,
+      "ADF": 14.98,
+      "ADL": 2.04,
+      "pectine": 11.16,
+      "ADF_aNDF": 49.55,
+      "uNDF_aNDF": 22.33,
+      "emicellulosa": 15.25,
+      "foraggiPct": 43.86,
+      "concentratiPct": 56.14
+    },
+    "totalAsFed": 48.3,
+    "workbookTotalDM": 23.10246,
+    "solverTotalDM": 23.095,
+    "costPerHead": 9.885,
+    "groupTotal": 9.885,
+    "totalLoadAsFed": 48.3,
+    "costPerKgAsFed": 0.204658,
+    "headCount": 1
+  },
+  "dry": {
+    "sheet": "VACCHE ASCIUTTE",
+    "groupId": "dry",
+    "feeds": [
+      {
+        "id": "f0",
+        "name": "mais trinciato aziendale",
+        "dmFactor": 0.245,
+        "nutrients": {
+          "proteina": 6.85,
+          "ee": 2.59,
+          "amido": 24.17,
+          "zuccheri": 0.2,
+          "ceneri": 3.38,
+          "aNDF": 50.83,
+          "uNDF": 10.35,
+          "ADF": 22.93,
+          "ADL": 2.51
+        },
+        "pricePerKg": 0.07,
+        "category": "forage"
+      },
+      {
+        "id": "f1",
+        "name": "fieno frumento",
+        "dmFactor": 0.911,
+        "nutrients": {
+          "proteina": 9.98,
+          "ee": 2.11,
+          "amido": 0.25,
+          "zuccheri": 9.6,
+          "ceneri": 5.54,
+          "aNDF": 62.41,
+          "uNDF": 19.03,
+          "ADF": 41.63,
+          "ADL": 5.51
+        },
+        "pricePerKg": 0.25,
+        "category": "forage"
+      },
+      {
+        "id": "f2",
+        "name": "frumento trinciato",
+        "dmFactor": 0.23,
+        "nutrients": {
+          "proteina": 9.26,
+          "ee": 2.29,
+          "amido": 4.26,
+          "zuccheri": 0,
+          "ceneri": 7.52,
+          "aNDF": 35.54,
+          "uNDF": 0,
+          "ADF": 37.53,
+          "ADL": 5.15
+        },
+        "pricePerKg": 0.09,
+        "category": "forage"
+      },
+      {
+        "id": "f3",
+        "name": "fieno fasciato 1 taglio aziendale",
+        "dmFactor": 0.768,
+        "nutrients": {
+          "proteina": 7.92,
+          "ee": 2.74,
+          "amido": 5.35,
+          "zuccheri": 7.5,
+          "ceneri": 2.86,
+          "aNDF": 62.12,
+          "uNDF": 66.98,
+          "ADF": 36.71,
+          "ADL": 2.23
+        },
+        "pricePerKg": 0.15,
+        "category": "forage"
+      },
+      {
+        "id": "f4",
+        "name": "fieno fasciato 2 taglio aziendale",
+        "dmFactor": 0.848,
+        "nutrients": {
+          "proteina": 11.01,
+          "ee": 2.73,
+          "amido": 2.28,
+          "zuccheri": 7.5,
+          "ceneri": 5.73,
+          "aNDF": 52.22,
+          "uNDF": 20.19,
+          "ADF": 36.63,
+          "ADL": 6.25
+        },
+        "pricePerKg": 0.15,
+        "category": "forage"
+      },
+      {
+        "id": "f5",
+        "name": "paglia",
+        "dmFactor": 0.891,
+        "nutrients": {
+          "proteina": 7.3,
+          "ee": 3,
+          "amido": 1,
+          "zuccheri": 7.95,
+          "ceneri": 8,
+          "aNDF": 65.75,
+          "uNDF": 50,
+          "ADF": 50.3,
+          "ADL": 9
+        },
+        "pricePerKg": 0.18,
+        "category": "forage"
+      },
+      {
+        "id": "f6",
+        "name": "sorgo insilato",
+        "dmFactor": 0.171,
+        "nutrients": {
+          "proteina": 8.65,
+          "ee": 3.33,
+          "amido": 5.2,
+          "zuccheri": 0.1,
+          "ceneri": 3.68,
+          "aNDF": 64.62,
+          "uNDF": 10.3,
+          "ADF": 64.44,
+          "ADL": 5.2
+        },
+        "pricePerKg": 0.05,
+        "category": "forage"
+      },
+      {
+        "id": "f7",
+        "name": "soia 70/30",
+        "dmFactor": 0.896,
+        "nutrients": {
+          "proteina": 45.25,
+          "ee": 7.59,
+          "amido": 6.46,
+          "zuccheri": 9.86,
+          "ceneri": 7.16,
+          "aNDF": 6.88,
+          "uNDF": 1.72,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.54,
+        "category": "concentrate"
+      },
+      {
+        "id": "f8",
+        "name": "mais 70/30",
+        "dmFactor": 0.879,
+        "nutrients": {
+          "proteina": 8.46,
+          "ee": 3.28,
+          "amido": 74.49,
+          "zuccheri": 2.3,
+          "ceneri": 1.41,
+          "aNDF": 12.11,
+          "uNDF": 3.03,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.3,
+        "category": "concentrate"
+      },
+      {
+        "id": "f9",
+        "name": "soia estrazione",
+        "dmFactor": 0.888,
+        "nutrients": {
+          "proteina": 49.08,
+          "ee": 2.1,
+          "amido": 5,
+          "zuccheri": 11,
+          "ceneri": 6.88,
+          "aNDF": 6,
+          "uNDF": 1.5,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0,
+        "category": "concentrate"
+      },
+      {
+        "id": "f10",
+        "name": "mangime preparto",
+        "dmFactor": 0.877,
+        "nutrients": {
+          "proteina": 20.76,
+          "ee": 1.92,
+          "amido": 19.51,
+          "zuccheri": 5.84,
+          "ceneri": 17.46,
+          "aNDF": 7.77,
+          "uNDF": 1.94,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0,
+        "category": "concentrate"
+      }
+    ],
+    "quantities": [
+      {
+        "id": "f0",
+        "name": "mais trinciato aziendale",
+        "kgAsFed": 10
+      },
+      {
+        "id": "f2",
+        "name": "frumento trinciato",
+        "kgAsFed": 7
+      },
+      {
+        "id": "f5",
+        "name": "paglia",
+        "kgAsFed": 2
+      },
+      {
+        "id": "f7",
+        "name": "soia 70/30",
+        "kgAsFed": 0.9
+      }
+    ],
+    "targets": [
+      {
+        "nutrientCode": "proteina",
+        "minValue": 12,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "amido",
+        "minValue": 11,
+        "maxValue": 12,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "aNDF",
+        "minValue": 50,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "ADF",
+        "minValue": 35,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "foraggiPct",
+        "minValue": 75,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "concentratiPct",
+        "minValue": null,
+        "maxValue": 25,
+        "isActive": true
+      }
+    ],
+    "analysis": {
+      "umidita": 66.56,
+      "proteina": 12.21,
+      "ee": 3.23,
+      "amido": 11,
+      "zuccheri": 3.4,
+      "ceneri": 6.08,
+      "aNDF": 45.8,
+      "NFC": 32.69,
+      "ADF": 31.02,
+      "foraggiPct": 87.88,
+      "concentratiPct": 12.12
+    },
+    "totalAsFed": 19.9,
+    "workbookTotalDM": 6.6545,
+    "solverTotalDM": 6.648,
+    "costPerHead": 2.176,
+    "groupTotal": 217.6,
+    "totalLoadAsFed": 1990,
+    "costPerKgAsFed": 0.1093467337,
+    "headCount": 100
+  },
+  "heifer": {
+    "sheet": "MANZE",
+    "groupId": "heifer",
+    "feeds": [
+      {
+        "id": "f0",
+        "name": "mais trinciato aziendale",
+        "dmFactor": 0.245,
+        "nutrients": {
+          "proteina": 6.85,
+          "ee": 2.59,
+          "amido": 24.17,
+          "zuccheri": 0.2,
+          "ceneri": 3.38,
+          "aNDF": 50.83,
+          "uNDF": 10.35,
+          "ADF": 22.93,
+          "ADL": 2.51
+        },
+        "pricePerKg": 0.07,
+        "category": "forage"
+      },
+      {
+        "id": "f1",
+        "name": "fieno frumento",
+        "dmFactor": 0.911,
+        "nutrients": {
+          "proteina": 9.98,
+          "ee": 2.11,
+          "amido": 0.25,
+          "zuccheri": 9.6,
+          "ceneri": 5.54,
+          "aNDF": 62.41,
+          "uNDF": 19.03,
+          "ADF": 41.63,
+          "ADL": 5.51
+        },
+        "pricePerKg": 0.25,
+        "category": "forage"
+      },
+      {
+        "id": "f2",
+        "name": "frumento trinciato",
+        "dmFactor": 0.314,
+        "nutrients": {
+          "proteina": 8.43,
+          "ee": 2.9,
+          "amido": 0.45,
+          "zuccheri": 2.1,
+          "ceneri": 7.03,
+          "aNDF": 75.34,
+          "uNDF": 0,
+          "ADF": 44.89,
+          "ADL": 5.5
+        },
+        "pricePerKg": 0.09,
+        "category": "forage"
+      },
+      {
+        "id": "f3",
+        "name": "fieno fasciato 1 taglio aziendale",
+        "dmFactor": 0.558,
+        "nutrients": {
+          "proteina": 11.63,
+          "ee": 2.84,
+          "amido": 0,
+          "zuccheri": 0,
+          "ceneri": 7.75,
+          "aNDF": 58.38,
+          "uNDF": 66.98,
+          "ADF": 39.18,
+          "ADL": 5.1
+        },
+        "pricePerKg": 0.15,
+        "category": "forage"
+      },
+      {
+        "id": "f4",
+        "name": "fieno fasciato 2 taglio aziendale",
+        "dmFactor": 0.766,
+        "nutrients": {
+          "proteina": 13.38,
+          "ee": 3.16,
+          "amido": 0,
+          "zuccheri": 0,
+          "ceneri": 7.67,
+          "aNDF": 55.51,
+          "uNDF": 20.19,
+          "ADF": 36.33,
+          "ADL": 6.08
+        },
+        "pricePerKg": 0.15,
+        "category": "forage"
+      },
+      {
+        "id": "f5",
+        "name": "paglia",
+        "dmFactor": 0.891,
+        "nutrients": {
+          "proteina": 7.3,
+          "ee": 3,
+          "amido": 1,
+          "zuccheri": 7.95,
+          "ceneri": 8,
+          "aNDF": 65.75,
+          "uNDF": 50,
+          "ADF": 50.3,
+          "ADL": 9
+        },
+        "pricePerKg": 0.18,
+        "category": "forage"
+      },
+      {
+        "id": "f6",
+        "name": "mix 1 medica 2 frumento",
+        "dmFactor": 0.873,
+        "nutrients": {
+          "proteina": 10.42,
+          "ee": 1.85,
+          "amido": 0.72,
+          "zuccheri": 6.15,
+          "ceneri": 7.31,
+          "aNDF": 57.91,
+          "uNDF": 22.05,
+          "ADF": 41.53,
+          "ADL": 6.69
+        },
+        "pricePerKg": 0.24,
+        "category": "forage"
+      },
+      {
+        "id": "f7",
+        "name": "marcomele",
+        "dmFactor": 0.35,
+        "nutrients": {
+          "proteina": 7.5,
+          "ee": 4.99,
+          "amido": 0,
+          "zuccheri": 0,
+          "ceneri": 0,
+          "aNDF": 52,
+          "uNDF": 0,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.06,
+        "category": "forage"
+      },
+      {
+        "id": "f8",
+        "name": "soia 70/30",
+        "dmFactor": 0.896,
+        "nutrients": {
+          "proteina": 45.25,
+          "ee": 7.59,
+          "amido": 6.46,
+          "zuccheri": 9.86,
+          "ceneri": 7.16,
+          "aNDF": 6.88,
+          "uNDF": 1.72,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.54,
+        "category": "concentrate"
+      },
+      {
+        "id": "f9",
+        "name": "mais 70/30",
+        "dmFactor": 0.879,
+        "nutrients": {
+          "proteina": 8.46,
+          "ee": 3.28,
+          "amido": 74.49,
+          "zuccheri": 2.3,
+          "ceneri": 1.41,
+          "aNDF": 12.11,
+          "uNDF": 3.03,
+          "ADF": 0,
+          "ADL": 0
+        },
+        "pricePerKg": 0.3,
+        "category": "concentrate"
+      }
+    ],
+    "quantities": [
+      {
+        "id": "f3",
+        "name": "fieno fasciato 1 taglio aziendale",
+        "kgAsFed": 4
+      },
+      {
+        "id": "f4",
+        "name": "fieno fasciato 2 taglio aziendale",
+        "kgAsFed": 4
+      },
+      {
+        "id": "f8",
+        "name": "soia 70/30",
+        "kgAsFed": 0.8
+      },
+      {
+        "id": "f9",
+        "name": "mais 70/30",
+        "kgAsFed": 1.2
+      }
+    ],
+    "targets": [
+      {
+        "nutrientCode": "proteina",
+        "minValue": 14,
+        "maxValue": 15,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "amido",
+        "minValue": 12,
+        "maxValue": 15,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "aNDF",
+        "minValue": 25,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "NFC",
+        "minValue": 34,
+        "maxValue": 36,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "foraggiPct",
+        "minValue": 65,
+        "maxValue": null,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "concentratiPct",
+        "minValue": null,
+        "maxValue": 35,
+        "isActive": true
+      }
+    ],
+    "analysis": {
+      "umidita": 29.32,
+      "proteina": 15.32,
+      "ee": 3.53,
+      "amido": 11.77,
+      "zuccheri": 1.34,
+      "ceneri": 6.71,
+      "aNDF": 45.01,
+      "NFC": 29.43,
+      "ADF": 28.12,
+      "foraggiPct": 74.93,
+      "concentratiPct": 25.07
+    },
+    "totalAsFed": 10,
+    "workbookTotalDM": 7.06836,
+    "solverTotalDM": 7.068,
+    "costPerHead": 1.992,
+    "groupTotal": 199.2,
+    "totalLoadAsFed": 1000,
+    "costPerKgAsFed": 0.1992,
+    "headCount": 100
+  }
+}

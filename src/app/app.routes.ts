@@ -62,6 +62,30 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'groups',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/groups/groups.component').then(
+        (m) => m.GroupsComponent
+      ),
+  },
+  {
+    path: 'inventory',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/inventory/inventory.component').then(
+        (m) => m.InventoryComponent
+      ),
+  },
+  {
+    path: 'targets',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/targets/targets.component').then(
+        (m) => m.TargetsComponent
+      ),
+  },
+  {
     path: 'recipes/:id',
     canActivate: [authGuard],
     loadComponent: () =>

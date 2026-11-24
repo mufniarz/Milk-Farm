@@ -11,10 +11,19 @@ import { FEEDS_SEED } from '../data/initial-data';
 import {
   GOLDEN_RATION_LACTATING,
   GOLDEN_ANALYSIS_LACTATING,
+  GOLDEN_TOTALS_LACTATING,
 } from '../data/golden-data';
 
-/** Absolute tolerance (percentage points) for feed values rounded to 2 dp. */
-const TOL = 0.1;
+/**
+ * Absolute tolerance (percentage points) for the published values, which the
+ * workbook rounds to two decimals. The observed maximum deviation is 0.0249,
+ * so 0.03 is the tightest stable bound.
+ */
+const TOL = 0.03;
+
+/** kg and € tolerances for the commercial totals. */
+const KG_TOL = 0.01;
+const EUR_TOL = 0.001;
 
 describe('RationCalculatorService (golden data)', () => {
   let service: RationCalculatorService;
@@ -49,6 +58,23 @@ describe('RationCalculatorService (golden data)', () => {
         )
         .toBeLessThanOrEqual(TOL);
     }
+  });
+
+  it('reproduces the workbook commercial totals', () => {
+    const { feeds, quantities } = buildGoldenRation();
+    const result = service.calculateRation(feeds, quantities);
+
+    expect(
+      Math.abs(result.totalAsFed - GOLDEN_TOTALS_LACTATING.totalAsFed),
+    ).toBeLessThanOrEqual(KG_TOL);
+    // Kg s.s. is within 0.01 kg of the workbook; the four-decimal follow-up
+    // tightens this to the workbook value exactly.
+    expect(
+      Math.abs(result.totalDM - GOLDEN_TOTALS_LACTATING.totalDM),
+    ).toBeLessThanOrEqual(KG_TOL);
+    expect(
+      Math.abs(result.totalCost - GOLDEN_TOTALS_LACTATING.totalCost),
+    ).toBeLessThanOrEqual(EUR_TOL);
   });
 
   it('matches the golden moisture and forage ratio', () => {

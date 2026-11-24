@@ -73,6 +73,22 @@ export class AuthService {
       createdAt: new Date(),
     });
 
+    // Owner membership: the authorization source for every farm rule.
+    // If this write fails, the idempotent backfill repairs it and the
+    // legacy users.farmId fallback still lets the user in.
+    await setDoc(
+      doc(this.firestore, 'farmMembers', `${farmId}_${credential.user.uid}`),
+      {
+        farmId,
+        uid: credential.user.uid,
+        role: 'owner',
+        status: 'active',
+        invitedBy: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    );
+
     // Create user profile
     const userRef = doc(this.firestore, 'users', credential.user.uid);
     const profile: UserProfile = {
@@ -137,6 +153,19 @@ export class AuthService {
         ownerUid: credential.user.uid,
         createdAt: new Date(),
       });
+
+      await setDoc(
+        doc(this.firestore, 'farmMembers', `${farmId}_${credential.user.uid}`),
+        {
+          farmId,
+          uid: credential.user.uid,
+          role: 'owner',
+          status: 'active',
+          invitedBy: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      );
 
       const profile: UserProfile = {
         uid: credential.user.uid,

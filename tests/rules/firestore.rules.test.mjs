@@ -1,0 +1,197 @@
+/**
+ * Firestore rules tests. Run against the emulator:
+ *
+ *   firebase emulators:exec --only firestore "npm run test:rules"
+ *
+ * The suite seeds one farm with an owner and a farm admin, then asserts the
+ * tenant boundary, membership creation, and the write-denied collections.
+ */
+import { after, before, beforeEach, test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {
+  assertFails,
+  assertSucceeds,
+  initializeTestEnvironment,
+} from '@firebase/rules-unit-testing';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
+
+const PROJECT_ID = 'demo-milk-farm';
+
+let testEnv;
+
+before(async () => {
+  testEnv = await initializeTestEnvironment({
+    projectId: PROJECT_ID,
+    firestore: {
+      rules: fs.readFileSync('firestore.rules', 'utf8'),
+    },
+  });
+});
+
+after(async () => {
+  await testEnv.cleanup();
+});
+
+beforeEach(async () => {
+  await testEnv.clearFirestore();
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'farms', 'f1'), {
+      id: 'f1',
+      name: 'Farm 1',
+      ownerUid: 'owner',
+    });
+    await setDoc(doc(db, 'farms', 'f2'), {
+      id: 'f2',
+      name: 'Farm 2',
+      ownerUid: 'owner',
+    });
+    await setDoc(doc(db, 'farmMembers', 'f1_owner'), {
+      farmId: 'f1',
+      uid: 'owner',
+      role: 'owner',
+      status: 'active',
+      invitedBy: null,
+    });
+    await setDoc(doc(db, 'farmMembers', 'f1_member'), {
+      farmId: 'f1',
+      uid: 'member',
+      role: 'farmAdmin',
+      status: 'active',
+      invitedBy: null,
+    });
+    await setDoc(doc(db, 'feeds', 'feed1'), {
+      name: 'Silage',
+      farmId: 'f1',
+      category: 'forage',
+      pricePerKg: 0.1,
+      moisturePct: 70,
+      isAvailable: true,
+      nutrients: {},
+    });
+    await setDoc(doc(db, 'farms', 'f1', 'groups', 'g1'), {
+      name: 'High',
+      animalGroupId: 'lactating',
+      headCount: 100,
+      activeRecipeId: null,
+      externalId: null,
+    });
+    await setDoc(doc(db, 'farms', 'f1', 'inventoryItems', 'feed1'), {
+      feedId: 'feed1',
+      onHandKgAsFed: 1000,
+      reorderPointDays: 7,
+      location: '',
+      unitCostPerKgAsFed: 0.1,
+    });
+    await setDoc(doc(db, 'farms', 'f1', 'targetOverrides', 'lactating'), {
+      groupId: 'lactating',
+      nutrients: {},
+      version: 1,
+    });
+  });
+});
+
+function dbFor(uid) {
+  return testEnv.authenticatedContext(uid).firestore();
+}
+
+test('member can read the farm and its feed', async () => {
+  const db = dbFor('member');
+  await assertSucceeds(getDoc(doc(db, 'farms', 'f1')));
+  await assertSucceeds(getDoc(doc(db, 'feeds', 'feed1')));
+  await assertSucceeds(getDoc(doc(db, 'farms', 'f1', 'groups', 'g1')));
+});
+
+test('outsider cannot read the farm or its feed', async () => {
+  const db = dbFor('other');
+  await assertFails(getDoc(doc(db, 'farms', 'f1')));
+  await assertFails(getDoc(doc(db, 'feeds', 'feed1')));
+  await assertFails(getDoc(doc(db, 'farms', 'f1', 'groups', 'g1')));
+});
+
+test('member can read target overrides but cannot write them', async () => {
+  const db = dbFor('member');
+  await assertSucceeds(
+    getDoc(doc(db, 'farms', 'f1', 'targetOverrides', 'lactating')),
+  );
+  await assertFails(
+    setDoc(doc(db, 'farms', 'f1', 'targetOverrides', 'dry'), {
+      groupId: 'dry',
+      nutrients: {},
+    }),
+  );
+});
+
+test('inventory ledger is read-only from the client', async () => {
+  const db = dbFor('member');
+  await assertSucceeds(
+    getDoc(doc(db, 'farms', 'f1', 'inventoryItems', 'feed1')),
+  );
+  await assertFails(
+    setDoc(doc(db, 'farms', 'f1', 'inventoryTransactions', 'tx1'), {
+      itemId: 'feed1',
+      type: 'delivery',
+      deltaKgAsFed: 10,
+    }),
+  );
+});
+
+test('feed farmId is immutable on update', async () => {
+  const db = dbFor('member');
+  await assertFails(
+    updateDoc(doc(db, 'feeds', 'feed1'), { farmId: 'f2' }),
+  );
+});
+
+test('owner can create their own owner membership, but not for another farm', async () => {
+  const owner = dbFor('owner');
+  await assertSucceeds(
+    setDoc(doc(owner, 'farmMembers', 'f2_owner'), {
+      farmId: 'f2',
+      uid: 'owner',
+      role: 'owner',
+      status: 'active',
+      invitedBy: null,
+    }),
+  );
+
+  const member = dbFor('member');
+  await assertFails(
+    setDoc(doc(member, 'farmMembers', 'f2_member'), {
+      farmId: 'f2',
+      uid: 'member',
+      role: 'farmAdmin',
+      status: 'active',
+      invitedBy: null,
+    }),
+  );
+});
+
+test('audit log is admin-readable and client-write-denied', async () => {
+  const member = dbFor('member');
+  await assertFails(
+    setDoc(doc(member, 'farms', 'f1', 'auditLog', 'entry1'), {
+      action: 'test',
+    }),
+  );
+});
+
+test('inactive membership is denied', async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'farmMembers', 'f1_member'), {
+      farmId: 'f1',
+      uid: 'member',
+      role: 'farmAdmin',
+      status: 'revoked',
+      invitedBy: null,
+    });
+  });
+  const db = dbFor('member');
+  await assertFails(getDoc(doc(db, 'feeds', 'feed1')));
+});

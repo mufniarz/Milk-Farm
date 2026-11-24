@@ -58,6 +58,30 @@ import { AuthService } from './core/services/auth.service';
               <mat-icon matListItemIcon>science</mat-icon>
               <span matListItemTitle>{{ 'NAV.RECIPES' | translate }}</span>
             </a>
+            <a
+              mat-list-item
+              routerLink="/groups"
+              routerLinkActive="active-link"
+            >
+              <mat-icon matListItemIcon>pets</mat-icon>
+              <span matListItemTitle>{{ 'NAV.GROUPS' | translate }}</span>
+            </a>
+            <a
+              mat-list-item
+              routerLink="/inventory"
+              routerLinkActive="active-link"
+            >
+              <mat-icon matListItemIcon>inventory_2</mat-icon>
+              <span matListItemTitle>{{ 'NAV.INVENTORY' | translate }}</span>
+            </a>
+            <a
+              mat-list-item
+              routerLink="/targets"
+              routerLinkActive="active-link"
+            >
+              <mat-icon matListItemIcon>track_changes</mat-icon>
+              <span matListItemTitle>{{ 'NAV.TARGETS' | translate }}</span>
+            </a>
           </mat-nav-list>
 
           <div class="sidenav-footer">

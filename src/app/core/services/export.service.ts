@@ -2,7 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { TranslateService } from '@ngx-translate/core';
 import { Recipe } from '../models/recipe.model';
-import { NUTRIENTS_MASTER, TARGET_RANGES } from '../data/initial-data';
+import { NUTRIENTS_MASTER } from '../data/initial-data';
+import { TargetService } from './target.service';
+import { FarmContextService } from './farm-context.service';
 
 interface ExportRequest {
   recipe: {
@@ -28,8 +30,14 @@ interface ExportRequest {
   }[];
   /** Ordered nutrient display metadata for the analysis section. */
   nutrients: { code: string; label: string; unit: string }[];
-  /** Target ranges ("valori ideali") for the recipe's animal group. */
-  targets: { code: string; min: number | null; max: number | null }[];
+  /** Effective target ranges ("valori ideali") for the recipe's animal group. */
+  targets: {
+    code: string;
+    min: number | null;
+    max: number | null;
+    source: 'reference' | 'override';
+    reason: string | null;
+  }[];
 }
 
 interface ExportResult {
@@ -42,6 +50,8 @@ interface ExportResult {
 export class ExportService {
   private functions = inject(Functions);
   private translate = inject(TranslateService);
+  private targetService = inject(TargetService);
+  private farmContext = inject(FarmContextService);
 
   /** i18n key for the recipe's animal group label. */
   private static readonly GROUP_KEYS: Record<string, string> = {
@@ -77,11 +87,16 @@ export class ExportService {
       unit: n.unit,
     }));
 
-    const targetList = TARGET_RANGES[recipe.animalGroupId] ?? [];
-    const targets = targetList.map((t) => ({
+    const effectiveTargets = await this.targetService.getEffectiveTargets(
+      this.farmContext.activeFarmId(),
+      recipe.animalGroupId,
+    );
+    const targets = effectiveTargets.map((t) => ({
       code: t.nutrientCode,
       min: t.minValue,
       max: t.maxValue,
+      source: t.source,
+      reason: t.reason ?? null,
     }));
 
     const { data } = await callable({

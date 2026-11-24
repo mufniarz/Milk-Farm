@@ -31,3 +31,42 @@ export interface NutrientTarget {
   /** Whether this target is actively used in optimization */
   isActive: boolean;
 }
+
+/** Where an effective target came from. */
+export type TargetSource = 'reference' | 'override';
+
+/**
+ * A target after the farm override layer has been applied. `source` lets the
+ * builder, optimizer and export show whether the workbook reference or the
+ * farm's own range is being used.
+ */
+export interface EffectiveNutrientTarget extends NutrientTarget {
+  source: TargetSource;
+  /** The workbook reference, kept when an override is active. */
+  referenceMinValue?: number | null;
+  referenceMaxValue?: number | null;
+  /** Required when source is 'override'. */
+  reason?: string;
+  updatedBy?: string;
+  updatedAt?: Date | null;
+}
+
+/** One nutrient override stored inside a farm's target-override document. */
+export interface TargetOverrideEntry {
+  minValue: number | null;
+  maxValue: number | null;
+  reason: string;
+  updatedBy: string;
+  updatedAt?: unknown;
+}
+
+/**
+ * Stored at `/farms/{farmId}/targetOverrides/{animalGroupId}`. The document
+ * id is the nutritional category, not a herd-group id.
+ */
+export interface TargetOverrideDoc {
+  groupId?: string;
+  nutrients: Record<string, TargetOverrideEntry>;
+  updatedAt?: unknown;
+  version?: number;
+}

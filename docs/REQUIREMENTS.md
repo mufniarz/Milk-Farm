@@ -30,7 +30,11 @@ numbers.
 |---|---|---|
 | Type/build | `npx ng build` | pass, 3.1 s |
 | Solver + export + golden ration | `pytest tests -q` | 8 passed |
-| Client engine vs workbook | calculator run against the golden lactating ration | all 17 metrics within 0.025 pp; total 48,3 kg t.q. and €9,885 match the sheet exactly |
+| Client engine vs workbook | calculator run against the golden lactating ration | all 17 metrics within 0.03 pp (observed max 0.0249); 48,3 kg t.q. and €9,885 match; `Kg s.s.` within 0.01 kg of 23.10246 |
+| Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
+| Solver + export + parity | `pytest tests -q` | 18 passed |
+| Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
+| i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Angular unit spec | `ng test` | not runnable in this environment — Chrome's sandbox is blocked (`sandbox initialization failed`). The spec exists and is the CI check for the same numbers. |
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
@@ -57,8 +61,19 @@ numbers.
 | 18 | % foraggi su ss | 40–45 | `nutrients.foraggiPct` | MET |
 | 19 | % concentrati su ss | 55–60 | `nutrients.concentratiPct` | MET |
 | 20 | costo razione | — | `totalCost` | MET |
-| 21 | costo razione al kg | — | `costPerKg` (builder) / export row | MET (added 2026-11-24) |
-| 22 | totale carico | — | `batchLoadAsFed` = per-head × `animalCount` | MET (added 2026-11-24) |
+| 21 | app output (not in lactating sheet) | — | `costPerKg` (builder) / export row | MET (added 2026-11-24) |
+| 22 | app output (not in lactating sheet) | — | `batchLoadAsFed` = per-head × `animalCount` | MET (added 2026-11-24) |
+
+Rows 21–22 are **app outputs**, not rows printed by the lactating sheet. The
+dry and heifer sheets do print `costo razione al Kg` and `Totale carico`; the
+parity gate checks those per sheet rather than assuming one universal list.
+
+**Kg s.s. precision.** The workbook's lactating `Kg s.s.` is **23.10246**; the
+app reproduces **23.095** because the generated feed library rounds moisture
+to one decimal before deriving the DM factor (`scripts/parse-excel.cjs`). The
+parity gate tolerates this at **0.01 kg**; a four-decimal follow-up removes
+the gap and tightens the gate to 0.001 kg. Do not call the DM total exact
+until that follow-up lands.
 
 ## B. Dry cows (VACCHE ASCIUTTE)
 
@@ -127,10 +142,31 @@ the build or the Python suite.
    those four rows red on the reference ration, and the solver reports them as
    `relaxed` when asked to hit them. Confirm whether the ideals come from a
    different feeding standard, or whether the forage analysis needs updating.
-2. **Targets are global, not per farm.** The workbook ideals are seeded once
-   and shared read-only by every account. If farms will tune their own ranges,
-   that needs a rules and schema change (writes to
-   `animalGroups/{id}/targets` are currently denied).
-3. **Herd size is per recipe, not per group.** `animalCount` defaults to 1 and
-   is entered on the builder. If the client wants a farm-wide head count
-   applied automatically, that is a small follow-up.
+2. **Targets were global; the override layer is now in place.** The workbook
+   ranges remain the immutable reference and `animalGroups/{id}/targets` stays
+   read-only. A farm owner/admin can set a per-farm override at
+   `farms/{farmId}/targetOverrides/{animalGroupId}` through a callable that
+   stores the reason, author and timestamp and appends an audit entry. The
+   builder and export show which nutrients use the farm's range.
+3. **Herd size is now per herd group.** `farms/{farmId}/groups` carries the
+   head count and the active recipe; `recipe.animalCount` remains the
+   builder's batch default and is not used for group economics once a group is
+   assigned.
+
+## G. Parity chain
+
+The parity gate has three independent parts; no part re-implements the
+calculator:
+
+1. **Regeneration.** `scripts/parse-excel.cjs` emits `initial-data.ts`,
+   `golden-data.ts`, `targets.json` and `reference_rations.json` from
+   `docs/ALIMENTAZIONE.xlsx`. CI runs the generator and fails on
+   `git diff --exit-code`, so hand edits and workbook drift are caught.
+2. **Workbook → fixtures.** `functions/tests/test_workbook_parity.py` opens
+   the workbook directly with `openpyxl` and checks the generated targets,
+   analysis and commercial rows against the sheet cells. It maps labels; it
+   does not calculate a ration.
+3. **Computed → fixtures.** `ration-calculator.service.spec.ts` computes the
+   reference ration and checks it against `golden-data.ts` (17 codes within
+   0.03 pp; totals within 0.01 kg / 0.001 €). `scripts/check-calculator.mts`
+   runs the same numbers without Karma for the local and CI smoke gate.

@@ -293,6 +293,16 @@ function parseSheet(ws) {
   // ── Analysis (computed values + target ranges) ──
   const targets = [];
   const golden = {};
+  // Commercial rows printed by the client's sheets. Not every sheet has all
+  // of them: the lactating sheet prints only Kg t.q., Kg s.s. and the ration
+  // cost, while the dry/heifer sheets also print €/kg and the group load.
+  const commercial = {
+    totalAsFed: null,
+    workbookTotalDM: null,
+    costPerKgAsFed: null,
+    totalLoadAsFed: null,
+    groupTotal: null,
+  };
   if (analysisRow !== -1) {
     for (let i = analysisRow + 1; i < rows.length; i++) {
       const r = rows[i];
@@ -300,9 +310,34 @@ function parseSheet(ws) {
       const label = r[0];
       if (label === null || label === undefined || String(label).trim() === "")
         continue;
+      const value = r[1];
+      const norm = String(label).toLowerCase().replace(/\s+/g, " ").trim();
+
+      // Commercial rows first: "costo razione" is a prefix of
+      // "costo razione al kg", so the more specific label must win.
+      if (norm.startsWith("costo razione al kg")) {
+        if (typeof value === "number") commercial.costPerKgAsFed = value;
+        continue;
+      }
+      if (norm.startsWith("costo razione")) {
+        if (typeof value === "number") commercial.groupTotal = value;
+        continue;
+      }
+      if (norm.startsWith("totale carico")) {
+        if (typeof value === "number") commercial.totalLoadAsFed = value;
+        continue;
+      }
+      if (norm.startsWith("kg tq")) {
+        if (typeof value === "number") commercial.totalAsFed = value;
+        continue;
+      }
+      if (norm.startsWith("kg s.s")) {
+        if (typeof value === "number") commercial.workbookTotalDM = value;
+        continue;
+      }
+
       const code = labelToCode(label);
       if (!code) continue;
-      const value = r[1];
       if (typeof value === "number") golden[code] = round(value * 100);
       const range = parseRange(r[2]);
       if (range) {
@@ -316,7 +351,7 @@ function parseSheet(ws) {
     }
   }
 
-  return { feeds, targets, golden };
+  return { feeds, targets, golden, commercial };
 }
 
 // ── Parse all sheets ──
@@ -359,31 +394,89 @@ FEEDS_SEED.sort((a, b) => {
 const TARGET_RANGES = {};
 for (const sheet of parsed) TARGET_RANGES[sheet.groupId] = sheet.targets;
 
-// ── Golden fixtures (lactating) for tests ──
-const lactating = parsed.find((s) => s.groupId === "lactating");
-const lactatingFeedByName = new Map(lactating.feeds.map((f) => [f.name, f]));
-const ws = wb.Sheets["VACCHE DA LATTE"];
-const lactRows = XLSX.utils.sheet_to_json(ws, {
-  header: 1,
-  raw: true,
-  defval: null,
-});
-const GOLDEN_RATION = [];
-for (const r of lactRows) {
-  const name = r[COL.name];
-  const qty = r[COL.kgAsFed];
-  if (
-    name &&
-    typeof qty === "number" &&
-    qty > 0 &&
-    lactatingFeedByName.has(String(name).trim().replace(/\s+/g, " "))
-  ) {
-    GOLDEN_RATION.push({
-      name: String(name).trim().replace(/\s+/g, " "),
-      kgAsFed: qty,
-    });
+// ── Reference rations (canonical fixture for every sheet) ──
+const testDir = path.join(REPO, "functions/tests");
+fs.mkdirSync(testDir, { recursive: true });
+
+function buildSheetReference(sheet) {
+  const solverFeeds = sheet.feeds.map((f, i) => ({
+    id: `f${i}`,
+    name: f.name,
+    dmFactor: round(1 - f.moisturePct / 100, 4),
+    nutrients: f.nutrients,
+    pricePerKg: f.pricePerKg,
+    category: f.category,
+  }));
+  const feedByName = new Map(solverFeeds.map((f) => [f.name, f]));
+
+  const ws = wb.Sheets[sheet.name];
+  const rows = XLSX.utils.sheet_to_json(ws, {
+    header: 1,
+    raw: true,
+    defval: null,
+  });
+  const quantities = [];
+  for (const r of rows) {
+    const rawName = r[COL.name];
+    const qty = r[COL.kgAsFed];
+    if (rawName === null || rawName === undefined) continue;
+    if (typeof qty !== "number" || qty <= 0) continue;
+    const name = String(rawName).trim().replace(/\s+/g, " ");
+    const feed = feedByName.get(name);
+    if (!feed) continue;
+    quantities.push({ id: feed.id, name, kgAsFed: qty });
   }
+
+  const totalAsFed = round(
+    quantities.reduce((sum, r) => sum + r.kgAsFed, 0),
+    4,
+  );
+  const solverTotalDM = round(
+    quantities.reduce(
+      (sum, r) => sum + r.kgAsFed * feedByName.get(r.name).dmFactor,
+      0,
+    ),
+    3,
+  );
+  const costPerHead = round(
+    quantities.reduce(
+      (sum, r) => sum + r.kgAsFed * feedByName.get(r.name).pricePerKg,
+      0,
+    ),
+    4,
+  );
+  const commercial = sheet.commercial || {};
+  const groupTotal = commercial.groupTotal ?? costPerHead;
+  const totalLoadAsFed = commercial.totalLoadAsFed ?? totalAsFed;
+  const headCount =
+    costPerHead > 0 ? Math.round(groupTotal / costPerHead) : 1;
+  const costPerKgAsFed =
+    commercial.costPerKgAsFed ??
+    (totalAsFed > 0 ? round(costPerHead / totalAsFed, 6) : 0);
+
+  return {
+    sheet: sheet.name,
+    groupId: sheet.groupId,
+    feeds: solverFeeds,
+    quantities,
+    targets: sheet.targets,
+    analysis: sheet.golden,
+    totalAsFed,
+    // The sheet's own Kg s.s. cell, for parity against the workbook.
+    workbookTotalDM: commercial.workbookTotalDM ?? solverTotalDM,
+    // The DM the rounded feed library reproduces, for solver constraints.
+    solverTotalDM,
+    costPerHead,
+    groupTotal: round(groupTotal, 4),
+    totalLoadAsFed: round(totalLoadAsFed, 4),
+    costPerKgAsFed,
+    headCount,
+  };
 }
+
+const referenceRations = Object.fromEntries(
+  parsed.map((s) => [s.groupId, buildSheetReference(s)]),
+);
 
 // ── Emit files ──
 const HEADER = `// AUTO-GENERATED by scripts/parse-excel.cjs from docs/ALIMENTAZIONE.xlsx.\n// Do not edit by hand — re-run the script to regenerate.\n`;
@@ -399,60 +492,38 @@ const initialData =
   `export const FEEDS_SEED: FeedSeed[] = ${JSON.stringify(FEEDS_SEED, null, 2)};\n\n` +
   `export const TARGET_RANGES: Record<AnimalGroupId, NutrientTarget[]> = ${JSON.stringify(TARGET_RANGES, null, 2)};\n`;
 
+const lactatingRef = referenceRations.lactating;
 const goldenData =
   HEADER +
   `export interface GoldenRationEntry {\n  name: string;\n  kgAsFed: number;\n}\n\n` +
-  `export const GOLDEN_RATION_LACTATING: GoldenRationEntry[] = ${JSON.stringify(GOLDEN_RATION, null, 2)};\n\n` +
-  `export const GOLDEN_ANALYSIS_LACTATING: Record<string, number> = ${JSON.stringify(lactating.golden, null, 2)};\n`;
+  `export interface GoldenTotals {\n  totalAsFed: number;\n  totalDM: number;\n  totalCost: number;\n}\n\n` +
+  `export const GOLDEN_RATION_LACTATING: GoldenRationEntry[] = ${JSON.stringify(lactatingRef.quantities.map((r) => ({ name: r.name, kgAsFed: r.kgAsFed })), null, 2)};\n\n` +
+  `export const GOLDEN_ANALYSIS_LACTATING: Record<string, number> = ${JSON.stringify(lactatingRef.analysis, null, 2)};\n\n` +
+  `export const GOLDEN_TOTALS_LACTATING: GoldenTotals = ${JSON.stringify({ totalAsFed: lactatingRef.totalAsFed, totalDM: lactatingRef.workbookTotalDM, totalCost: lactatingRef.costPerHead }, null, 2)};\n\n` +
+  `export const GOLDEN_TOTALS_DRY: GoldenTotals = ${JSON.stringify({ totalAsFed: referenceRations.dry.totalAsFed, totalDM: referenceRations.dry.workbookTotalDM, totalCost: referenceRations.dry.costPerHead }, null, 2)};\n\n` +
+  `export const GOLDEN_TOTALS_HEIFER: GoldenTotals = ${JSON.stringify({ totalAsFed: referenceRations.heifer.totalAsFed, totalDM: referenceRations.heifer.workbookTotalDM, totalCost: referenceRations.heifer.costPerHead }, null, 2)};\n`;
 
 const outDir = path.join(REPO, "src/app/core/data");
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, "initial-data.ts"), initialData);
 fs.writeFileSync(path.join(outDir, "golden-data.ts"), goldenData);
 
-// ── JSON fixture for the Python solver test (single source of truth) ──
-const solverFeeds = lactating.feeds.map((f, i) => ({
-  id: `f${i}`,
-  name: f.name,
-  dmFactor: round(1 - f.moisturePct / 100, 4),
-  nutrients: f.nutrients,
-  pricePerKg: f.pricePerKg,
-  category: f.category,
-}));
-const nameToId = new Map(solverFeeds.map((f) => [f.name, f.id]));
-const goldenRation = GOLDEN_RATION.map((r) => ({
-  id: nameToId.get(r.name),
-  name: r.name,
-  kgAsFed: r.kgAsFed,
-}));
-const referenceCost = round(
-  goldenRation.reduce((s, r) => {
-    const f = solverFeeds.find((x) => x.id === r.id);
-    return s + r.kgAsFed * f.pricePerKg;
-  }, 0),
-  4,
+// ── JSON fixtures for the Python solver + parity tests (single source of truth) ──
+const targetsFixture = Object.fromEntries(
+  parsed.map((s) => [s.groupId, s.targets]),
 );
-const referenceTotalDM = round(
-  goldenRation.reduce((s, r) => {
-    const f = solverFeeds.find((x) => x.id === r.id);
-    return s + r.kgAsFed * f.dmFactor;
-  }, 0),
-  3,
-);
-const fixture = {
-  feeds: solverFeeds,
-  targets: TARGET_RANGES.lactating,
-  goldenRation,
-  goldenAnalysis: lactating.golden,
-  referenceCost,
-  referenceTotalDM,
-};
-const testDir = path.join(REPO, "functions/tests");
-fs.mkdirSync(testDir, { recursive: true });
 fs.writeFileSync(
-  path.join(testDir, "golden_ration.json"),
-  JSON.stringify(fixture, null, 2),
+  path.join(testDir, "targets.json"),
+  JSON.stringify(targetsFixture, null, 2),
 );
+fs.writeFileSync(
+  path.join(testDir, "reference_rations.json"),
+  JSON.stringify(referenceRations, null, 2),
+);
+
+// The old single-lactating fixture would be a second source of truth.
+const oldFixture = path.join(testDir, "golden_ration.json");
+if (fs.existsSync(oldFixture)) fs.unlinkSync(oldFixture);
 
 console.log(
   `Feeds: ${FEEDS_SEED.length} (forage ${FEEDS_SEED.filter((f) => f.category === "forage").length}, concentrate ${FEEDS_SEED.filter((f) => f.category === "concentrate").length})`,
@@ -461,9 +532,9 @@ console.log(
   `Targets: ` +
     parsed.map((s) => `${s.groupId}=${s.targets.length}`).join(", "),
 );
-console.log(
-  `Golden ration feeds: ${GOLDEN_RATION.length}, golden analysis codes: ${Object.keys(lactating.golden).length}`,
-);
-console.log(
-  `Solver fixture: ${solverFeeds.length} feeds, referenceCost=${referenceCost}, referenceTotalDM=${referenceTotalDM}`,
-);
+for (const groupId of ["lactating", "dry", "heifer"]) {
+  const ref = referenceRations[groupId];
+  console.log(
+    `${groupId}: ${ref.quantities.length} feeds, tq=${ref.totalAsFed}, s.s.=${ref.workbookTotalDM} (solver ${ref.solverTotalDM}), cost/head=${ref.costPerHead}, group=${ref.groupTotal}, heads=${ref.headCount}`,
+  );
+}
