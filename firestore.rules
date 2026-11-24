@@ -41,8 +41,12 @@ service cloud.firestore {
         && resource.data.farmId == getUserFarmId();
       allow create: if isAuthenticated()
         && request.resource.data.farmId == getUserFarmId();
-      allow update, delete: if isAuthenticated()
+      allow delete: if isAuthenticated()
         && resource.data.farmId == getUserFarmId();
+      // farmId is immutable: an update may never move a feed to another farm.
+      allow update: if isAuthenticated()
+        && resource.data.farmId == getUserFarmId()
+        && request.resource.data.farmId == resource.data.farmId;
     }
 
     // ─── Recipes (per-farm) ─────────────────────────────────────────────
@@ -51,8 +55,12 @@ service cloud.firestore {
         && resource.data.farmId == getUserFarmId();
       allow create: if isAuthenticated()
         && request.resource.data.farmId == getUserFarmId();
-      allow update, delete: if isAuthenticated()
+      allow delete: if isAuthenticated()
         && resource.data.farmId == getUserFarmId();
+      // farmId is immutable: an update may never move a recipe to another farm.
+      allow update: if isAuthenticated()
+        && resource.data.farmId == getUserFarmId()
+        && request.resource.data.farmId == resource.data.farmId;
 
       // Recipe feed entries subcollection
       match /feeds/{feedEntryId} {
@@ -83,8 +91,11 @@ service cloud.firestore {
         && resource.data.ownerUid == request.auth.uid;
       allow create: if isAuthenticated()
         && request.resource.data.ownerUid == request.auth.uid;
+      // ownerUid is immutable: a farm can never be handed to another account
+      // through a client write.
       allow update: if isAuthenticated()
-        && resource.data.ownerUid == request.auth.uid;
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if false;
     }
   }

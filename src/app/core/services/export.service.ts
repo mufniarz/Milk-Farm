@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { TranslateService } from '@ngx-translate/core';
 import { Recipe } from '../models/recipe.model';
 import { NUTRIENTS_MASTER, TARGET_RANGES } from '../data/initial-data';
 
@@ -7,6 +8,10 @@ interface ExportRequest {
   recipe: {
     name: string;
     animalGroupId: string;
+    /** Localized group label, e.g. "Vacche in lattazione". */
+    animalGroupLabel: string;
+    /** Herd size the ration is mixed for; drives the "totale carico" rows. */
+    animalCount: number;
     totalAsFed: number;
     totalDM: number;
     cost: number;
@@ -36,6 +41,14 @@ interface ExportResult {
 @Injectable({ providedIn: 'root' })
 export class ExportService {
   private functions = inject(Functions);
+  private translate = inject(TranslateService);
+
+  /** i18n key for the recipe's animal group label. */
+  private static readonly GROUP_KEYS: Record<string, string> = {
+    lactating: 'RECIPES.LACTATING',
+    dry: 'RECIPES.DRY',
+    heifer: 'RECIPES.HEIFER',
+  };
 
   /**
    * Call the export_recipe Cloud Function and trigger a browser download
@@ -75,6 +88,10 @@ export class ExportService {
       recipe: {
         name: recipe.name,
         animalGroupId: recipe.animalGroupId,
+        animalGroupLabel: this.translate.instant(
+          ExportService.GROUP_KEYS[recipe.animalGroupId] ?? 'RECIPES.ANIMAL_GROUP',
+        ),
+        animalCount: recipe.animalCount ?? 1,
         totalAsFed: recipe.totalAsFed,
         totalDM: recipe.totalDM,
         cost: recipe.cost,

@@ -15,8 +15,15 @@ export interface Recipe {
   totalAsFed: number;
   /** Total kg DM across all feeds */
   totalDM: number;
-  /** Total cost (€) */
+  /** Total cost (€) for one animal's daily ration */
   cost: number;
+  /**
+   * Number of animals the ration is mixed for (batch size).
+   * The reference spreadsheet reports both per-head figures and the
+   * "totale carico" — per-head quantities multiplied by the herd size.
+   * Defaults to 1 when absent (older recipes).
+   */
+  animalCount?: number;
   /** Computed nutrient analysis on DM basis */
   nutrientAnalysis: Record<string, number>;
   /** Farm ownership for multi-tenancy */

@@ -112,11 +112,30 @@ def export_recipe(req: https_fn.CallableRequest):
         )
 
     data = req.data or {}
-    recipe = data.get("recipe", {})
-    feeds = data.get("feeds", [])
-    nutrients = data.get("nutrients", [])
-    targets = {t["code"]: t for t in data.get("targets", [])}
+    filename, content = build_recipe_workbook(
+        data.get("recipe", {}),
+        data.get("feeds", []),
+        data.get("nutrients", []),
+        data.get("targets", []),
+    )
 
+    return {
+        "filename": filename,
+        "contentBase64": base64.b64encode(content).decode("ascii"),
+        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
+
+
+def build_recipe_workbook(recipe, feeds, nutrients, target_list):
+    """
+    Build the ration .xlsx workbook and return (filename, bytes).
+
+    Pure function (no Firebase or Flask context) so it can be unit-tested and
+    reused. Mirrors the source spreadsheet layout: FORAGGI / CONCENTRATI
+    tables, per-head totals, "totale carico" for the group, then
+    "valori stimati su s.s." next to "valori ideali".
+    """
+    targets = {t["code"]: t for t in target_list}
     wb = Workbook()
     ws = wb.active
     ws.title = "Razione"
@@ -130,7 +149,13 @@ def export_recipe(req: https_fn.CallableRequest):
 
     ws["A1"] = recipe.get("name", "Razione")
     ws["A1"].font = title_font
-    ws["A2"] = f"Gruppo animale: {recipe.get('animalGroupId', '')}"
+    try:
+        animal_count = int(recipe.get("animalCount") or 1)
+    except (TypeError, ValueError):
+        animal_count = 1
+    animal_count = max(1, min(animal_count, 100000))
+    group_label = recipe.get("animalGroupLabel") or recipe.get("animalGroupId", "")
+    ws["A2"] = f"Gruppo animale: {group_label}"
 
     feed_headers = ["Prodotto", "Prezzo €/kg", "Kg t.q.", "Kg s.s.", "Umidità %", "Costo €"]
 
@@ -177,10 +202,30 @@ def export_recipe(req: https_fn.CallableRequest):
     row, _ = write_section("CONCENTRATI", concentrates, row)
 
     # ── Grand totals ──
+    total_as_fed = recipe.get("totalAsFed", 0)
+    total_cost = recipe.get("cost", 0)
     ws.cell(row=row, column=1, value="TOTALE RAZIONE").font = bold
-    ws.cell(row=row, column=3, value=round(recipe.get("totalAsFed", 0), 3)).font = bold
+    ws.cell(row=row, column=3, value=round(total_as_fed, 3)).font = bold
     ws.cell(row=row, column=4, value=round(recipe.get("totalDM", 0), 3)).font = bold
-    ws.cell(row=row, column=6, value=round(recipe.get("cost", 0), 4)).font = bold
+    ws.cell(row=row, column=6, value=round(total_cost, 4)).font = bold
+    row += 2
+
+    # ── Per-head economics and the whole-group load ("totale carico") ──
+    ws.cell(row=row, column=1, value="Capi")
+    ws.cell(row=row, column=3, value=animal_count)
+    row += 1
+    ws.cell(row=row, column=1, value="Costo razione al kg (€/kg t.q.)")
+    ws.cell(
+        row=row,
+        column=3,
+        value=round(total_cost / total_as_fed, 4) if total_as_fed else 0,
+    )
+    row += 1
+    ws.cell(row=row, column=1, value="Totale carico (kg t.q.)").font = bold
+    ws.cell(row=row, column=3, value=round(total_as_fed * animal_count, 3)).font = bold
+    row += 1
+    ws.cell(row=row, column=1, value="Costo totale carico (€)").font = bold
+    ws.cell(row=row, column=6, value=round(total_cost * animal_count, 2)).font = bold
     row += 2
 
     # ── valori stimati su s.s. | valori ideali ──
@@ -230,8 +275,4 @@ def export_recipe(req: https_fn.CallableRequest):
 
     safe_name = "".join(c for c in recipe.get("name", "ration") if c.isalnum() or c in " -_").strip() or "ration"
 
-    return {
-        "filename": f"{safe_name}.xlsx",
-        "contentBase64": base64.b64encode(buffer.read()).decode("ascii"),
-        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }
+    return f"{safe_name}.xlsx", buffer.read()

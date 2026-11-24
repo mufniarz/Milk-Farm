@@ -27,11 +27,13 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { BaseChartDirective } from 'ng2-charts';
+import { take } from 'rxjs/operators';
 import { FeedService } from '../../core/services/feed.service';
 import { RecipeService } from '../../core/services/recipe.service';
 import {
   OptimizationService,
   OptimizationConstraints,
+  OptimizationWarning,
 } from '../../core/services/optimization.service';
 import {
   RationCalculatorService,
@@ -115,6 +117,18 @@ interface RecipeFeedEntry {
                       'RECIPES.HEIFER' | translate
                     }}</mat-option>
                   </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="flex-1">
+                  <mat-label>{{ 'RECIPES.NUM_ANIMALS' | translate }}</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    [(ngModel)]="animalCount"
+                    min="1"
+                    step="1"
+                    id="animal-count"
+                  />
                 </mat-form-field>
               </div>
 
@@ -296,6 +310,28 @@ interface RecipeFeedEntry {
                   </div>
                 }
 
+                @if (optimizationWarnings().length) {
+                  <ul class="optimization-warnings">
+                    @for (warning of optimizationWarnings(); track warning.code) {
+                      <li>
+                        <strong>{{ warning.code }}</strong>
+                        {{ warning.value | number: '1.2-2' }} —
+                        {{
+                          (warning.issue === 'below_min'
+                            ? 'RECIPES.BELOW_MIN'
+                            : 'RECIPES.ABOVE_MAX'
+                          ) | translate
+                        }}
+                        {{
+                          warning.issue === 'below_min'
+                            ? warning.min
+                            : warning.max
+                        }}
+                      </li>
+                    }
+                  </ul>
+                }
+
                 <div class="results-summary">
                   <div class="result-item">
                     <span class="result-label">{{
@@ -326,6 +362,14 @@ interface RecipeFeedEntry {
                   </div>
                   <div class="result-item">
                     <span class="result-label">{{
+                      'RECIPES.COST_PER_KG' | translate
+                    }}</span>
+                    <span class="result-value"
+                      >€{{ costPerKg | number: '1.3-3' }}/kg</span
+                    >
+                  </div>
+                  <div class="result-item">
+                    <span class="result-label">{{
                       'RECIPES.FORAGE_RATIO' | translate
                     }}</span>
                     <span class="result-value">{{
@@ -340,6 +384,22 @@ interface RecipeFeedEntry {
                       >{{
                         rationResult()!.moisturePct | number: '1.1-1'
                       }}%</span
+                    >
+                  </div>
+                  <div class="result-item">
+                    <span class="result-label">{{
+                      'RECIPES.TOTAL_LOAD' | translate
+                    }}</span>
+                    <span class="result-value"
+                      >{{ batchLoadAsFed | number: '1.0-1' }} kg</span
+                    >
+                  </div>
+                  <div class="result-item">
+                    <span class="result-label">{{
+                      'RECIPES.LOAD_COST' | translate
+                    }}</span>
+                    <span class="result-value"
+                      >€{{ batchLoadCost | number: '1.2-2' }}</span
                     >
                   </div>
                 </div>
@@ -599,6 +659,13 @@ interface RecipeFeedEntry {
       letter-spacing: 0.3px;
     }
 
+    .optimization-warnings {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: #b26a00;
+    }
+
     .result-value {
       font-size: 20px;
       font-weight: 600;
@@ -720,7 +787,11 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   feedColumns = ['select', 'name', 'quantity', 'price'];
 
   recipeName = '';
+  /** Set when editing a saved recipe; null while creating a new one. */
+  private recipeId: string | null = null;
   animalGroupId: AnimalGroupId = 'lactating';
+  /** Herd size the ration is mixed for; 1 keeps per-head figures. */
+  animalCount = 1;
   constraints: OptimizationConstraints = {};
   targets: NutrientTarget[] = TARGET_RANGES['lactating'];
 
@@ -730,6 +801,8 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   saving = signal(false);
   optimizationMessage = signal('');
   optimizationStatus = signal<'optimal' | 'relaxed' | 'infeasible' | ''>('');
+  /** Targets the relaxed solution could not satisfy, shown to the user. */
+  optimizationWarnings = signal<OptimizationWarning[]>([]);
 
   // Chart data
   radarChartType: ChartType = 'radar';
@@ -755,18 +828,45 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     this.feedEntries().filter((e) => e.selected && e.kgAsFed > 0),
   );
 
-  ngOnInit(): void {
-    this.feedService.getAvailableFeeds().subscribe((feeds) => {
-      this.feedEntries.set(
-        feeds.map((f) => ({ feed: f, kgAsFed: 0, selected: false })),
-      );
-    });
+  /**
+   * Cost of one kg of ration as fed (€/kg t.q.), matching the
+   * "costo razione al Kg" row of the reference spreadsheet.
+   */
+  get costPerKg(): number {
+    const result = this.rationResult();
+    if (!result || result.totalAsFed <= 0) return 0;
+    return result.totalCost / result.totalAsFed;
+  }
 
-    // If editing an existing recipe, load it
+  /**
+   * Load to mix for the whole group ("Totale carico"): per-head kg as fed
+   * multiplied by the number of animals.
+   */
+  get batchLoadAsFed(): number {
+    return (this.rationResult()?.totalAsFed ?? 0) * (this.animalCount || 1);
+  }
+
+  /** Total feed cost for the whole group ("costo razione"). */
+  get batchLoadCost(): number {
+    return (this.rationResult()?.totalCost ?? 0) * (this.animalCount || 1);
+  }
+
+  ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.loadRecipe(id);
-    }
+
+    // Wait for the first feed emission before restoring a saved recipe:
+    // matching quantities against an empty list silently loses them.
+    this.feedService
+      .getAvailableFeeds()
+      .pipe(take(1))
+      .subscribe((feeds) => {
+        this.feedEntries.set(
+          feeds.map((f) => ({ feed: f, kgAsFed: 0, selected: false })),
+        );
+        if (id) {
+          this.loadRecipe(id);
+        }
+      });
   }
 
   ngAfterViewInit(): void {
@@ -818,8 +918,10 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   private async loadRecipe(id: string): Promise<void> {
     const recipe = await this.recipeService.getRecipeWithFeeds(id);
     if (recipe) {
+      this.recipeId = id;
       this.recipeName = recipe.name;
       this.animalGroupId = recipe.animalGroupId;
+      this.animalCount = recipe.animalCount ?? 1;
       this.targets = TARGET_RANGES[this.animalGroupId] ?? [];
 
       // Match recipe feeds to available feeds
@@ -860,15 +962,33 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     const selected = this.feedEntries().filter((e) => e.selected);
     if (selected.length < 2) return;
 
+    // The solver fixes total dry matter. Without a target, the cost-minimising
+    // answer is the smallest possible ration (about 1 kg DM), which is useless.
+    // Fall back to the dry matter of the ration already on screen.
+    const totalDM =
+      this.constraints.totalDM ?? this.rationResult()?.totalDM ?? null;
+    if (!totalDM) {
+      this.optimizationStatus.set('infeasible');
+      this.optimizationMessage.set(
+        this.translate.instant('RECIPES.NEED_TOTAL_DM'),
+      );
+      return;
+    }
+    const constraints: OptimizationConstraints = {
+      ...this.constraints,
+      totalDM,
+    };
+
     this.optimizing.set(true);
     this.optimizationMessage.set('');
+    this.optimizationWarnings.set([]);
 
     try {
       const feeds = selected.map((e) => e.feed);
       const result = await this.optimizationService.optimize(
         feeds,
         this.targets,
-        this.constraints,
+        constraints,
       );
 
       if (result.status === 'optimal' && result.feeds) {
@@ -906,6 +1026,7 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
 
         this.optimizationStatus.set('relaxed');
         this.optimizationMessage.set(this.translate.instant('RECIPES.RELAXED'));
+        this.optimizationWarnings.set(result.warnings ?? []);
       } else {
         this.optimizationStatus.set('infeasible');
         this.optimizationMessage.set(
@@ -943,17 +1064,28 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
         cost: e.kgAsFed * e.feed.pricePerKg,
       }));
 
-      await this.recipeService.saveRecipe(
-        {
-          name: this.recipeName,
-          animalGroupId: this.animalGroupId,
-          totalAsFed: result.totalAsFed,
-          totalDM: result.totalDM,
-          cost: result.totalCost,
-          nutrientAnalysis: result.nutrients,
-        },
-        recipeFeeds,
+      // Herd size is a batch multiplier: keep it a sane positive integer.
+      const animalCount = Math.min(
+        Math.max(Math.round(this.animalCount || 1), 1),
+        100000,
       );
+      this.animalCount = animalCount;
+
+      const payload = {
+        name: this.recipeName,
+        animalGroupId: this.animalGroupId,
+        totalAsFed: result.totalAsFed,
+        totalDM: result.totalDM,
+        cost: result.totalCost,
+        animalCount,
+        nutrientAnalysis: result.nutrients,
+      };
+
+      if (this.recipeId) {
+        await this.recipeService.updateRecipe(this.recipeId, payload, recipeFeeds);
+      } else {
+        this.recipeId = await this.recipeService.saveRecipe(payload, recipeFeeds);
+      }
 
       this.snackBar.open(this.translate.instant('RECIPES.SAVED'), '', {
         duration: 3000,

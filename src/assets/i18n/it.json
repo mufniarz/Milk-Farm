@@ -66,7 +66,8 @@
     "UPDATED": "Alimento aggiornato",
     "DELETED": "Alimento eliminato",
     "IMPORT_NO_FEEDS": "Nessun alimento valido trovato nel file",
-    "IMPORT_FAILED": "Importazione fallita: {{error}}"
+    "IMPORT_FAILED": "Importazione fallita: {{error}}",
+    "IMPORT_PERCENT_NOTE": "Valori percentuali convertiti da frazioni."
   },
   "RECIPES": {
     "TITLE": "Ricette",
@@ -74,6 +75,7 @@
     "BUILDER_TITLE": "Formulatore Razione",
     "NAME": "Nome Ricetta",
     "ANIMAL_GROUP": "Gruppo Animale",
+    "NUM_ANIMALS": "Numero capi",
     "LACTATING": "Vacche in lattazione",
     "DRY": "Vacche in asciutta",
     "HEIFER": "Manze",
@@ -86,6 +88,12 @@
     "TOTAL_DM": "Sostanza Secca Totale (kg)",
     "TOTAL_AS_FED": "Tal Quale Totale (kg)",
     "TOTAL_COST": "Costo Totale (€)",
+    "COST_PER_KG": "Costo al kg",
+    "TOTAL_LOAD": "Carico totale (kg t.q.)",
+    "NEED_TOTAL_DM": "Imposta la sostanza secca totale (o inserisci le quantità della razione) prima di ottimizzare.",
+    "BELOW_MIN": "sotto il minimo",
+    "ABOVE_MAX": "sopra il massimo",
+    "LOAD_COST": "Costo carico (€)",
     "FORAGE_RATIO": "Rapporto Foraggio",
     "MOISTURE_PCT": "Umidità TMR (%)",
     "NUTRIENT_ANALYSIS": "Analisi Nutrienti",

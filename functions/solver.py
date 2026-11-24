@@ -31,10 +31,15 @@ def solve_ration(feeds, targets, constraints):
         f["dmFactor"] * x[f["id"]] for f in feeds if f.get("category") == "forage"
     )
 
-    if "totalDM" in constraints and constraints["totalDM"] is not None:
-        prob += total_dm == constraints["totalDM"], "FixedTotalDM"
-    else:
-        prob += total_dm >= 1.0, "MinimumDM"
+    total_dm_target = constraints.get("totalDM")
+    if total_dm_target is None:
+        # Without a fixed intake the cost-minimising answer is the smallest
+        # possible ration (about 1 kg DM), which is useless in practice.
+        return {
+            "status": "error",
+            "message": "A total dry matter target (totalDM) is required.",
+        }
+    prob += total_dm == total_dm_target, "FixedTotalDM"
 
     for t in targets:
         _add_nutrient_constraint(
@@ -226,7 +231,12 @@ def _solve_relaxed(feeds, targets, constraints):
         f["dmFactor"] * x[f["id"]] for f in feeds if f.get("category") == "forage"
     )
 
-    target_dm = constraints.get("totalDM") or 22.0
+    target_dm = constraints.get("totalDM")
+    if target_dm is None:
+        return {
+            "status": "error",
+            "message": "A total dry matter target (totalDM) is required.",
+        }
     prob += total_dm == target_dm, "FixedTotalDM"
 
     deviations = []

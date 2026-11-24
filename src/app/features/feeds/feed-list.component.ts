@@ -16,21 +16,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { FeedService } from '../../core/services/feed.service';
-import { Feed, FeedCategory } from '../../core/models/feed.model';
+import { Feed } from '../../core/models/feed.model';
+import { FeedImportResult, parseFeedRows } from '../../core/utils/feed-import';
 import { FeedFormComponent } from './feed-form.component';
-
-/** Well-known nutrient codes used in the feed form */
-const NUTRIENT_CODES = [
-  'proteina',
-  'ee',
-  'amido',
-  'zuccheri',
-  'ceneri',
-  'aNDF',
-  'uNDF',
-  'ADF',
-  'ADL',
-];
 
 @Component({
   selector: 'mf-feed-list',
@@ -452,8 +440,8 @@ export class FeedListComponent implements OnInit {
       if (!file) return;
 
       try {
-        const feeds = await this.parseImportFile(file);
-        if (feeds.length === 0) {
+        const result = await this.parseImportFile(file);
+        if (result.feeds.length === 0) {
           this.snackBar.open(
             this.translate.instant('FEEDS.IMPORT_NO_FEEDS'),
             '',
@@ -461,11 +449,14 @@ export class FeedListComponent implements OnInit {
           );
           return;
         }
-        const count = await this.feedService.importFeeds(feeds);
+        const count = await this.feedService.importFeeds(result.feeds);
+        const note = result.scaledFromFractions
+          ? ' ' + this.translate.instant('FEEDS.IMPORT_PERCENT_NOTE')
+          : '';
         this.snackBar.open(
-          this.translate.instant('FEEDS.IMPORTED_COUNT', { count }),
+          this.translate.instant('FEEDS.IMPORTED_COUNT', { count }) + note,
           '',
-          { duration: 4000 },
+          { duration: 6000 },
         );
       } catch (e: any) {
         this.snackBar.open(
@@ -484,87 +475,24 @@ export class FeedListComponent implements OnInit {
   }
 
   /**
-   * Parse a CSV or Excel file into Feed objects.
-   * Expected column headers (case-insensitive):
-   *   name, category, pricePerKg, moisturePct, isAvailable, <nutrient codes>
-   * Category: "forage" or "concentrate" (or "F"/"C")
-   * isAvailable: true/false (or "1"/"0")
+   * Parse the uploaded file into feeds.
+   *
+   * The parser detects the layout, so both the app's flat template and the
+   * farm's own workbook (FORAGGI / CONCENTRATI sections, Italian headers,
+   * fractional percentages) import without preprocessing.
    */
-  private async parseImportFile(
-    file: File,
-  ): Promise<Omit<Feed, 'id' | 'farmId'>[]> {
-    // Dynamically import xlsx to avoid SSR issues
+  private async parseImportFile(file: File): Promise<FeedImportResult> {
+    // Dynamically import xlsx to keep it out of the initial bundle
     const XLSX = await import('xlsx');
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array' });
 
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rows: Record<string, string | number | boolean | undefined>[] =
-      XLSX.utils.sheet_to_json(sheet);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      blankrows: false,
+    });
 
-    const feeds: Omit<Feed, 'id' | 'farmId'>[] = [];
-
-    for (const row of rows) {
-      const name = String(
-        row['name'] || row['Name'] || row['NOME'] || '',
-      ).trim();
-      if (!name) continue;
-
-      // Parse category
-      let category: FeedCategory = 'forage';
-      const catRaw = String(
-        row['category'] ||
-          row['Category'] ||
-          row['Categoria'] ||
-          row['cat'] ||
-          'forage',
-      ).toLowerCase();
-      if (['concentrate', 'concentrato', 'C'].includes(catRaw)) {
-        category = 'concentrate';
-      }
-
-      const pricePerKg =
-        Number(
-          row['pricePerKg'] ||
-            row['price'] ||
-            row['Prezzo'] ||
-            row['pricePerKg'] ||
-            0,
-        ) || 0;
-      const moisturePct =
-        Number(
-          row['moisturePct'] ||
-            row['moisture'] ||
-            row['Umidita'] ||
-            row['moisturePct'] ||
-            0,
-        ) || 0;
-      const isAvailable =
-        row['isAvailable'] !== false &&
-        row['isAvailable'] !== '0' &&
-        row['isAvailable'] !== 'falsa' &&
-        row['isAvailable'] !== 'no';
-
-      // Parse nutrients from the row
-      const nutrients: Record<string, number> = {};
-      for (const code of NUTRIENT_CODES) {
-        const val = Number(row[code] || row[code.toUpperCase()] || 0);
-        if (!isNaN(val)) {
-          nutrients[code] = val;
-        }
-      }
-
-      feeds.push({
-        name,
-        category,
-        pricePerKg,
-        moisturePct,
-        isAvailable: !!isAvailable,
-        nutrients,
-      });
-    }
-
-    return feeds;
+    return parseFeedRows(rows);
   }
 }

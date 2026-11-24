@@ -66,7 +66,8 @@
     "UPDATED": "Feed updated",
     "DELETED": "Feed deleted",
     "IMPORT_NO_FEEDS": "No valid feeds found in file",
-    "IMPORT_FAILED": "Import failed: {{error}}"
+    "IMPORT_FAILED": "Import failed: {{error}}",
+    "IMPORT_PERCENT_NOTE": "Percentage values converted from fractions."
   },
   "RECIPES": {
     "TITLE": "Recipes",
@@ -74,6 +75,7 @@
     "BUILDER_TITLE": "Ration Formulator",
     "NAME": "Recipe Name",
     "ANIMAL_GROUP": "Animal Group",
+    "NUM_ANIMALS": "Number of animals",
     "LACTATING": "Lactating Cows",
     "DRY": "Dry Cows",
     "HEIFER": "Heifers",
@@ -86,6 +88,12 @@
     "TOTAL_DM": "Total Dry Matter (kg)",
     "TOTAL_AS_FED": "Total As-Fed (kg)",
     "TOTAL_COST": "Total Cost (€)",
+    "COST_PER_KG": "Cost per kg",
+    "TOTAL_LOAD": "Total load (kg as fed)",
+    "NEED_TOTAL_DM": "Set the total dry matter (or enter the ration quantities) before optimising.",
+    "BELOW_MIN": "below minimum",
+    "ABOVE_MAX": "above maximum",
+    "LOAD_COST": "Load cost (€)",
     "FORAGE_RATIO": "Forage Ratio",
     "MOISTURE_PCT": "TMR Moisture (%)",
     "NUTRIENT_ANALYSIS": "Nutrient Analysis",

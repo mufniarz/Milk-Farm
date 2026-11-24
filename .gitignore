@@ -38,6 +38,8 @@ testem.log
 /typings
 
 # Firebase
+.firebase/
+firebase-service-account.json
 .firebaserc
 firebase.json
 firebase-debug.log

@@ -128,6 +128,44 @@ export class RecipeService {
   }
 
   /**
+   * Update an existing recipe and replace its feed entries.
+   *
+   * Editing a saved recipe must not create a second document: the recipe is
+   * updated in place and the subcollection is rewritten in one batch.
+   */
+  async updateRecipe(
+    recipeId: string,
+    recipe: Omit<Recipe, 'id' | 'farmId' | 'createdAt'>,
+    feeds: Omit<RecipeFeed, 'id'>[],
+  ): Promise<string> {
+    this.loading.set(true);
+    try {
+      const recipeRef = doc(this.firestore, 'recipes', recipeId);
+      await updateDoc(recipeRef, { ...recipe, updatedAt: new Date() });
+
+      const feedsRef = collection(this.firestore, 'recipes', recipeId, 'feeds');
+      const existing = await new Promise<RecipeFeed[]>((resolve) => {
+        collectionData(query(feedsRef), { idField: 'id' })
+          .pipe(take(1))
+          .subscribe((entries) => resolve(entries as RecipeFeed[]));
+      });
+
+      const batch = writeBatch(this.firestore);
+      for (const entry of existing) {
+        batch.delete(doc(feedsRef, entry.id!));
+      }
+      for (const feed of feeds) {
+        batch.set(doc(feedsRef), feed);
+      }
+
+      await batch.commit();
+      return recipeId;
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  /**
    * Delete a recipe and its feed entries.
    */
   async deleteRecipe(recipeId: string): Promise<void> {

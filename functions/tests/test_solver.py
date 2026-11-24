@@ -77,3 +77,11 @@ def test_conflicting_targets_fall_back_to_relaxed():
     assert result["status"] in ("relaxed", "optimal")
     if result["status"] == "relaxed":
         assert any(w["code"] == "ADF_aNDF" for w in result.get("warnings", []))
+
+
+def test_missing_total_dm_is_rejected():
+    """A ration needs a fixed intake: without one the cheapest answer is 1 kg."""
+    result = solve_ration(FIXTURE["feeds"], [], {})
+
+    assert result["status"] == "error"
+    assert "totalDM" in result["message"]
