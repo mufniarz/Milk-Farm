@@ -893,7 +893,9 @@ def _post_feeding_inventory(db, farm_id, feeding_id):
         if not current.exists:
             return "missing"
         current_data = current.to_dict() or {}
-        if current_data.get("inventoryPostedAt") or current_data.get("writeOffAt"):
+        if current_data.get("writeOffAt"):
+            return "written-off"
+        if current_data.get("inventoryPostedAt"):
             return "already-posted"
         if current_data.get("status") != "confirmed":
             return "not-confirmed"
@@ -1279,6 +1281,8 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
         item_refs = {}
         total_by_feed = {}
         write_off_lines = []
+        write_off_details = []
+        running = {}
         for line, feed_id, loaded, item_ref, item, ledger_ref, ledger in prepared:
             if ledger.exists or not item.exists:
                 continue
@@ -1288,17 +1292,22 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
                     item_data.get("onHandKgAsFed") or 0
                 )
                 item_refs[feed_id] = item_ref
+                running[feed_id] = item_before[feed_id]
+            unit_cost = float(
+                line.get("costPerKgAsFed")
+                or item_data.get("unitCostPerKgAsFed")
+                or 0
+            )
+            before_kg = running[feed_id]
+            after_kg = before_kg - loaded
+            running[feed_id] = after_kg
             transaction.set(
                 ledger_ref,
                 {
                     "itemId": feed_id,
                     "type": "write_off",
                     "deltaKgAsFed": -loaded,
-                    "unitCostPerKgAsFed": float(
-                        line.get("costPerKgAsFed")
-                        or item_data.get("unitCostPerKgAsFed")
-                        or 0
-                    ),
+                    "unitCostPerKgAsFed": unit_cost,
                     "sourceType": "abandoned",
                     "sourceId": line.get("lineId"),
                     "idempotencyKey": f"{farm_id}_{feeding_id}_{line.get('lineId')}_writeoff",
@@ -1310,6 +1319,16 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
             )
             total_by_feed[feed_id] = total_by_feed.get(feed_id, 0.0) + loaded
             write_off_lines.append(line.get("lineId"))
+            write_off_details.append(
+                {
+                    "lineId": line.get("lineId"),
+                    "feedId": feed_id,
+                    "deltaKgAsFed": -loaded,
+                    "unitCostPerKgAsFed": unit_cost,
+                    "onHandBeforeKgAsFed": before_kg,
+                    "onHandAfterKgAsFed": after_kg,
+                }
+            )
 
         for feed_id, total in total_by_feed.items():
             transaction.update(
@@ -1336,6 +1355,7 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
                 "deadAt": dead_at,
                 "alreadyPosted": already_posted,
                 "writeOffLines": write_off_lines,
+                "writeOffs": write_off_details,
                 "writeOffKgAsFed": sum(total_by_feed.values()),
                 "at": firestore.SERVER_TIMESTAMP,
             },
@@ -1353,9 +1373,12 @@ def _retry_one_failure(db, farm_id, feeding_id, instance_id, allow_dead=False):
     except Exception as error:
         _fail_retry(db, farm_id, feeding_id, error)
         return False
-    reason = (
-        "already-posted" if result == "already-posted" else "retry-succeeded"
-    )
+    reason = {
+        "already-posted": "already-posted",
+        "written-off": "written-off",
+        "missing": "missing-feeding",
+        "not-confirmed": "not-confirmed",
+    }.get(result, "retry-succeeded")
     _resolve_trigger_failure(db, farm_id, feeding_id, instance_id, reason)
     return True
 
@@ -1462,6 +1485,69 @@ def retry_feeding_failures(req: https_fn.CallableRequest):
         else:
             failed += 1
     return {"ok": True, "resolved": resolved, "failed": failed}
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def mark_feeding_failure_handled(req: https_fn.CallableRequest):
+    """Close a failure the operator handled with a manual inventory adjustment."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    farm_id = _require_string(data, "farmId")
+    feeding_id = _require_string(data, "feedingId")
+    db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
+    ref = _failure_ref(db, farm_id, feeding_id)
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = ref.get(transaction=transaction)
+        if not snapshot.exists:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.NOT_FOUND,
+                message="Failure not found.",
+            )
+        current = snapshot.to_dict() or {}
+        if current.get("status") == "resolved":
+            return
+        if current.get("status") == "retrying":
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+                message="A retry is in progress.",
+            )
+        transaction.update(
+            ref,
+            {
+                "status": "resolved",
+                "resolvedAt": firestore.SERVER_TIMESTAMP,
+                "resolvedBy": req.auth.uid,
+                "resolution": "manual-adjustment",
+                "lockedBy": None,
+                "lockedAt": None,
+            },
+        )
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "feeding.trigger_resolved",
+                "farmId": farm_id,
+                "feedingId": feeding_id,
+                "resolvedBy": req.auth.uid,
+                "reason": "manual-adjustment",
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
+    return {"ok": True}
 
 
 # ── Retroactive posting ─────────────────────────────────────────────────────

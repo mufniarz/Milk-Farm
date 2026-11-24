@@ -82,7 +82,7 @@ XDG_CONFIG_HOME=./.firebase-config FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
 directly under Node's type stripping; keep the extension. `scripts/backfill-members.mts`
 uses the same runner.
 
-`pytest` without the emulator skips the 22 callable/trigger tests. `npm run test:functions`
+`pytest` without the emulator skips the 24 callable/trigger tests. `npm run test:functions`
 runs the full suite through the emulator with `REQUIRE_EMULATOR=1`, so a missing
 emulator fails instead of silently skipping. The parity chain
 (workbook -> fixtures -> computed) is described in
@@ -101,9 +101,9 @@ emulator fails instead of silently skipping. The parity chain
    `farmMembers(uid,status)`, `feedings(inventorySkippedFeedIds,status)`,
    `milkRecords(herdGroupId,date)`, and the collection-group
    `feedingTriggerFailures(status)` index the scheduled retry needs.
-3. Deploy the functions in `functions/main.py`: the eight callables
-   (target overrides x2, inventory x3, retro posting, failure retry, farm milk
-   price), the `on_feeding_confirmed` trigger, and the
+3. Deploy the functions in `functions/main.py`: the nine callables
+   (target overrides x2, inventory x3, retro posting, failure retry, manual
+   handled, farm milk price), the `on_feeding_confirmed` trigger, and the
    `scheduled_feeding_retry` scheduled function. Enable
    `cloudscheduler.googleapis.com` first; the function uses the
    `*/5 * * * *` schedule decorator, and `firebase deploy --only functions`

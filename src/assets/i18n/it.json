@@ -245,7 +245,10 @@
     "RETRY_DONE": "Riprova completata",
     "RETRY_FAILED": "Riprova non riuscita.",
     "ALREADY_CONFIRMED": "Questo gruppo ha già un carico confermato oggi. La razione è giornaliera: una seconda conferma scaricherebbe due volte l'inventario. Il multi-carico non è ancora disponibile.",
-    "WRITTEN_OFF": "Scaricato in perdita"
+    "WRITTEN_OFF": "Scaricato in perdita",
+    "MARK_HANDLED": "Segna gestito",
+    "MARKED_HANDLED": "Carico segnato come gestito manualmente.",
+    "MARK_HANDLED_FAILED": "Operazione non riuscita."
   },
   "ACCURACY": {
     "TITLE": "Precisione di caricamento",

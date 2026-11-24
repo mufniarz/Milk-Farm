@@ -1,3 +1,5 @@
+import { Feeding } from '../models/feeding.model';
+
 /**
  * Pure loading-sheet math, kept free of Angular so it can be unit-tested
  * without Karma's component harness. The component delegates to these.
@@ -101,4 +103,23 @@ export function findOverdrawnFeeds(
     }
   }
   return result;
+}
+
+
+/**
+ * One confirmation per group per day: a written-off feeding is a historical
+ * record, not an active load, so it must not block a corrected confirmation.
+ */
+export function hasConfirmedLoadForDate(
+  feedings: Feeding[],
+  herdGroupId: string,
+  date: string,
+): boolean {
+  return feedings.some(
+    (feeding) =>
+      feeding.herdGroupId === herdGroupId &&
+      feeding.date === date &&
+      feeding.status === 'confirmed' &&
+      !feeding.writeOffAt,
+  );
 }

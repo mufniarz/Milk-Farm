@@ -27,6 +27,7 @@ import {
   computeDeviationPct,
   findOverdrawnFeeds,
   findUntrackedFeedIds,
+  hasConfirmedLoadForDate,
   localDateKey,
 } from '../../core/utils/loading-math';
 
@@ -229,6 +230,15 @@ import {
                   <mat-icon>error</mat-icon>
                   {{ 'LOADING.FAILED' | translate }}
                 </span>
+                @if (failure.status === 'dead' && canRetry) {
+                  <button
+                    mat-button
+                    (click)="markHandled(failure)"
+                    [disabled]="saving"
+                  >
+                    {{ 'LOADING.MARK_HANDLED' | translate }}
+                  </button>
+                }
               }
               @if (feeding.writeOffAt) {
                 <span class="overdrawn">
@@ -505,11 +515,10 @@ export class LoadingComponent implements OnInit, OnDestroy {
   }
 
   get alreadyConfirmedToday(): boolean {
-    return this.feedings.some(
-      (feeding) =>
-        feeding.herdGroupId === this.selectedGroupId &&
-        feeding.date === this.today &&
-        feeding.status === 'confirmed',
+    return hasConfirmedLoadForDate(
+      this.feedings,
+      this.selectedGroupId,
+      this.today,
     );
   }
 
@@ -520,6 +529,27 @@ export class LoadingComponent implements OnInit, OnDestroy {
 
   failureFor(feedingId: string | undefined): FeedingFailure | undefined {
     return this.failures.find((failure) => failure.feedingId === feedingId);
+  }
+
+  async markHandled(failure: FeedingFailure): Promise<void> {
+    this.saving = true;
+    try {
+      await this.failureService.markHandled(failure.feedingId);
+      this.snackBar.open(
+        this.translate.instant('LOADING.MARKED_HANDLED'),
+        undefined,
+        { duration: 4000 },
+      );
+    } catch (error) {
+      console.error('Failed to mark feeding handled', error);
+      this.snackBar.open(
+        this.translate.instant('LOADING.MARK_HANDLED_FAILED'),
+        undefined,
+        { duration: 5000 },
+      );
+    } finally {
+      this.saving = false;
+    }
   }
 
   async retryFailures(): Promise<void> {

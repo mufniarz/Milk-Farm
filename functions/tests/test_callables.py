@@ -1274,6 +1274,15 @@ def test_abandonment_books_write_off_and_blocks_retry():
     ref.update(
         {"deadAt": datetime.now(timezone.utc) - timedelta(days=91)}
     )
+    # The write-off must use the load-time line cost, not the item's current
+    # replacement cost.
+    (
+        DB.collection("farms")
+        .document("f1")
+        .collection("inventoryItems")
+        .document("feed1")
+        .update({"unitCostPerKgAsFed": 0.15})
+    )
 
     assert main._abandon_dead_failure(DB, "f1", "feeding-writeoff") is True
     assert _on_hand("feed1")["onHandKgAsFed"] == 950
@@ -1282,6 +1291,7 @@ def test_abandonment_books_write_off_and_blocks_retry():
     assert len(write_offs) == 2
     assert sorted(entry["deltaKgAsFed"] for entry in write_offs) == [-30.0, -20.0]
     assert all(entry["sourceType"] == "abandoned" for entry in write_offs)
+    assert all(entry["unitCostPerKgAsFed"] == 0.12 for entry in write_offs)
 
     feeding = (
         DB.collection("farms")
@@ -1297,7 +1307,7 @@ def test_abandonment_books_write_off_and_blocks_retry():
     ledger_before = len(_ledger())
     assert (
         main._post_feeding_inventory(DB, "f1", "feeding-writeoff")
-        == "already-posted"
+        == "written-off"
     )
     assert len(_ledger()) == ledger_before
     assert _on_hand("feed1")["onHandKgAsFed"] == 950
@@ -1317,3 +1327,102 @@ def test_abandonment_books_write_off_and_blocks_retry():
     assert len(abandoned) == 1
     assert abandoned[0]["writeOffKgAsFed"] == 50
     assert sorted(abandoned[0]["writeOffLines"]) == ["w1", "w2"]
+    details = abandoned[0]["writeOffs"]
+    assert [entry["lineId"] for entry in details] == ["w1", "w2"]
+    assert [entry["onHandBeforeKgAsFed"] for entry in details] == [1000, 970]
+    assert [entry["onHandAfterKgAsFed"] for entry in details] == [970, 950]
+    assert all(entry["unitCostPerKgAsFed"] == 0.12 for entry in details)
+
+
+def test_manual_handled_closes_the_queue_without_double_posting():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-manual",
+        lines=_feeding_lines(loaded=(50,)),
+    )
+    _failure_doc("feeding-manual", status="dead", retry_count=5)
+
+    # The operator records the correction manually, then marks the queue row.
+    _handler(main.adjust_inventory)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "itemId": "feed1",
+                "deltaKgAsFed": -50,
+                "reason": "manual correction for failed posting",
+                "idempotencyKey": "manual-failed-posting",
+            },
+        )
+    )
+    _handler(main.mark_feeding_failure_handled)(
+        _Req("owner", {"farmId": "f1", "feedingId": "feeding-manual"})
+    )
+
+    failure = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .document("feeding-manual")
+        .get()
+        .to_dict()
+    )
+    assert failure["status"] == "resolved"
+    assert failure["resolution"] == "manual-adjustment"
+
+    ledger_before = len(_ledger())
+    result = _handler(main.retry_feeding_failures)(
+        _Req("owner", {"farmId": "f1"})
+    )
+    assert result["resolved"] == 0
+    assert len(_ledger()) == ledger_before
+    assert _on_hand("feed1")["onHandKgAsFed"] == 950
+    assert main._abandon_dead_failure(DB, "f1", "feeding-manual") is False
+
+
+def test_retry_reasons_for_written_off_missing_and_draft():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-written",
+        lines=_feeding_lines(loaded=(10,)),
+    )
+    (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding-written")
+        .update({"writeOffAt": firestore.SERVER_TIMESTAMP})
+    )
+    _failure_doc("feeding-written", status="pending")
+
+    _failure_doc("feeding-missing", status="pending")
+
+    _create_feeding(
+        feeding_id="feeding-draft",
+        status="draft",
+        lines=_feeding_lines(loaded=(10,)),
+    )
+    _failure_doc("feeding-draft", status="pending")
+
+    result = _handler(main.retry_feeding_failures)(
+        _Req("owner", {"farmId": "f1"})
+    )
+    assert result["resolved"] == 3
+    assert result["failed"] == 0
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    reasons = {
+        entry["feedingId"]: entry["reason"]
+        for entry in audits
+        if entry["action"] == "feeding.trigger_resolved"
+    }
+    assert reasons["feeding-written"] == "written-off"
+    assert reasons["feeding-missing"] == "missing-feeding"
+    assert reasons["feeding-draft"] == "not-confirmed"
+    assert len(_ledger()) == 1  # only the seed delivery

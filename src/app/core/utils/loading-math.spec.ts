@@ -3,8 +3,10 @@ import {
   computeDeviationPct,
   findOverdrawnFeeds,
   findUntrackedFeedIds,
+  hasConfirmedLoadForDate,
   localDateKey,
 } from './loading-math';
+import { Feeding } from '../models/feeding.model';
 
 describe('loading math', () => {
   it('computes called kg from the recipe per-head quantity and head count', () => {
@@ -63,5 +65,37 @@ describe('loading math', () => {
         [],
       ),
     ).toEqual([]);
+  });
+});
+
+
+describe('once-daily guard', () => {
+  const base = {
+    herdGroupId: 'g1',
+    date: '2026-11-20',
+    status: 'confirmed',
+  } as Feeding;
+
+  it('finds a confirmed load for the group and date', () => {
+    expect(
+      hasConfirmedLoadForDate([base], 'g1', '2026-11-20'),
+    ).toBeTrue();
+  });
+
+  it('ignores draft and written-off feedings', () => {
+    expect(
+      hasConfirmedLoadForDate(
+        [{ ...base, status: 'draft' }],
+        'g1',
+        '2026-11-20',
+      ),
+    ).toBeFalse();
+    expect(
+      hasConfirmedLoadForDate(
+        [{ ...base, writeOffAt: new Date() }],
+        'g1',
+        '2026-11-20',
+      ),
+    ).toBeFalse();
   });
 });

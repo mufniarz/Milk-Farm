@@ -50,6 +50,17 @@ export class FeedingFailureService {
     );
   }
 
+  async markHandled(feedingId: string): Promise<void> {
+    const callable = httpsCallable<
+      { farmId: string; feedingId: string },
+      { ok: boolean }
+    >(this.functions, 'mark_feeding_failure_handled');
+    await callable({
+      farmId: this.farmContext.activeFarmId(),
+      feedingId,
+    });
+  }
+
   async retryAll(status?: 'pending' | 'dead'): Promise<RetryFailuresResult> {
     const callable = httpsCallable<
       { farmId: string; status?: 'pending' | 'dead' },
