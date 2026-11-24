@@ -33,7 +33,7 @@ numbers.
 | Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 11 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged) |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine and loading math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 8 passed — 3 calculator parity + 5 loading math (called kg, deviation incl. null, untracked, per-feed overdraft) |
+| Client engine, loading and accuracy math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 13 passed — 3 calculator parity + 5 loading math + 5 accuracy (drafts excluded, pending included, corrections/anomalies flagged, aggregation, Italian CSV) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 13 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
@@ -143,6 +143,59 @@ The feeding document/trigger half is in place; the loading sheet is next.
   the report lands.
 - **Orphan drafts.** Unconfirmed drafts are not cleaned up yet; a later
   increment should add a 30-day soft-delete or an admin cleanup action.
+- **Concurrency primitive.** The ledger uses `transaction.set` with
+  deterministic ids, not `create()`. Safety comes from the transaction: both
+  concurrent invocations read the feeding inside their transaction, Firestore
+  serializes them, the loser retries, sees `inventoryPostedAt`, and returns.
+  Do not replace the transaction with a non-transactional create/set.
+- **Retry configuration.** The installed `firebase-functions==0.6.0` does not
+  expose `retry` on `on_document_written` (`FirestoreOptions` rejects it), so
+  it cannot be set in the decorator. Set the retry policy on the deployed
+  function (or add an application-level failure queue) before relying on
+  automatic retries; the `inventoryPostedAt` guard makes a retry safe
+  whenever it happens.
+
+## I. Feeder accuracy report
+
+The report is the first consumer of the ingestion/loading trail. Decisions:
+
+- **Drafts excluded.** A draft is not a load.
+- **Confirmed-but-posting included** with a `status` column
+  (`posted` / `pending`). The load happened; inventory posting is an
+  operations concern.
+- **Corrections counted and flagged.** `correctsFeedingId` adds
+  `isCorrection: true` to the CSV; both the original and the correction
+  remain visible.
+- **Anomaly columns.** `hasOverdrawn` and `hasSkipped` per row, so a clean
+  deviation record with constant skipped lines is still visible.
+- **CSV shape.** One row per feeding line:
+  `date; herdGroupId; feederId; feedId; feedName; calledKgAsFed;
+  loadedKgAsFed; deviationPct; refusedKgAsFed; status; isCorrection;
+  hasOverdrawn; hasSkipped`. `;` delimiter, `,` decimal, UTF-8 BOM for
+  Italian Excel. The on-screen table aggregates; the CSV does not.
+- **Aggregation.** Per feeder (filterable by herd group and 7/28/90-day
+  window): load count, line count, mean absolute deviation,
+  load-weighted deviation (`sum |loaded - called| / sum called`), worst three
+  ingredients, and a weekly trend.
+- **Index.** `feedings(feederId, date)` is added with the report; the current
+  screen loads the farm's feedings and filters client-side, but the index is
+  in place for the eventual server-side range query.
+- **Independence.** The report does not read inventory, so it can ship before
+  retroactive posting if the pilot scorecard is the nearer deadline.
+
+## J. Retroactive posting (next)
+
+Decisions to implement, not yet built:
+
+- **Window:** all historical skipped lines, not a rolling window.
+- **Trigger:** a separate callable on inventory-item creation scans feedings
+  whose `inventorySkippedLines` contain the feed and posts `adjustment`
+  entries; it is not automatic in `on_feeding_confirmed`.
+- **Audit type:** `inventory.retroactive` with `sourceFeedingId` and
+  `sourceLineId`, distinct from `feeding.confirm`.
+- **Reconciliation:** rerun for affected items immediately; do not wait for
+  the next nightly job.
+- **Approval:** owner/admin only, not feeder.
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 

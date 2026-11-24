@@ -1029,6 +1029,9 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
                 "inventoryOverdrawn": overdrawn,
             },
         )
+        # Written with the same transaction object as the ledger and the
+        # feeding update: a crash before commit rolls the audit back too, so
+        # there is no window where the ledger moves but the audit is missing.
         _write_audit(
             transaction,
             db,

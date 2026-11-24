@@ -9,7 +9,8 @@
     "TARGETS": "Targets",
     "GROUPS": "Groups",
     "INVENTORY": "Inventory",
-    "LOADING": "Loading"
+    "LOADING": "Loading",
+    "ACCURACY": "Accuracy"
   },
   "AUTH": {
     "LOGIN": "Login",
@@ -231,5 +232,26 @@
     "OVERDRAFT_ACK": "I understand the load exceeds on-hand stock",
     "OVERDRAFT_ACK_REQUIRED": "Acknowledge the overdraft warning to confirm.",
     "POSTING_DELAYED": "posting delayed — check back"
+  },
+  "ACCURACY": {
+    "TITLE": "Feeder accuracy",
+    "SUBTITLE": "Called versus loaded deviation per feeder and herd group. Drafts are excluded.",
+    "WINDOW": "Window",
+    "DAYS": "Last {{days}} days",
+    "GROUP": "Group",
+    "ALL_GROUPS": "All groups",
+    "LINES": "lines",
+    "EXPORT": "Export CSV",
+    "FEEDER": "Feeder",
+    "LOADS": "Loads",
+    "LINE_COUNT": "Lines",
+    "MEAN_ABS": "Mean abs.",
+    "WEIGHTED": "Weighted",
+    "ANOMALIES": "Overdrawn / skipped",
+    "WORST": "Worst ingredients",
+    "TREND": "Weeks",
+    "EMPTY": "No data in this window.",
+    "PENDING_NOTE": "Confirmed but not-yet-posted loads are included; the CSV status column says posted or pending.",
+    "EXPORTED": "CSV exported."
   }
 }

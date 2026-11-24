@@ -133,6 +133,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "feedings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "feederId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

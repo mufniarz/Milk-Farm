@@ -9,7 +9,8 @@
     "TARGETS": "Obiettivi",
     "GROUPS": "Gruppi",
     "INVENTORY": "Scorte",
-    "LOADING": "Carico"
+    "LOADING": "Carico",
+    "ACCURACY": "Precisione"
   },
   "AUTH": {
     "LOGIN": "Accedi",
@@ -231,5 +232,26 @@
     "OVERDRAFT_ACK": "Ho capito: il carico supera la giacenza",
     "OVERDRAFT_ACK_REQUIRED": "Conferma la casella per procedere con il carico in eccedenza.",
     "POSTING_DELAYED": "registrazione in ritardo — riprova più tardi"
+  },
+  "ACCURACY": {
+    "TITLE": "Precisione di caricamento",
+    "SUBTITLE": "Scostamento tra quantità chiamate e caricate per addetto e gruppo. Le bozze sono escluse.",
+    "WINDOW": "Periodo",
+    "DAYS": "Ultimi {{days}} giorni",
+    "GROUP": "Gruppo",
+    "ALL_GROUPS": "Tutti i gruppi",
+    "LINES": "righe",
+    "EXPORT": "Esporta CSV",
+    "FEEDER": "Addetto",
+    "LOADS": "Carichi",
+    "LINE_COUNT": "Righe",
+    "MEAN_ABS": "Scost. medio",
+    "WEIGHTED": "Scost. pesato",
+    "ANOMALIES": "Sotto zero / non scaricati",
+    "WORST": "Peggiori alimenti",
+    "TREND": "Settimane",
+    "EMPTY": "Nessun dato nel periodo.",
+    "PENDING_NOTE": "I carichi confermati ma non ancora scaricati sono inclusi; il CSV riporta lo stato posted o pending.",
+    "EXPORTED": "CSV esportato."
   }
 }

@@ -140,7 +140,18 @@ inventory and target overrides require `farmMembers`.
 - The recent list shows "posting…" until the trigger sets
   `inventoryPostedAt`, then "posting delayed — check back" after 30 seconds;
   a dead-letter view is the next operational addition.
-- The accuracy report will export one row per feeding line (`date`,
-  `herdGroupId`, `feederId`, `feedId`, `calledKgAsFed`, `loadedKgAsFed`,
-  `deviationPct`, `refusedKgAsFed`). It is independent of inventory, so it can
-  ship before retroactive posting if that is the nearer deadline.
+- The accuracy report at `/accuracy` exports one row per feeding line
+  (`date; herdGroupId; feederId; feedId; feedName; calledKgAsFed;
+  loadedKgAsFed; deviationPct; refusedKgAsFed; status; isCorrection;
+  hasOverdrawn; hasSkipped`) with `;` delimiter, `,` decimal and a UTF-8 BOM
+  for Italian Excel. Drafts are excluded; confirmed-but-posting loads are
+  included with `status=pending`; corrections and anomalies are flagged. The
+  report is independent of inventory.
+- The ledger uses `transaction.set` with deterministic ids. Concurrent trigger
+  invocations are serialized by the transaction; the loser retries, sees
+  `inventoryPostedAt`, and returns. Do not replace this with a
+  non-transactional write.
+- `firebase-functions==0.6.0` does not expose `retry` on
+  `on_document_written`; set the retry policy on the deployed function (or add
+  a failure queue) before relying on automatic retries. The
+  `inventoryPostedAt` guard makes retry safe when it is enabled.

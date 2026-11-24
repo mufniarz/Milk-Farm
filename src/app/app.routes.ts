@@ -62,6 +62,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'accuracy',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/accuracy/accuracy.component').then(
+        (m) => m.AccuracyComponent
+      ),
+  },
+  {
     path: 'loading',
     canActivate: [authGuard],
     loadComponent: () =>

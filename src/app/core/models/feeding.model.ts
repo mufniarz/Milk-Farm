@@ -34,6 +34,8 @@ export interface Feeding {
   /** Refusals/weighback, in kg as fed; affects intake, not inventory. */
   refusedKgAsFed: number;
   idempotencyKey: string;
+  /** Set when this feeding corrects an earlier one; both are counted. */
+  correctsFeedingId?: string | null;
   /** Set by the inventory trigger; a client must never write it. */
   inventoryPostedAt?: Date | null;
   inventoryPostedLines?: number;
