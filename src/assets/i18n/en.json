@@ -203,7 +203,8 @@
     "OVERDRAWN_ALERT": "feeds overdrawn — record a delivery",
     "RETRO_POST": "Post skipped loads",
     "RETRO_POSTED": "Lines posted",
-    "RETRO_FAILED": "Retroactive posting failed."
+    "RETRO_FAILED": "Retroactive posting failed.",
+    "PENDING_SKIPPED": "Feeds with unposted loads"
   },
   "LOADING": {
     "TITLE": "Barn loading",
@@ -262,7 +263,8 @@
     "WORST_TOOLTIP": "Cumulative absolute deviation in kg; ties by mean deviation, then alphabetical.",
     "TREND_TOOLTIP": "Monday-start weeks; mean absolute deviation.",
     "RESTRICTED": "Only the owner, farm admin or consultant can view this report.",
-    "REFUSAL_ERROR": "Refused exceeds loaded: check the data."
+    "REFUSAL_ERROR": "Refused exceeds loaded: row excluded from the aggregate.",
+    "DATA_ERRORS": "data errors"
   },
   "IOFC": {
     "TITLE": "Income over feed cost",
@@ -285,6 +287,7 @@
     "DRY": "IOFC does not apply to dry groups.",
     "EMPTY": "Select a group with a milk record.",
     "NO_COST": "No feed cost available: assign an active recipe to the group or record the cost. IOFC is not calculable.",
-    "NO_RECORD": "No milk record for this date. Enter the group's milk to calculate IOFC."
+    "NO_RECORD": "No milk record for this date. Enter the group's milk to calculate IOFC.",
+    "RESTRICTED": "Only the owner, farm admin or consultant can view IOFC."
   }
 }

@@ -13,9 +13,13 @@ import { firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
 import { HerdGroup } from '../../core/models/group.model';
 import { MilkRecord } from '../../core/models/milk.model';
+import { Feeding } from '../../core/models/feeding.model';
 import { GroupService } from '../../core/services/group.service';
 import { RecipeService } from '../../core/services/recipe.service';
 import { MilkService } from '../../core/services/milk.service';
+import { FeedingService } from '../../core/services/feeding.service';
+import { FarmService } from '../../core/services/farm.service';
+import { FarmContextService } from '../../core/services/farm-context.service';
 import { computeIofc, IofcResult } from '../../core/utils/iofc';
 import { localDateKey } from '../../core/utils/loading-math';
 
@@ -47,6 +51,9 @@ import { localDateKey } from '../../core/utils/loading-math';
       <h1 class="page-title">{{ 'IOFC.TITLE' | translate }}</h1>
       <p class="page-subtitle">{{ 'IOFC.SUBTITLE' | translate }}</p>
 
+      @if (!canView) {
+        <div class="banner warning">{{ 'IOFC.RESTRICTED' | translate }}</div>
+      } @else {
       <mat-card appearance="outlined" class="form-card">
         <mat-card-content class="form-grid">
           <mat-form-field appearance="outline">
@@ -95,6 +102,15 @@ import { localDateKey } from '../../core/utils/loading-math';
           >
             {{ 'IOFC.SAVE' | translate }}
           </button>
+          @if (canEditFarm) {
+            <button
+              mat-stroked-button
+              (click)="saveFarmDefault()"
+              [disabled]="saving"
+            >
+              {{ 'IOFC.SAVE_DEFAULT' | translate }}
+            </button>
+          }
         </mat-card-content>
       </mat-card>
 
@@ -103,7 +119,11 @@ import { localDateKey } from '../../core/utils/loading-math';
       } @else if (isDry) {
         <div class="banner warning">{{ 'IOFC.DRY' | translate }}</div>
       } @else {
-        @if (!hasRecordForDate && milkKg === 0) {
+        @if (incompleteSnapshot) {
+          <div class="banner warning">
+            {{ 'IOFC.INCOMPLETE_SNAPSHOT' | translate }}
+          </div>
+        } @else if (!hasRecordForDate && milkKg === 0) {
           <p class="empty">{{ 'IOFC.NO_RECORD' | translate }}</p>
         } @else {
           @if (result; as r) {
@@ -158,13 +178,20 @@ import { localDateKey } from '../../core/utils/loading-math';
               <div class="trend-row">
                 <span>{{ point.date }}</span>
                 <span>{{ point.milkKg | number: '1.0-0' }} kg</span>
-                <span>€{{ point.iofcPerCow | number: '1.2-2' }}</span>
+                <span>
+                  {{
+                    point.iofcPerCow === null
+                      ? '—'
+                      : '€' + (point.iofcPerCow | number: '1.2-2')
+                  }}
+                </span>
               </div>
             } @empty {
               <p class="empty">{{ 'IOFC.EMPTY' | translate }}</p>
             }
           </mat-card-content>
         </mat-card>
+      }
       }
     </div>
   `,
@@ -175,7 +202,7 @@ import { localDateKey } from '../../core/utils/loading-math';
     .form-card { margin-bottom: 16px; }
     .form-grid {
       display: grid;
-      grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr auto;
+      grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr auto auto;
       gap: 12px;
       align-items: center;
     }
@@ -215,11 +242,16 @@ export class IofcComponent implements OnInit {
   private groupService = inject(GroupService);
   private recipeService = inject(RecipeService);
   private milkService = inject(MilkService);
+  private feedingService = inject(FeedingService);
+  private farmService = inject(FarmService);
+  private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
 
   groups: HerdGroup[] = [];
   records: MilkRecord[] = [];
+  feedings: Feeding[] = [];
+  farmMilkPrice: number | null = null;
   selectedGroupId = '';
   date = localDateKey();
   milkKg = 0;
@@ -228,7 +260,15 @@ export class IofcComponent implements OnInit {
   hasRecordForDate = false;
   saving = false;
 
+  get canView(): boolean {
+    if (this.farmContext.loading()) return true;
+    const role = this.farmContext.activeRole();
+    return role === 'owner' || role === 'farmAdmin' || role === 'consultant';
+  }
+
   ngOnInit(): void {
+    if (!this.canView) return;
+    void this.loadFarmDefault();
     this.groupService.getGroups().subscribe((groups) => {
       this.groups = groups;
       if (!this.selectedGroupId && groups.length > 0) {
@@ -246,41 +286,90 @@ export class IofcComponent implements OnInit {
     return this.records.find((record) => record.date === this.date);
   }
 
+  private get feedingForDate(): Feeding | undefined {
+    return this.feedings.find(
+      (feeding) => feeding.date === this.date && feeding.status === 'confirmed',
+    );
+  }
+
+  private get headCountForEntry(): number {
+    return this.feedingForDate?.animalCount ?? this.group?.headCount ?? 0;
+  }
+
+  get incompleteSnapshot(): boolean {
+    const record = this.recordForDate;
+    return (
+      !!record &&
+      (record.feedCostPerHeadSnapshot == null ||
+        record.headCountSnapshot == null)
+    );
+  }
+
+  get canEditFarm(): boolean {
+    const role = this.farmContext.activeRole();
+    return role === 'owner' || role === 'farmAdmin';
+  }
+
   get isDry(): boolean {
     return this.group?.animalGroupId === 'dry';
   }
 
   get result(): IofcResult | null {
     const group = this.group;
-    if (!group || group.headCount <= 0) return null;
+    if (!group) return null;
     const record = this.recordForDate;
-    const feedCost =
-      record?.feedCostPerHeadSnapshot ?? this.feedCostPerHead;
-    if (feedCost === null) return null;
-    const headCount = record?.headCountSnapshot ?? group.headCount;
+    if (record) {
+      if (
+        record.feedCostPerHeadSnapshot == null ||
+        record.headCountSnapshot == null
+      ) {
+        return null;
+      }
+      return computeIofc({
+        headCount: record.headCountSnapshot,
+        milkKg: this.milkKg,
+        milkPricePerKg: this.milkPricePerKg,
+        feedCostPerHead: record.feedCostPerHeadSnapshot,
+      });
+    }
+    if (this.feedCostPerHead === null) return null;
+    const headCount = this.headCountForEntry;
     if (!headCount || headCount <= 0) return null;
     return computeIofc({
       headCount,
       milkKg: this.milkKg,
       milkPricePerKg: this.milkPricePerKg,
-      feedCostPerHead: feedCost,
+      feedCostPerHead: this.feedCostPerHead,
     });
   }
 
-  get trend(): { date: string; milkKg: number; iofcPerCow: number }[] {
-    const group = this.group;
-    if (!group) return [];
-    const points: { date: string; milkKg: number; iofcPerCow: number }[] = [];
+  get trend(): {
+    date: string;
+    milkKg: number;
+    iofcPerCow: number | null;
+  }[] {
+    const points: {
+      date: string;
+      milkKg: number;
+      iofcPerCow: number | null;
+    }[] = [];
     for (const record of this.records.slice(0, 7)) {
-      const headCount = record.headCountSnapshot ?? group.headCount;
-      const feedCost =
-        record.feedCostPerHeadSnapshot ?? this.feedCostPerHead;
-      if (!headCount || headCount <= 0 || feedCost === null) continue;
+      if (
+        record.feedCostPerHeadSnapshot == null ||
+        record.headCountSnapshot == null
+      ) {
+        points.push({
+          date: record.date,
+          milkKg: record.milkKg,
+          iofcPerCow: null,
+        });
+        continue;
+      }
       const result = computeIofc({
-        headCount,
+        headCount: record.headCountSnapshot,
         milkKg: record.milkKg,
         milkPricePerKg: record.milkPricePerKg,
-        feedCostPerHead: feedCost,
+        feedCostPerHead: record.feedCostPerHeadSnapshot,
       });
       points.push({
         date: record.date,
@@ -295,8 +384,9 @@ export class IofcComponent implements OnInit {
     const group = this.group;
     this.feedCostPerHead = null;
     this.records = [];
+    this.feedings = [];
     this.milkKg = 0;
-    this.milkPricePerKg = 0.5;
+    this.milkPricePerKg = this.farmMilkPrice ?? 0.5;
     this.hasRecordForDate = false;
     if (!group?.id) return;
     if (group.activeRecipeId) {
@@ -305,7 +395,18 @@ export class IofcComponent implements OnInit {
       );
       this.feedCostPerHead = recipe?.cost ?? null;
     }
-    await this.loadRecords(group.id);
+    try {
+      this.feedings = await firstValueFrom(
+        this.feedingService.getFeedings(group.id).pipe(take(1)),
+      );
+    } catch {
+      this.feedings = [];
+    }
+    try {
+      await this.loadRecords(group.id);
+    } catch {
+      this.records = [];
+    }
     this.applyRecordForDate();
   }
 
@@ -319,6 +420,13 @@ export class IofcComponent implements OnInit {
     );
   }
 
+  private async loadFarmDefault(): Promise<void> {
+    this.farmMilkPrice = await this.farmService.getMilkPricePerKg();
+    if (!this.hasRecordForDate) {
+      this.milkPricePerKg = this.farmMilkPrice ?? 0.5;
+    }
+  }
+
   private applyRecordForDate(): void {
     const record = this.recordForDate;
     this.hasRecordForDate = !!record;
@@ -327,7 +435,29 @@ export class IofcComponent implements OnInit {
       this.milkPricePerKg = record.milkPricePerKg;
     } else {
       this.milkKg = 0;
-      this.milkPricePerKg = 0.5;
+      this.milkPricePerKg = this.farmMilkPrice ?? 0.5;
+    }
+  }
+
+  async saveFarmDefault(): Promise<void> {
+    this.saving = true;
+    try {
+      await this.farmService.setMilkPricePerKg(this.milkPricePerKg);
+      this.farmMilkPrice = this.milkPricePerKg;
+      this.snackBar.open(
+        this.translate.instant('IOFC.DEFAULT_SAVED'),
+        undefined,
+        { duration: 3000 },
+      );
+    } catch (error) {
+      console.error('Failed to save farm milk price', error);
+      this.snackBar.open(
+        this.translate.instant('IOFC.DEFAULT_FAILED'),
+        undefined,
+        { duration: 5000 },
+      );
+    } finally {
+      this.saving = false;
     }
   }
 
@@ -342,7 +472,7 @@ export class IofcComponent implements OnInit {
         milkKg: this.milkKg,
         milkPricePerKg: this.milkPricePerKg,
         feedCostPerHeadSnapshot: this.feedCostPerHead,
-        headCountSnapshot: group.headCount,
+        headCountSnapshot: this.headCountForEntry,
       });
       await this.loadRecords(group.id);
       this.applyRecordForDate();

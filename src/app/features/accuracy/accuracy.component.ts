@@ -124,9 +124,9 @@ import {
               <span>{{ summary.meanAbsDeviationPct | number: '1.1-1' }}%</span>
               <span>{{ summary.loadWeightedDeviationPct | number: '1.1-1' }}%</span>
               <span
-                [class.alert]="summary.refusalError"
+                [class.alert]="summary.dataErrorCount > 0"
                 [title]="
-                  summary.refusalError
+                  summary.dataErrorCount > 0
                     ? ('ACCURACY.REFUSAL_ERROR' | translate)
                     : ''
                 "
@@ -143,6 +143,10 @@ import {
                 "
               >
                 {{ summary.overdrawnLoads }} / {{ summary.skippedLoads }}
+                @if (summary.dataErrorCount > 0) {
+                  · {{ summary.dataErrorCount }}
+                  {{ 'ACCURACY.DATA_ERRORS' | translate }}
+                }
               </span>
               <span class="ingredients">
                 @for (item of summary.worstIngredients; track item.feedId) {
@@ -277,9 +281,14 @@ export class AccuracyComponent implements OnInit {
   groupId = '';
 
   ngOnInit(): void {
-    this.feedingService
-      .getFeedings()
-      .subscribe((feedings) => (this.feedings = feedings));
+    this.feedingService.getFeedings().subscribe({
+      next: (feedings) => (this.feedings = feedings),
+      error: () => {
+        // Feeder-role accounts are denied feedings by the rules; the page
+        // shows the restricted message instead.
+        this.feedings = [];
+      },
+    });
     this.feederService
       .getFeeders()
       .subscribe((feeders) => (this.feeders = feeders));

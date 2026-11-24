@@ -143,6 +143,9 @@ inventory and target overrides require `farmMembers`.
 - The recent list shows "posting…" until the trigger sets
   `inventoryPostedAt`, then "posting delayed — check back" after 30 seconds;
   a dead-letter view is the next operational addition.
+- Data errors (refusals greater than the loaded quantity) are excluded from
+  the accuracy aggregate and counted per feeder; the CSV carries
+  `hasRefusalError`.
 - The accuracy report at `/accuracy` exports one row per feeding line
   (`date; herdGroupId; feederId; feedId; feedName; calledKgAsFed;
   loadedKgAsFed; deviationPct; refusedKgAsFed; status; isCorrection;
@@ -170,9 +173,11 @@ inventory and target overrides require `farmMembers`.
   `post_skipped_consumption` and audits each line as `inventory.retroactive`
   with before/after and an `overdrawn` flag. The feeding mutation is audited
   as `feeding.skipped_cleared`; a second call returns `postedLines: 0,
-  alreadyPosted: N`. Ledger entries carry the original feeding date, while
-  their timestamps reflect the retroactive moment. Duplicate skipped lines
-  for one feed post per-line entries and update on-hand once.
+  alreadyPosted: N`. Ledger entries carry the original feeding date and the
+  line's historical `costPerKgAsFed`, while their timestamps reflect the
+  retroactive moment. Duplicate skipped lines for one feed post per-line
+  entries and update on-hand once. The inventory page also lists every item
+  with pending skipped loads, so none are forgotten.
 - Feeder-role accounts read only their own feedings at the rules level
   (`createdBy == uid`), and the report UI is restricted to
   owner/admin/consultant; a server-side report callable is the consultant-scale
@@ -181,18 +186,25 @@ inventory and target overrides require `farmMembers`.
   cost from the active recipe, IOFC/day, per cow, milk per cow and feed cost
   per kg. Milk records are owner/admin/consultant only. Dry groups show IOFC
   as not applicable. With no recipe and no snapshot the page shows n/a, never
-  a zero feed cost; existing records use their `feedCostPerHeadSnapshot` and
-  `headCountSnapshot` so historical IOFC does not move. The trend is the last
-  seven records. The milk price is per record (form default EUR 0.50); a
-  farm-level default is not implemented, and fat/protein are stored but not
-  used by flat-price IOFC.
+  a zero feed cost; a record with a missing snapshot shows "incomplete
+  snapshot" rather than falling back to today's herd. The record's
+  `headCountSnapshot` is the day's confirmed feeding `animalCount` when one
+  exists, otherwise the group head count. The trend is the last seven
+  records. The milk price is per record, with a farm-level default at
+  `farms/{farmId}.milkPricePerKg` that owner/admin can save from the page;
+  fat/protein are stored but not used by flat-price IOFC.
 - **Pre-deploy requirement:** the trigger failure queue/alert must exist
   before the trigger is deployed. The SDK cannot enable retry (0.6.0 stable and
   0.7.0rc0 both hardcode `retry=False`), so a transient failure otherwise
   loses the inventory posting silently.
-- **Deploy chain:** everything except the trigger can ship first — feeds,
-  recipes, targets, groups, inventory items/ledger (manual), loading sheet,
-  accuracy and IOFC. Loading works without automatic inventory posting; IOFC
-  and the accuracy report are fully functional. The failure queue is the
-  gate for the trigger only, and it is deliberately ahead of the scenario
+- **Failure queue design:** `farms/{farmId}/feedingTriggerFailures/{feedingId}`
+  holds the error, attempts and status; a scheduled function retries pending
+  failures up to five times and marks dead; the loading sheet shows delayed/
+  failed postings with a manual retry. This is a pre-deploy design, not just
+  a phrase.
+- **Deploy chain:** everything except the trigger **and the loading sheet**
+  can ship first — feeds, recipes, targets, groups, inventory/ledger
+  (manual), accuracy, IOFC and retroactive posting. The loading sheet is
+  gated on the trigger and the queue; shipping it without them would show
+  stale on-hand. The failure queue is deliberately ahead of the scenario
   increment.

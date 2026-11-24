@@ -1116,25 +1116,31 @@ def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
                 .document(f"{farm_id}_{feeding_id}_{line_id}")
             )
             ledger_snap = ledger_ref.get(transaction=transaction)
-            prepared.append((skipped_line, ledger_ref, ledger_snap, loaded))
+            prepared.append(
+                (skipped_line, ledger_ref, ledger_snap, loaded, full_line)
+            )
 
         total = 0.0
         posted = 0
         running = before
         audit_lines = []
-        for skipped_line, ledger_ref, ledger_snap, loaded in prepared:
+        for skipped_line, ledger_ref, ledger_snap, loaded, full_line in prepared:
             if ledger_snap.exists:
                 continue
             line_id = skipped_line.get("lineId")
+            # Historical load cost, not today's replacement cost.
+            unit_cost = float(
+                full_line.get("costPerKgAsFed")
+                or item_data.get("unitCostPerKgAsFed")
+                or 0
+            )
             transaction.set(
                 ledger_ref,
                 {
                     "itemId": feed_id,
                     "type": "adjustment",
                     "deltaKgAsFed": -loaded,
-                    "unitCostPerKgAsFed": float(
-                        item_data.get("unitCostPerKgAsFed") or 0
-                    ),
+                    "unitCostPerKgAsFed": unit_cost,
                     "sourceType": "retroactive",
                     "sourceId": line_id,
                     "idempotencyKey": f"{farm_id}_{feeding_id}_{line_id}",
@@ -1146,7 +1152,7 @@ def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
             )
             total += loaded
             posted += 1
-            audit_lines.append((line_id, running, running - loaded))
+            audit_lines.append((line_id, running, running - loaded, unit_cost))
             running -= loaded
 
         if total > 0:
@@ -1192,7 +1198,7 @@ def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
                 "at": firestore.SERVER_TIMESTAMP,
             },
         )
-        for line_id, line_before, line_after in audit_lines:
+        for line_id, line_before, line_after, unit_cost in audit_lines:
             _write_audit(
                 transaction,
                 db,
@@ -1204,6 +1210,7 @@ def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
                     "sourceFeedingId": feeding_id,
                     "sourceLineId": line_id,
                     "deltaKgAsFed": -(line_before - line_after),
+                    "unitCostPerKgAsFed": unit_cost,
                     "onHandBeforeKgAsFed": line_before,
                     "onHandAfterKgAsFed": line_after,
                     "overdrawn": line_after < 0,

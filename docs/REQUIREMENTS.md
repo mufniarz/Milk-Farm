@@ -148,12 +148,14 @@ The feeding document/trigger half is in place; the loading sheet is next.
   concurrent invocations read the feeding inside their transaction, Firestore
   serializes them, the loser retries, sees `inventoryPostedAt`, and returns.
   Do not replace the transaction with a non-transactional create/set.
-- **Deploy chain.** Deploy everything except the trigger: feeds, recipes,
-  targets, groups, inventory items/ledger (manual), loading sheet, accuracy
-  and IOFC. Loading works but inventory posting is manual until the trigger's
-  failure queue exists; IOFC and the accuracy report are fully functional
-  without the trigger. The failure queue is deliberately ahead of the
-  scenario increment because the trigger must not ship without it.
+- **Deploy chain.** Deploy everything except the trigger **and the loading
+  sheet**: feeds, recipes, targets, groups, inventory items/ledger (manual),
+  accuracy, IOFC and retroactive posting. The loading sheet is gated on the
+  trigger (inventory posting) and the failure queue (recovery path); shipping
+  it without them would show stale on-hand and lying alerts. IOFC and the
+  accuracy report are fully functional without the trigger. The failure queue
+  is deliberately ahead of the scenario increment because the trigger must
+  not ship without it.
 - **Retry configuration.** PyPI shows `0.6.0` as the latest stable release
   and `0.7.0rc0` as a release candidate. Both hardcode `retry=False` in
   `FirestoreOptions._endpoint` (`0.7.0rc0` still constructs
@@ -196,9 +198,11 @@ The report is the first consumer of the ingestion/loading trail. Decisions:
   load outranks a feed off by a lot once; ties by mean deviation, then
   alphabetical. Weekly trend = Monday-start weeks, mean absolute deviation
   per week. Both are in the column tooltips.
-- **Refusal clamp.** Intake efficiency is clamped at 0 and the row is flagged
-  (`refusalError`) when refusals exceed the loaded quantity, rather than
-  rendering a negative percentage.
+- **Refusal data errors.** A feeding whose refusals exceed its loaded quantity
+  is a data error: its rows are excluded from the feeder's MAD, weighted
+  deviation, intake efficiency and ingredient ranking, and counted in
+  `dataErrorCount`. The CSV carries `hasRefusalError`. The UI shows the count
+  in the anomalies column and flags the intake cell.
 - **Intake efficiency.** The on-screen summary now shows
   `100 x (1 - refused / loaded)` alongside deviation; the CSV keeps the
   per-line refusal.
@@ -260,15 +264,42 @@ Implemented as a separate, auditable action:
 - **Replay audit.** A replay returns `postedLines: 0, alreadyPosted: N` and
   writes no new `inventory.retroactive` or `feeding.skipped_cleared` entry;
   the test asserts the audit count is unchanged.
-- **Dates.** Ledger entries carry the original feeding's local `date`; their
-  `createdAt` timestamp and the audit `at` reflect the retroactive moment.
+- **Dates and valuation.** Ledger entries carry the original feeding's local
+  `date` and the feeding line's historical `costPerKgAsFed` (not the item's
+  current replacement cost); their `createdAt` timestamp and the audit `at`
+  reflect the retroactive moment.
 - **Retry-safe.** Deterministic ledger ids mean a replay posts nothing twice;
   a second call returns `postedLines: 0, alreadyPosted: N`, so the operator
   sees why nothing changed.
 - **UI.** The inventory page has a "Post skipped loads" action on the
-  selected item; the callable reports how many lines it posted.
+  selected item and a banner listing every item with pending skipped loads
+  (`inventorySkippedFeedIds`), so an operator cannot fix one of three and
+  forget the rest. The callable reports how many lines it posted.
 
-## K. IOFC
+## K. Trigger failure queue (pre-deploy design)
+
+The trigger must not deploy until this exists. The SDK cannot set retry
+(0.6.0 stable and 0.7.0rc0 both hardcode `retry=False`), so a transient
+failure is silent data loss.
+
+- **Storage:** `farms/{farmId}/feedingTriggerFailures/{feedingId}` with
+  `feedingId`, `farmId`, `error`, `attemptedAt`, `retryCount`,
+  `lastRetryAt`, `status` (`pending` / `dead`).
+- **Writer:** the trigger wraps its transaction; on an exception it writes the
+  failure document. A successful post leaves no failure document (or marks it
+  resolved if one existed).
+- **Retry policy:** a scheduled function every 5 minutes scans `status =
+  pending` and `retryCount < 5`, re-invokes the same posting logic, increments
+  `retryCount`/`lastRetryAt`; after five failures it sets `status = dead`.
+- **Alerting:** the loading sheet's recent-loads list shows a
+  "posting delayed/failed" state; an admin can trigger a manual retry from the
+  same view. Email is optional.
+- **Replay semantics:** retries use the same `inventoryPostedAt` guard and
+  deterministic ledger ids, so a success after partial failure is idempotent.
+- **Deploy gate:** the trigger and the loading sheet are gated on this queue.
+  Everything else can ship first (see the deploy chain).
+
+## L. IOFC
 
 The first Stage 2 item is in place:
 
@@ -288,10 +319,12 @@ The first Stage 2 item is in place:
   selected date has no feed-cost snapshot, `result` is null and the page
   renders a n/a warning; a missing cost never produces a fictional IOFC.
 - **Live vs snapshot.** A new date uses the active recipe's current per-head
-  cost; an existing milk record uses its own `feedCostPerHeadSnapshot` and
-  `headCountSnapshot`, so historical IOFC does not move when the recipe or
-  herd changes. Older records without a snapshot fall back to the current
-  cost and head count.
+  cost and the day's feeding `animalCount` when one exists; an existing milk
+  record uses its own `feedCostPerHeadSnapshot` and `headCountSnapshot`, so
+  historical IOFC does not move when the recipe or herd changes. A record
+  with a missing snapshot renders `—` with an "incomplete snapshot" warning;
+  there is **no** live fallback. A migration, if ever needed, must be an
+  explicit, auditable backfill filtered to records before the migration date.
 - **No record.** A date with no milk record and zero entered milk shows "no
   record for this date", not a zero-revenue/negative-IOFC day. Entering milk
   previews the result until saved.
@@ -299,15 +332,19 @@ The first Stage 2 item is in place:
   revenue, feed cost, IOFC/day, IOFC/cow, milk/cow and feed cost/kg; a
   seven-day trend from the stored records. Dry groups show IOFC as not
   applicable.
-- **Milk price.** The price is per record; the form defaults to EUR 0.50.
-  A farm-level default setting is not implemented yet. `fatPct`/`proteinPct`
-  are stored but not used by the flat-price IOFC, so no one assumes component
-  pricing is wired.
+- **Milk price.** The price is per record, with a farm-level default at
+  `farms/{farmId}.milkPricePerKg` loaded into the form; the owner/admin can
+  save the current value as the default from the IOFC page. `fatPct`/
+  `proteinPct` are stored but not used by the flat-price IOFC, so no one
+  assumes component pricing is wired.
 - **Wiring test.** `iofc.component.spec.ts` uses a real group (headCount 100
   and 50) and a recipe cost of EUR 4.50, asserting feed cost 450 and 225, so
   the group/head-count/per-head wiring is tested, not just the arithmetic.
 - **Still to do in Stage 2:** what-if scenarios, sensitivity at +/-5/10% for
   the top ingredients, saved scenario library, and the comparison export.
+- **Attribution note.** Feeder-accuracy groups by `feederId`, a name chosen
+  by the operator, not a measured identity; it measures the operator's record
+  of the feeder's loading.
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 

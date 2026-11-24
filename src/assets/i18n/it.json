@@ -203,7 +203,8 @@
     "OVERDRAWN_ALERT": "alimenti sotto zero — registra una consegna",
     "RETRO_POST": "Registra carichi non scaricati",
     "RETRO_POSTED": "Righe registrate",
-    "RETRO_FAILED": "Registrazione retroattiva non riuscita."
+    "RETRO_FAILED": "Registrazione retroattiva non riuscita.",
+    "PENDING_SKIPPED": "Alimenti con carichi non scaricati"
   },
   "LOADING": {
     "TITLE": "Carico in stalla",
@@ -262,7 +263,8 @@
     "WORST_TOOLTIP": "Scostamento assoluto cumulato in kg; a parità, scostamento medio e ordine alfabetico.",
     "TREND_TOOLTIP": "Settimane da lunedì; media dello scostamento assoluto.",
     "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere questo report.",
-    "REFUSAL_ERROR": "Rifiuti superiori al caricato: verificare i dati."
+    "REFUSAL_ERROR": "Rifiuti superiori al caricato: riga esclusa dal calcolo.",
+    "DATA_ERRORS": "errori dati"
   },
   "IOFC": {
     "TITLE": "Income over feed cost",
@@ -285,6 +287,7 @@
     "DRY": "L'IOFC non si applica ai gruppi in asciutta.",
     "EMPTY": "Seleziona un gruppo con una registrazione latte.",
     "NO_COST": "Nessun costo razione disponibile: assegna una razione attiva al gruppo o registra il costo. IOFC non calcolabile.",
-    "NO_RECORD": "Nessuna registrazione latte per questa data. Inserisci il latte del gruppo per calcolare l'IOFC."
+    "NO_RECORD": "Nessuna registrazione latte per questa data. Inserisci il latte del gruppo per calcolare l'IOFC.",
+    "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere l'IOFC."
   }
 }

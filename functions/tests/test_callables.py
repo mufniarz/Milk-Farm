@@ -673,7 +673,7 @@ def test_retroactive_posting_posts_skipped_lines_once():
     _handler(main.upsert_inventory_item)(
         _Req(
             "owner",
-            {"farmId": "f1", "feedId": "feed2", "unitCostPerKgAsFed": 0.1},
+            {"farmId": "f1", "feedId": "feed2", "unitCostPerKgAsFed": 0.12},
         )
     )
     _handler(main.record_delivery)(
@@ -683,7 +683,7 @@ def test_retroactive_posting_posts_skipped_lines_once():
                 "farmId": "f1",
                 "feedId": "feed2",
                 "quantityKgAsFed": 100,
-                "unitCostPerKgAsFed": 0.1,
+                "unitCostPerKgAsFed": 0.12,
                 "idempotencyKey": "delivery-feed2",
             },
         )
@@ -739,6 +739,8 @@ def test_retroactive_posting_posts_skipped_lines_once():
     assert adjustments[0]["deltaKgAsFed"] == -40
     assert adjustments[0]["sourceType"] == "retroactive"
     assert adjustments[0]["date"] == "2026-11-20"
+    # Historical load cost (0.10), not the item's current 0.12.
+    assert adjustments[0]["unitCostPerKgAsFed"] == 0.1
 
     feeding = (
         DB.collection("farms")
@@ -763,6 +765,7 @@ def test_retroactive_posting_posts_skipped_lines_once():
     assert retro[0]["sourceFeedingId"] == "feeding-skip"
     assert retro[0]["sourceLineId"] == "sl1"
     assert retro[0]["deltaKgAsFed"] == -40
+    assert retro[0]["unitCostPerKgAsFed"] == 0.1
     cleared = [
         entry for entry in audits if entry["action"] == "feeding.skipped_cleared"
     ]

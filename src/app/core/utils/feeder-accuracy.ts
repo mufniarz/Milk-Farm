@@ -24,6 +24,8 @@ export interface AccuracyRow {
   isCorrection: boolean;
   hasOverdrawn: boolean;
   hasSkipped: boolean;
+  /** Refusals exceed the loaded quantity: a data error, excluded from MAD. */
+  hasRefusalError: boolean;
 }
 
 export interface IngredientAccuracy {
@@ -52,8 +54,8 @@ export interface FeederAccuracy {
   refusedKgAsFed: number;
   /** 100 x (1 - refused / loaded), clamped at 0; null when loaded is zero. */
   intakeEfficiencyPct: number | null;
-  /** True when the recorded refusals exceed the loaded quantity. */
-  refusalError: boolean;
+  /** Loads excluded from the aggregate because refusals exceed load. */
+  dataErrorCount: number;
   overdrawnLoads: number;
   skippedLoads: number;
   worstIngredients: IngredientAccuracy[];
@@ -70,6 +72,11 @@ export function buildAccuracyRows(feedings: readonly Feeding[]): AccuracyRow[] {
       : 'pending';
     const hasOverdrawn = (feeding.inventoryOverdrawn?.length ?? 0) > 0;
     const hasSkipped = (feeding.inventorySkippedLines?.length ?? 0) > 0;
+    const loadedTotal = (feeding.lines ?? []).reduce(
+      (sum, line) => sum + line.loadedKgAsFed,
+      0,
+    );
+    const hasRefusalError = feeding.refusedKgAsFed > loadedTotal;
     for (const line of feeding.lines ?? []) {
       rows.push({
         feedingId: feeding.id ?? `${feeding.date}|${feeding.herdGroupId}|${feeding.feederId}`,
@@ -89,6 +96,7 @@ export function buildAccuracyRows(feedings: readonly Feeding[]): AccuracyRow[] {
         isCorrection: !!feeding.correctsFeedingId,
         hasOverdrawn,
         hasSkipped,
+        hasRefusalError,
       });
     }
   }
@@ -120,14 +128,18 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
 
   const result: FeederAccuracy[] = [];
   for (const [feederId, feederRows] of byFeeder) {
-    const deviations = feederRows
+    const dataErrorCount = uniqueLoadCount(
+      feederRows.filter((row) => row.hasRefusalError),
+    );
+    const validRows = feederRows.filter((row) => !row.hasRefusalError);
+    const deviations = validRows
       .map((row) => row.deviationPct)
       .filter((value): value is number => value !== null);
     const meanAbs = mean(deviations.map((value) => Math.abs(value)));
 
     let calledSum = 0;
     let absDeltaSum = 0;
-    for (const row of feederRows) {
+    for (const row of validRows) {
       if (!(row.calledKgAsFed > 0)) continue;
       calledSum += row.calledKgAsFed;
       absDeltaSum += Math.abs(row.loadedKgAsFed - row.calledKgAsFed);
@@ -136,7 +148,7 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
 
     const uniqueRefusals = new Map<string, number>();
     let loadedSum = 0;
-    for (const row of feederRows) {
+    for (const row of validRows) {
       loadedSum += row.loadedKgAsFed;
       if (!uniqueRefusals.has(row.feedingId)) {
         uniqueRefusals.set(row.feedingId, row.refusedKgAsFed);
@@ -150,10 +162,9 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
       loadedSum > 0 ? (1 - refusedSum / loadedSum) * 100 : null;
     const intakeEfficiencyPct =
       rawIntake === null ? null : Math.max(0, rawIntake);
-    const refusalError = loadedSum > 0 && refusedSum > loadedSum;
 
     const byIngredient = new Map<string, AccuracyRow[]>();
-    for (const row of feederRows) {
+    for (const row of validRows) {
       const list = byIngredient.get(row.feedId) ?? [];
       list.push(row);
       byIngredient.set(row.feedId, list);
@@ -193,23 +204,23 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
 
     result.push({
       feederId,
-      loadCount: new Set(feederRows.map((row) => `${row.date}|${row.herdGroupId}`))
+      loadCount: new Set(validRows.map((row) => `${row.date}|${row.herdGroupId}`))
         .size,
-      lineCount: feederRows.length,
+      lineCount: validRows.length,
       meanAbsDeviationPct: meanAbs,
       loadWeightedDeviationPct: weighted,
       loadedKgAsFed: loadedSum,
       refusedKgAsFed: refusedSum,
       intakeEfficiencyPct,
-      refusalError,
+      dataErrorCount,
       overdrawnLoads: uniqueLoadCount(
-        feederRows.filter((row) => row.hasOverdrawn),
+        validRows.filter((row) => row.hasOverdrawn),
       ),
       skippedLoads: uniqueLoadCount(
-        feederRows.filter((row) => row.hasSkipped),
+        validRows.filter((row) => row.hasSkipped),
       ),
       worstIngredients: ingredients.slice(0, 3),
-      weekly: summarizeWeeks(feederRows),
+      weekly: summarizeWeeks(validRows),
     });
   }
 
@@ -275,6 +286,7 @@ export function accuracyRowsToCsv(
     'isCorrection',
     'hasOverdrawn',
     'hasSkipped',
+    'hasRefusalError',
   ];
   const escape = (value: string): string => {
     if (
@@ -304,6 +316,7 @@ export function accuracyRowsToCsv(
       row.isCorrection ? 'true' : 'false',
       row.hasOverdrawn ? 'true' : 'false',
       row.hasSkipped ? 'true' : 'false',
+      row.hasRefusalError ? 'true' : 'false',
     ]
       .map((value) => escape(String(value)))
       .join(delimiter),

@@ -5,6 +5,9 @@ import { IofcComponent } from './iofc.component';
 import { GroupService } from '../../core/services/group.service';
 import { RecipeService } from '../../core/services/recipe.service';
 import { MilkService } from '../../core/services/milk.service';
+import { FeedingService } from '../../core/services/feeding.service';
+import { FarmService } from '../../core/services/farm.service';
+import { FarmContextService } from '../../core/services/farm-context.service';
 import { HerdGroup } from '../../core/models/group.model';
 
 /**
@@ -40,6 +43,18 @@ describe('IofcComponent wiring', () => {
         {
           provide: MilkService,
           useValue: { getMilkRecords: () => of([]), saveRecord: async () => 'id' },
+        },
+        { provide: FeedingService, useValue: { getFeedings: () => of([]) } },
+        {
+          provide: FarmService,
+          useValue: {
+            getMilkPricePerKg: async () => null,
+            setMilkPricePerKg: async () => undefined,
+          },
+        },
+        {
+          provide: FarmContextService,
+          useValue: { activeRole: () => 'owner', loading: () => false },
         },
       ],
     });

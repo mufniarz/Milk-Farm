@@ -205,25 +205,43 @@ describe('feeder accuracy math', () => {
     expect(summary.worstIngredients[1].totalAbsDeviationKg).toBe(20);
   });
 
-  it('clamps a negative intake efficiency and flags the data error', () => {
-    const rows = buildAccuracyRows([
-      feeding({
-        refusedKgAsFed: 300,
-        lines: [
-          {
-            lineId: 'x',
-            feedId: 'hay',
-            feedName: 'Hay',
-            calledKgAsFed: 250,
-            loadedKgAsFed: 250,
-            costPerKgAsFed: 0.1,
-          },
-        ],
-      }),
-    ]);
-    const [summary] = summarizeByFeeder(rows);
-    expect(summary.intakeEfficiencyPct).toBe(0);
-    expect(summary.refusalError).toBeTrue();
+  it('excludes a refusal-error row from the aggregate and counts it', () => {
+    const clean = feeding({
+      id: 'clean',
+      refusedKgAsFed: 0,
+      lines: [
+        {
+          lineId: 'x',
+          feedId: 'hay',
+          feedName: 'Hay',
+          calledKgAsFed: 250,
+          loadedKgAsFed: 250,
+          costPerKgAsFed: 0.1,
+        },
+      ],
+    });
+    const dataError = feeding({
+      id: 'error',
+      refusedKgAsFed: 300,
+      lines: [
+        {
+          lineId: 'y',
+          feedId: 'hay',
+          feedName: 'Hay',
+          calledKgAsFed: 250,
+          loadedKgAsFed: 250,
+          costPerKgAsFed: 0.1,
+        },
+      ],
+    });
+
+    const [summary] = summarizeByFeeder(
+      buildAccuracyRows([clean, dataError]),
+    );
+    expect(summary.lineCount).toBe(1);
+    expect(summary.meanAbsDeviationPct).toBe(0);
+    expect(summary.dataErrorCount).toBe(1);
+    expect(summary.intakeEfficiencyPct).toBe(100);
   });
 
   it('filters rows by the report window', () => {
@@ -257,5 +275,6 @@ describe('feeder accuracy math', () => {
     expect(csv).toContain('110,5');
     expect(csv).toContain('10,5');
     expect(csv).toContain('feeder-1');
+    expect(csv).toContain('hasSkipped;hasRefusalError');
   });
 });

@@ -57,4 +57,6 @@ export interface Farm {
   ownerUid: string;
   /** Creation timestamp */
   createdAt: Date;
+  /** Optional farm-level default for the IOFC milk price (€/kg). */
+  milkPricePerKg?: number;
 }

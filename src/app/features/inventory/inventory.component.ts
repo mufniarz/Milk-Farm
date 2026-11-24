@@ -18,6 +18,7 @@ import {
 import { FeedService } from '../../core/services/feed.service';
 import { GroupService } from '../../core/services/group.service';
 import { InventoryService } from '../../core/services/inventory.service';
+import { FeedingService } from '../../core/services/feeding.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
 
 /**
@@ -58,6 +59,13 @@ import { FarmContextService } from '../../core/services/farm-context.service';
       } @else if (cautionCount > 0) {
         <div class="alert caution">
           {{ cautionCount }} {{ 'INVENTORY.CAUTION_ALERT' | translate }}
+        </div>
+      }
+
+      @if (pendingSkippedFeedIds.size > 0) {
+        <div class="alert caution">
+          {{ 'INVENTORY.PENDING_SKIPPED' | translate }}:
+          {{ pendingSkippedNames() }}
         </div>
       }
 
@@ -106,9 +114,12 @@ import { FarmContextService } from '../../core/services/farm-context.service';
           </div>
           @for (cover of covers; track cover.item.id) {
             <div class="item-row">
-              <span class="feed-name">{{
-                cover.item.feedName || cover.item.feedId
-              }}</span>
+              <span class="feed-name">
+                {{ cover.item.feedName || cover.item.feedId }}
+                @if (pendingSkippedFeedIds.has(cover.item.feedId)) {
+                  <mat-icon class="pending-icon">warning</mat-icon>
+                }
+              </span>
               <span>{{ cover.item.onHandKgAsFed | number: '1.0-0' }} kg</span>
               <span>{{ cover.dailyUsageKgAsFed | number: '1.0-0' }} kg</span>
               <span [class]="'level ' + cover.level">
@@ -270,6 +281,14 @@ import { FarmContextService } from '../../core/services/farm-context.service';
     .level.overdrawn {
       color: #a02525;
     }
+    .pending-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #8a5300;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
     .empty {
       color: rgba(0, 0, 0, 0.5);
       padding: 16px 4px;
@@ -291,6 +310,7 @@ export class InventoryComponent implements OnInit {
   private feedService = inject(FeedService);
   private groupService = inject(GroupService);
   private inventoryService = inject(InventoryService);
+  private feedingService = inject(FeedingService);
   private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
@@ -299,6 +319,7 @@ export class InventoryComponent implements OnInit {
   groups: HerdGroup[] = [];
   items: InventoryItem[] = [];
   covers: InventoryCover[] = [];
+  pendingSkippedFeedIds = new Set<string>();
   selectedItem: InventoryItem | null = null;
   saving = false;
 
@@ -321,6 +342,11 @@ export class InventoryComponent implements OnInit {
   };
 
   readonly loading = signal(false);
+
+  get canViewFeedings(): boolean {
+    const role = this.farmContext.activeRole();
+    return role === 'owner' || role === 'farmAdmin' || role === 'consultant';
+  }
 
   get canAdmin(): boolean {
     const role = this.farmContext.activeRole();
@@ -355,6 +381,24 @@ export class InventoryComponent implements OnInit {
         this.items = items;
         void this.refreshCover();
       });
+    if (this.canViewFeedings) {
+      this.feedingService.getFeedings().subscribe((feedings) => {
+        const ids = new Set<string>();
+        for (const feeding of feedings) {
+          for (const feedId of feeding.inventorySkippedFeedIds ?? []) {
+            ids.add(feedId);
+          }
+        }
+        this.pendingSkippedFeedIds = ids;
+      });
+    }
+  }
+
+  pendingSkippedNames(): string {
+    return this.items
+      .filter((item) => this.pendingSkippedFeedIds.has(item.feedId))
+      .map((item) => item.feedName || item.feedId)
+      .join(', ');
   }
 
   private async refreshCover(): Promise<void> {
