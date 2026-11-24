@@ -249,8 +249,10 @@
     "MARK_HANDLED": "Segna gestito",
     "MARKED_HANDLED": "Carico segnato come gestito manualmente.",
     "MARK_HANDLED_FAILED": "Operazione non riuscita.",
-    "ACKNOWLEDGE": "Nessuna azione",
-    "ACKNOWLEDGED": "Carico chiuso senza azione."
+    "ACKNOWLEDGE": "Nessuna scrittura necessaria",
+    "ACKNOWLEDGED": "Carico chiuso senza azione.",
+    "WRITE_OFF": "Scarica in perdita",
+    "NEEDS_REVIEW": "da verificare"
   },
   "ACCURACY": {
     "TITLE": "Precisione di caricamento",

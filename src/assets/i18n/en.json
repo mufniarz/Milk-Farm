@@ -249,8 +249,10 @@
     "MARK_HANDLED": "Mark handled",
     "MARKED_HANDLED": "Feeding marked as handled manually.",
     "MARK_HANDLED_FAILED": "Could not mark handled.",
-    "ACKNOWLEDGE": "No action",
-    "ACKNOWLEDGED": "Feeding closed without action."
+    "ACKNOWLEDGE": "No ledger entry needed",
+    "ACKNOWLEDGED": "Feeding closed without action.",
+    "WRITE_OFF": "Write off",
+    "NEEDS_REVIEW": "to review"
   },
   "ACCURACY": {
     "TITLE": "Feeder accuracy",

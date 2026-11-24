@@ -35,7 +35,7 @@ export interface InventoryTransaction {
   type: InventoryTransactionType;
   deltaKgAsFed: number;
   unitCostPerKgAsFed: number;
-  sourceType: 'manual' | 'feeding' | 'retroactive' | 'abandoned';
+  sourceType: 'manual' | 'feeding' | 'retroactive' | 'abandoned' | 'manual-write-off';
   sourceId: string;
   /** The feeding's local date; the ledger timestamp is when it was written. */
   date?: string;

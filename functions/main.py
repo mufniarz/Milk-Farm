@@ -1221,6 +1221,109 @@ def _fail_retry(db, farm_id, feeding_id, error):
     apply(db.transaction())
 
 
+def _write_off_feeding(
+    transaction,
+    db,
+    farm_id,
+    feeding_id,
+    feeding_data,
+    source="abandoned",
+    created_by="trigger_abandoned",
+):
+    """Read the items/ledgers and book per-line write_off entries.
+
+    Must be called before the caller writes anything else in the transaction.
+    Returns the line ids, per-line details and totals.
+    """
+    prepared = []
+    if feeding_data:
+        for line in feeding_data.get("lines") or []:
+            line_id = line.get("lineId")
+            feed_id = line.get("feedId")
+            loaded = float(line.get("loadedKgAsFed") or 0)
+            if not line_id or not feed_id or loaded <= 0:
+                continue
+            item_ref = _inventory_item_ref(db, farm_id, feed_id)
+            item = item_ref.get(transaction=transaction)
+            ledger_ref = (
+                db.collection("farms")
+                .document(farm_id)
+                .collection("inventoryTransactions")
+                .document(f"{farm_id}_{feeding_id}_{line_id}_writeoff")
+            )
+            ledger = ledger_ref.get(transaction=transaction)
+            prepared.append(
+                (line, feed_id, loaded, item_ref, item, ledger_ref, ledger)
+            )
+
+    item_before = {}
+    item_refs = {}
+    total_by_feed = {}
+    write_off_lines = []
+    write_off_details = []
+    running = {}
+    for line, feed_id, loaded, item_ref, item, ledger_ref, ledger in prepared:
+        if ledger.exists or not item.exists:
+            continue
+        item_data = item.to_dict() or {}
+        if feed_id not in item_before:
+            item_before[feed_id] = float(
+                item_data.get("onHandKgAsFed") or 0
+            )
+            item_refs[feed_id] = item_ref
+            running[feed_id] = item_before[feed_id]
+        unit_cost = float(
+            line.get("costPerKgAsFed")
+            or item_data.get("unitCostPerKgAsFed")
+            or 0
+        )
+        before_kg = running[feed_id]
+        after_kg = before_kg - loaded
+        running[feed_id] = after_kg
+        transaction.set(
+            ledger_ref,
+            {
+                "itemId": feed_id,
+                "type": "write_off",
+                "deltaKgAsFed": -loaded,
+                "unitCostPerKgAsFed": unit_cost,
+                "sourceType": source,
+                "sourceId": line.get("lineId"),
+                "idempotencyKey": f"{farm_id}_{feeding_id}_{line.get('lineId')}_writeoff",
+                "date": feeding_data.get("date"),
+                "createdBy": created_by,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "note": f"write-off feeding {feeding_id}",
+            },
+        )
+        total_by_feed[feed_id] = total_by_feed.get(feed_id, 0.0) + loaded
+        write_off_lines.append(line.get("lineId"))
+        write_off_details.append(
+            {
+                "lineId": line.get("lineId"),
+                "feedId": feed_id,
+                "deltaKgAsFed": -loaded,
+                "unitCostPerKgAsFed": unit_cost,
+                "onHandBeforeKgAsFed": before_kg,
+                "onHandAfterKgAsFed": after_kg,
+            }
+        )
+
+    for feed_id, total in total_by_feed.items():
+        transaction.update(
+            item_refs[feed_id],
+            {
+                "onHandKgAsFed": item_before[feed_id] - total,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+    return {
+        "writeOffLines": write_off_lines,
+        "writeOffs": write_off_details,
+        "totalByFeed": total_by_feed,
+    }
+
+
 def _abandon_dead_failure(db, farm_id, feeding_id):
     """Abandon a dead failure after 90 days and book the physical write-off."""
     ref = _failure_ref(db, farm_id, feeding_id)
@@ -1262,6 +1365,15 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
         # already handled the load. Escalate for a human decision instead.
         if feeding.exists and not already_posted:
             attempted_at = data.get("attemptedAt")
+            expected_consumption = [
+                {
+                    "lineId": line.get("lineId"),
+                    "feedId": line.get("feedId"),
+                    "kg": float(line.get("loadedKgAsFed") or 0),
+                }
+                for line in feeding_data.get("lines") or []
+                if line.get("lineId") and line.get("feedId")
+            ]
             for feed_id in {
                 line.get("feedId")
                 for line in feeding_data.get("lines") or []
@@ -1303,93 +1415,29 @@ def _abandon_dead_failure(db, farm_id, feeding_id):
                             "farmId": farm_id,
                             "feedingId": feeding_id,
                             "reason": "adjustment-detected",
+                            "detectedAdjustments": [
+                                {
+                                    "itemId": feed_id,
+                                    "transactionId": entry.id,
+                                    "deltaKgAsFed": entry_data.get(
+                                        "deltaKgAsFed"
+                                    ),
+                                    "createdAt": created_at,
+                                }
+                            ],
+                            "expectedConsumption": expected_consumption,
                             "at": firestore.SERVER_TIMESTAMP,
                         },
                     )
                     return True
 
-        prepared = []
-        if feeding.exists and not already_posted:
-            for line in feeding_data.get("lines") or []:
-                line_id = line.get("lineId")
-                feed_id = line.get("feedId")
-                loaded = float(line.get("loadedKgAsFed") or 0)
-                if not line_id or not feed_id or loaded <= 0:
-                    continue
-                item_ref = _inventory_item_ref(db, farm_id, feed_id)
-                item = item_ref.get(transaction=transaction)
-                ledger_ref = (
-                    db.collection("farms")
-                    .document(farm_id)
-                    .collection("inventoryTransactions")
-                    .document(f"{farm_id}_{feeding_id}_{line_id}_writeoff")
-                )
-                ledger = ledger_ref.get(transaction=transaction)
-                prepared.append(
-                    (line, feed_id, loaded, item_ref, item, ledger_ref, ledger)
-                )
+        write_off = _write_off_feeding(
+            transaction, db, farm_id, feeding_id, feeding_data
+        )
+        write_off_lines = write_off["writeOffLines"]
+        write_off_details = write_off["writeOffs"]
+        total_by_feed = write_off["totalByFeed"]
 
-        item_before = {}
-        item_refs = {}
-        total_by_feed = {}
-        write_off_lines = []
-        write_off_details = []
-        running = {}
-        for line, feed_id, loaded, item_ref, item, ledger_ref, ledger in prepared:
-            if ledger.exists or not item.exists:
-                continue
-            item_data = item.to_dict() or {}
-            if feed_id not in item_before:
-                item_before[feed_id] = float(
-                    item_data.get("onHandKgAsFed") or 0
-                )
-                item_refs[feed_id] = item_ref
-                running[feed_id] = item_before[feed_id]
-            unit_cost = float(
-                line.get("costPerKgAsFed")
-                or item_data.get("unitCostPerKgAsFed")
-                or 0
-            )
-            before_kg = running[feed_id]
-            after_kg = before_kg - loaded
-            running[feed_id] = after_kg
-            transaction.set(
-                ledger_ref,
-                {
-                    "itemId": feed_id,
-                    "type": "write_off",
-                    "deltaKgAsFed": -loaded,
-                    "unitCostPerKgAsFed": unit_cost,
-                    "sourceType": "abandoned",
-                    "sourceId": line.get("lineId"),
-                    "idempotencyKey": f"{farm_id}_{feeding_id}_{line.get('lineId')}_writeoff",
-                    "date": feeding_data.get("date"),
-                    "createdBy": "trigger_abandoned",
-                    "createdAt": firestore.SERVER_TIMESTAMP,
-                    "note": f"write-off feeding {feeding_id}",
-                },
-            )
-            total_by_feed[feed_id] = total_by_feed.get(feed_id, 0.0) + loaded
-            write_off_lines.append(line.get("lineId"))
-            write_off_details.append(
-                {
-                    "lineId": line.get("lineId"),
-                    "feedId": feed_id,
-                    "deltaKgAsFed": -loaded,
-                    "unitCostPerKgAsFed": unit_cost,
-                    "onHandBeforeKgAsFed": before_kg,
-                    "onHandAfterKgAsFed": after_kg,
-                }
-            )
-
-        for feed_id, total in total_by_feed.items():
-            transaction.update(
-                item_refs[feed_id],
-                {
-                    "onHandKgAsFed": item_before[feed_id] - total,
-                    "updatedAt": firestore.SERVER_TIMESTAMP,
-                },
-            )
         if feeding.exists and not already_posted:
             transaction.update(
                 feeding_ref, {"writeOffAt": firestore.SERVER_TIMESTAMP}
@@ -1549,12 +1597,7 @@ def retry_feeding_failures(req: https_fn.CallableRequest):
     region="europe-west1",
 )
 def mark_feeding_failure_handled(req: https_fn.CallableRequest):
-    """Close a failure with a manual adjustment or an explicit acknowledgement.
-
-    `manual-adjustment` requires at least one adjustment ledger entry on the
-    feeding's items after the failure; `acknowledged-no-action` records the
-    operator's explicit decision to accept no ledger entry.
-    """
+    """Resolve a failure with an adjustment, a write-off, or an explicit ack."""
     if req.auth is None:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
@@ -1564,7 +1607,11 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
     farm_id = _require_string(data, "farmId")
     feeding_id = _require_string(data, "feedingId")
     resolution = data.get("resolution", "manual-adjustment")
-    if resolution not in ("manual-adjustment", "acknowledged-no-action"):
+    if resolution not in (
+        "manual-adjustment",
+        "acknowledged-no-action",
+        "write-off",
+    ):
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
             message="Unknown resolution.",
@@ -1576,6 +1623,9 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
         .document(farm_id)
         .collection("feedings")
         .document(feeding_id)
+    )
+    stored_resolution = (
+        "manual-write-off" if resolution == "write-off" else resolution
     )
 
     @firestore.transactional
@@ -1594,16 +1644,54 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
                 code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
                 message="A retry is in progress.",
             )
-        if resolution == "manual-adjustment":
+
+        extra = {}
+        if resolution == "write-off":
+            feeding = feeding_ref.get(transaction=transaction)
+            if not feeding.exists:
+                raise https_fn.HttpsError(
+                    code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+                    message="Feeding not found; cannot write off.",
+                )
+            feeding_data = feeding.to_dict() or {}
+            if (
+                feeding_data.get("inventoryPostedAt")
+                or feeding_data.get("writeOffAt")
+            ):
+                extra = {
+                    "writeOffLines": [],
+                    "writeOffs": [],
+                }
+            else:
+                write_off = _write_off_feeding(
+                    transaction,
+                    db,
+                    farm_id,
+                    feeding_id,
+                    feeding_data,
+                    source="manual-write-off",
+                    created_by=req.auth.uid,
+                )
+                transaction.update(
+                    feeding_ref,
+                    {"writeOffAt": firestore.SERVER_TIMESTAMP},
+                )
+                extra = {
+                    "writeOffLines": write_off["writeOffLines"],
+                    "writeOffs": write_off["writeOffs"],
+                }
+        elif resolution == "manual-adjustment":
             feeding = feeding_ref.get(transaction=transaction)
             feeding_data = feeding.to_dict() if feeding.exists else {}
             attempted_at = current.get("attemptedAt")
-            found = False
-            for feed_id in {
+            feed_ids = {
                 line.get("feedId")
                 for line in feeding_data.get("lines") or []
                 if line.get("feedId")
-            }:
+            }
+            uncovered = []
+            for feed_id in sorted(feed_ids):
+                found = False
                 adjustments = (
                     db.collection("farms")
                     .document(farm_id)
@@ -1618,28 +1706,29 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
                     if (
                         attempted_at is not None
                         and created_at is not None
-                        and created_at < attempted_at
+                        and created_at <= attempted_at
                     ):
                         continue
                     found = True
                     break
-                if found:
-                    break
-            if not found:
+                if not found:
+                    uncovered.append(feed_id)
+            if uncovered:
                 raise https_fn.HttpsError(
                     code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
                     message=(
-                        "Record an inventory adjustment before marking the "
-                        "failure handled, or use acknowledged-no-action."
+                        "Adjust every affected item first; uncovered: "
+                        + ", ".join(uncovered)
                     ),
                 )
+
         transaction.update(
             ref,
             {
                 "status": "resolved",
                 "resolvedAt": firestore.SERVER_TIMESTAMP,
                 "resolvedBy": req.auth.uid,
-                "resolution": resolution,
+                "resolution": stored_resolution,
                 "lockedBy": None,
                 "lockedAt": None,
             },
@@ -1653,11 +1742,12 @@ def mark_feeding_failure_handled(req: https_fn.CallableRequest):
                 "farmId": farm_id,
                 "feedingId": feeding_id,
                 "resolvedBy": req.auth.uid,
-                "reason": resolution,
+                "reason": stored_resolution,
                 "at": firestore.SERVER_TIMESTAMP,
+                **extra,
             },
         )
-        return {"alreadyResolved": False}
+        return {"alreadyResolved": False, **extra}
 
     result = apply(db.transaction())
     return {"ok": True, **result}

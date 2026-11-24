@@ -52,7 +52,7 @@ export class FeedingFailureService {
 
   async markHandled(
     feedingId: string,
-    resolution: 'manual-adjustment' | 'acknowledged-no-action',
+    resolution: 'manual-adjustment' | 'acknowledged-no-action' | 'write-off',
   ): Promise<void> {
     const callable = httpsCallable<
       { farmId: string; feedingId: string; resolution: string },

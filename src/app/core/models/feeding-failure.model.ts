@@ -11,5 +11,5 @@ export interface FeedingFailure {
   deadAt?: Date;
   resolvedAt?: Date;
   resolvedBy?: string;
-  resolution?: 'manual-adjustment' | 'acknowledged-no-action';
+  resolution?: 'manual-adjustment' | 'acknowledged-no-action' | 'manual-write-off';
 }

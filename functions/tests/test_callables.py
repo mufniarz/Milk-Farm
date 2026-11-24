@@ -1466,11 +1466,16 @@ def test_adjustment_without_mark_goes_needs_review_at_abandonment():
         .collection("auditLog")
         .stream()
     ]
-    assert any(
-        entry["action"] == "feeding.trigger_needs_review"
-        and entry["feedingId"] == "feeding-nomark"
+    review = [
+        entry
         for entry in audits
-    )
+        if entry["action"] == "feeding.trigger_needs_review"
+        and entry["feedingId"] == "feeding-nomark"
+    ]
+    assert len(review) == 1
+    assert review[0]["detectedAdjustments"][0]["itemId"] == "feed1"
+    assert review[0]["detectedAdjustments"][0]["deltaKgAsFed"] == -50
+    assert review[0]["expectedConsumption"][0]["lineId"] == "line-1"
 
 
 def test_mark_handled_requires_adjustment_or_explicit_acknowledgement():
@@ -1582,3 +1587,169 @@ def test_mark_handled_with_adjustment_and_cross_farm_denial():
                 },
             )
         )
+
+
+def test_manual_write_off_resolution_books_the_write_off():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-manual-wo",
+        lines=_feeding_lines(loaded=(40,)),
+    )
+    _failure_doc("feeding-manual-wo", status="needs-review", retry_count=5)
+
+    result = _handler(main.mark_feeding_failure_handled)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedingId": "feeding-manual-wo",
+                "resolution": "write-off",
+            },
+        )
+    )
+    assert result["writeOffLines"] == ["line-1"]
+    assert _on_hand("feed1")["onHandKgAsFed"] == 960
+
+    write_offs = [entry for entry in _ledger() if entry["type"] == "write_off"]
+    assert len(write_offs) == 1
+    assert write_offs[0]["deltaKgAsFed"] == -40
+    assert write_offs[0]["sourceType"] == "manual-write-off"
+
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding-manual-wo")
+        .get()
+        .to_dict()
+    )
+    assert feeding["writeOffAt"] is not None
+
+    failure = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .document("feeding-manual-wo")
+        .get()
+        .to_dict()
+    )
+    assert failure["status"] == "resolved"
+    assert failure["resolution"] == "manual-write-off"
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    resolved = [
+        entry
+        for entry in audits
+        if entry["action"] == "feeding.trigger_resolved"
+        and entry["feedingId"] == "feeding-manual-wo"
+    ]
+    assert len(resolved) == 1
+    assert resolved[0]["reason"] == "manual-write-off"
+    assert resolved[0]["writeOffs"][0]["deltaKgAsFed"] == -40
+
+
+def test_manual_adjustment_requires_every_item_to_be_covered():
+    _prepare_inventory(1000)
+    DB.collection("feeds").document("feed2").set(
+        {
+            "name": "Hay",
+            "farmId": "f1",
+            "category": "forage",
+            "pricePerKg": 0.1,
+            "moisturePct": 10,
+            "isAvailable": True,
+            "nutrients": {},
+        }
+    )
+    _handler(main.upsert_inventory_item)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed2"})
+    )
+    _handler(main.record_delivery)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedId": "feed2",
+                "quantityKgAsFed": 1000,
+                "unitCostPerKgAsFed": 0.12,
+                "idempotencyKey": "delivery-feed2-partial",
+            },
+        )
+    )
+    _create_feeding(
+        feeding_id="feeding-partial",
+        lines=[
+            {
+                "lineId": "p1",
+                "feedId": "feed1",
+                "feedName": "Silage",
+                "calledKgAsFed": 30,
+                "loadedKgAsFed": 30,
+                "costPerKgAsFed": 0.12,
+            },
+            {
+                "lineId": "p2",
+                "feedId": "feed2",
+                "feedName": "Hay",
+                "calledKgAsFed": 20,
+                "loadedKgAsFed": 20,
+                "costPerKgAsFed": 0.12,
+            },
+        ],
+    )
+    _failure_doc("feeding-partial", status="dead", retry_count=5)
+
+    _handler(main.adjust_inventory)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "itemId": "feed1",
+                "deltaKgAsFed": -30,
+                "reason": "partial correction",
+                "idempotencyKey": "partial-feed1",
+            },
+        )
+    )
+    with pytest.raises(https_fn.HttpsError) as error:
+        _handler(main.mark_feeding_failure_handled)(
+            _Req(
+                "owner",
+                {
+                    "farmId": "f1",
+                    "feedingId": "feeding-partial",
+                    "resolution": "manual-adjustment",
+                },
+            )
+        )
+    assert "feed2" in (error.value.message or "")
+
+    _handler(main.adjust_inventory)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "itemId": "feed2",
+                "deltaKgAsFed": -20,
+                "reason": "partial correction",
+                "idempotencyKey": "partial-feed2",
+            },
+        )
+    )
+    result = _handler(main.mark_feeding_failure_handled)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedingId": "feeding-partial",
+                "resolution": "manual-adjustment",
+            },
+        )
+    )
+    assert result["ok"] is True

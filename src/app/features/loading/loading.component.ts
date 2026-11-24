@@ -66,6 +66,9 @@ import {
       @if (failures.length > 0) {
         <div class="alert caution">
           {{ 'LOADING.FAILURES' | translate }}: {{ failures.length }}
+          @if (needsReviewCount > 0) {
+            · {{ needsReviewCount }} {{ 'LOADING.NEEDS_REVIEW' | translate }}
+          }
           @if (canRetry) {
             <button
               mat-button
@@ -241,6 +244,13 @@ import {
                     [disabled]="saving"
                   >
                     {{ 'LOADING.MARK_HANDLED' | translate }}
+                  </button>
+                  <button
+                    mat-button
+                    (click)="markHandled(failure, 'write-off')"
+                    [disabled]="saving"
+                  >
+                    {{ 'LOADING.WRITE_OFF' | translate }}
                   </button>
                   <button
                     mat-button
@@ -538,13 +548,22 @@ export class LoadingComponent implements OnInit, OnDestroy {
     return role === 'owner' || role === 'farmAdmin';
   }
 
+  get needsReviewCount(): number {
+    return this.failures.filter(
+      (failure) => failure.status === 'needs-review',
+    ).length;
+  }
+
   failureFor(feedingId: string | undefined): FeedingFailure | undefined {
     return this.failures.find((failure) => failure.feedingId === feedingId);
   }
 
   async markHandled(
     failure: FeedingFailure,
-    resolution: 'manual-adjustment' | 'acknowledged-no-action',
+    resolution:
+      | 'manual-adjustment'
+      | 'acknowledged-no-action'
+      | 'write-off',
   ): Promise<void> {
     this.saving = true;
     try {
