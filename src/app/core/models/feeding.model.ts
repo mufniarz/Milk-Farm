@@ -37,7 +37,12 @@ export interface Feeding {
   /** Set by the inventory trigger; a client must never write it. */
   inventoryPostedAt?: Date | null;
   inventoryPostedLines?: number;
-  inventorySkippedLines?: string[];
+  /** Lines whose feed had no inventory item; the trigger could not post them. */
+  inventorySkippedLines?: {
+    lineId: string;
+    feedId: string;
+    feedName: string;
+  }[];
   createdBy?: string;
   createdAt?: Date;
   confirmedAt?: Date | null;

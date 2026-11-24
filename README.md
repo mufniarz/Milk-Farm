@@ -104,3 +104,20 @@ emulator fails instead of silently skipping. The parity chain
 
 Do not deploy the new collections' rules before the backfill: groups,
 inventory and target overrides require `farmMembers`.
+
+## Feeding ledger
+
+- A feeding is a draft at `farms/{farmId}/feedings/{feedingId}` and is
+  confirmed once. After confirmation the client cannot edit it; the
+  `on_feeding_confirmed` trigger posts consumption and sets
+  `inventoryPostedAt`.
+- Ledger entries are **per line**: `{farmId}_{feedingId}_{lineId}`, so two
+  lines of the same feed write two entries. The trigger's "aggregate per
+  feed" step only sums the line deltas for the item's on-hand update; it does
+  not collapse the ledger entries.
+- The loading sheet at `/loading` warns before confirmation when a line's
+  feed has no inventory item. The trigger records those in
+  `inventorySkippedLines` (line id, feed id, feed name) and the recent-loads
+  list shows them; the rest of the load still posts.
+- Feeders are names in `farms/{farmId}/feeders`, not logins. `feederId` is
+  the name record; `createdBy` is the operator who entered the load.

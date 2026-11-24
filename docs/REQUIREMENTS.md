@@ -35,8 +35,8 @@ numbers.
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
 | Client engine vs workbook (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 3 passed — 17 codes at 0.03 pp, totals at 0.01 kg / 0.001 €, moisture/forage |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
-| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 11 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability |
-| Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `3 created / 1 unchanged` matched the real run; second run was `0 created / 4 unchanged`; an uncovered farm exited 1. Existing consultant role was preserved. **Not run against the target database** because deploy access is locked. |
+| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 13 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions |
+| Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
 | Full suite incl. callables | `npm run test:functions` | 28 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 10 callable/trigger) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
@@ -83,6 +83,33 @@ The feeding document/trigger half is in place; the loading sheet is next.
   owner/admin and draft-only.
 - `FeedingService` in the client creates drafts, confirms them, and lists
   feedings by herd group.
+- **Ledger identity is per line.** The ledger doc id is
+  `{farmId}_{feedingId}_{lineId}`, and a two-line same-feed load writes two
+  entries. "Aggregate per feed" refers only to the on-hand math: the trigger
+  sums the line deltas so the second line cannot overwrite the first with a
+  stale snapshot. Reconciliation and the accuracy report are per line.
+- **Audit shape.** `feeding.confirm` carries
+  `inventoryPosted: [{feedId, deltaKgAsFed, onHandBeforeKgAsFed,
+  onHandAfterKgAsFed}]` and `skipped: [{lineId, feedId, feedName}]`, so an
+  on-hand/ledger disagreement can be reconstructed from the audit entry.
+- **Loading sheet.** `/loading` selects a herd group and feeder, shows the
+  called quantity (`recipe line x head count`) and the loaded quantity per
+  line, and confirms the load. It warns before confirmation when a line's
+  feed has no inventory item (the trigger would skip it) and the recent-loads
+  list shows `inventorySkippedLines` once the trigger has run.
+- **Feeder identity.** Feeders are names in `farms/{farmId}/feeders`, not
+  logins. `Feeding.feederId` points at that name; `Feeding.createdBy` records
+  the logged-in operator who entered the load. The accuracy report will
+  attribute by feeder name.
+- **Trigger retries.** Firestore retries a failing trigger; the
+  `inventoryPostedAt` guard makes retries safe, and malformed/untracked lines
+  are skipped rather than thrown. A persistently failing feeding is not
+  dead-lettered yet; add a dead-letter/alert view when the report ships.
+- **Accuracy-report index.** `feedings(herdGroupId, createdAt)` covers the
+  loading list. The report will need `feedings(feederId, date)`; add it when
+  the report lands.
+- **Orphan drafts.** Unconfirmed drafts are not cleaned up yet; a later
+  increment should add a 30-day soft-delete or an admin cleanup action.
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 

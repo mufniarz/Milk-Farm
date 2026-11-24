@@ -62,6 +62,9 @@ async function seed() {
     "owner-b": "farm-b",
     "consultant-c": "farm-b",
     "legacy-l": "farm-a",
+    // Dual-role: farm-a is their users.farmId, but they are already a
+    // consultant on farm-b. The backfill must not collapse the two roles.
+    "dual-role": "farm-a",
   };
   for (const [uid, farmId] of Object.entries(users)) {
     await db.collection("users").doc(uid).set({
@@ -74,10 +77,20 @@ async function seed() {
     });
   }
 
-  // An already-granted consultant. The backfill must not overwrite this role.
+  // Already-granted consultants. The backfill must not overwrite these
+  // roles, and must not collapse a user's two farms into one.
   await db.collection("farmMembers").doc("farm-b_consultant-c").set({
     farmId: "farm-b",
     uid: "consultant-c",
+    role: "consultant",
+    status: "active",
+    invitedBy: "owner-b",
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.collection("farmMembers").doc("farm-b_dual-role").set({
+    farmId: "farm-b",
+    uid: "dual-role",
     role: "consultant",
     status: "active",
     invitedBy: "owner-b",
@@ -102,7 +115,7 @@ async function seed() {
   }
 
   console.log(
-    `Seeded emulator (project ${projectId}): 2${negative ? "+1" : ""} farms, ${Object.keys(users).length + (negative ? 1 : 0)} users, 1 consultant membership.`,
+    `Seeded emulator (project ${projectId}): 2${negative ? "+1" : ""} farms, ${Object.keys(users).length + (negative ? 1 : 0)} users, 2 consultant memberships.`,
   );
 }
 

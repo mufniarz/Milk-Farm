@@ -106,6 +106,17 @@ service cloud.firestore {
         );
       }
 
+      // ── Feeders (names, not logins) ──
+      match /feeders/{feederId} {
+        allow read: if isMember(farmId);
+        allow create, update: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant']
+        )
+          && request.resource.data.farmId == farmId;
+        allow delete: if hasRole(farmId, ['owner', 'farmAdmin']);
+      }
+
       // ── Feedings (draft by the barn, confirmed once) ──
       // A feeding is created as a draft and may be edited only while the
       // stored status is draft. Confirmation is one client update; after it

@@ -8,7 +8,8 @@
     "SETTINGS": "Settings",
     "TARGETS": "Targets",
     "GROUPS": "Groups",
-    "INVENTORY": "Inventory"
+    "INVENTORY": "Inventory",
+    "LOADING": "Loading"
   },
   "AUTH": {
     "LOGIN": "Login",
@@ -196,5 +197,31 @@
     "ADJUST": "Adjust",
     "DELIVERY_SAVED": "Delivery recorded.",
     "ADJUST_SAVED": "Correction recorded."
+  },
+  "LOADING": {
+    "TITLE": "Barn loading",
+    "SUBTITLE": "Called versus loaded quantities per group. Confirming posts the load to inventory.",
+    "GROUP": "Group",
+    "FEEDER": "Feeder",
+    "NEW_FEEDER": "New feeder",
+    "ADD_FEEDER": "Add",
+    "REFUSED": "Refused (kg as fed)",
+    "NO_RECIPE": "This group has no active ration. Assign one on the Groups page.",
+    "UNTRACKED_BANNER": "feeds with no inventory item: their consumption will not be posted",
+    "FEED": "Feed",
+    "CALLED": "Called",
+    "LOADED": "Loaded",
+    "DEVIATION": "Deviation",
+    "TOTAL_CALLED": "Total called",
+    "TOTAL_LOADED": "Total loaded",
+    "SAVE_DRAFT": "Save draft",
+    "CONFIRM": "Confirm load",
+    "RECENT": "Recent loads",
+    "SKIPPED": "not posted",
+    "TRACKED": "posted",
+    "EMPTY": "No loads recorded yet.",
+    "CONFIRMED": "Load confirmed.",
+    "DRAFT_SAVED": "Draft saved.",
+    "SAVE_FAILED": "Could not save."
   }
 }

@@ -8,7 +8,8 @@
     "SETTINGS": "Impostazioni",
     "TARGETS": "Obiettivi",
     "GROUPS": "Gruppi",
-    "INVENTORY": "Scorte"
+    "INVENTORY": "Scorte",
+    "LOADING": "Carico"
   },
   "AUTH": {
     "LOGIN": "Accedi",
@@ -196,5 +197,31 @@
     "ADJUST": "Correggi",
     "DELIVERY_SAVED": "Consegna registrata.",
     "ADJUST_SAVED": "Correzione registrata."
+  },
+  "LOADING": {
+    "TITLE": "Carico in stalla",
+    "SUBTITLE": "Quantità chiamate e caricate per gruppo. La conferma scarica le scorte.",
+    "GROUP": "Gruppo",
+    "FEEDER": "Addetto",
+    "NEW_FEEDER": "Nuovo addetto",
+    "ADD_FEEDER": "Aggiungi",
+    "REFUSED": "Rifiuti (kg t.q.)",
+    "NO_RECIPE": "Il gruppo non ha una razione attiva. Assegnala dalla pagina Gruppi.",
+    "UNTRACKED_BANNER": "alimenti senza articolo di magazzino: il carico non sarà scaricato per questi",
+    "FEED": "Alimento",
+    "CALLED": "Chiamato",
+    "LOADED": "Caricato",
+    "DEVIATION": "Scostamento",
+    "TOTAL_CALLED": "Totale chiamato",
+    "TOTAL_LOADED": "Totale caricato",
+    "SAVE_DRAFT": "Salva bozza",
+    "CONFIRM": "Conferma carico",
+    "RECENT": "Carichi recenti",
+    "SKIPPED": "non scaricati",
+    "TRACKED": "scaricato",
+    "EMPTY": "Nessun carico registrato.",
+    "CONFIRMED": "Carico confermato.",
+    "DRAFT_SAVED": "Bozza salvata.",
+    "SAVE_FAILED": "Salvataggio non riuscito."
   }
 }

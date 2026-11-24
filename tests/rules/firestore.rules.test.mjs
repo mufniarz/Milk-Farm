@@ -98,6 +98,11 @@ beforeEach(async () => {
       activeRecipeId: null,
       externalId: null,
     });
+    await setDoc(doc(db, 'farms', 'f1', 'feeders', 'feeder1'), {
+      farmId: 'f1',
+      name: 'Mario',
+      active: true,
+    });
     await setDoc(doc(db, 'farms', 'f1', 'feedings', 'feeding1'), {
       farmId: 'f1',
       herdGroupId: 'g1',
@@ -272,5 +277,36 @@ test('an outsider cannot create a feeding', async () => {
       lines: [],
       idempotencyKey: 'feeding-key-3',
     }),
+  );
+});
+
+
+test('a member can read feeders; a feeder cannot create one', async () => {
+  const member = dbFor('member');
+  await assertSucceeds(
+    getDoc(doc(member, 'farms', 'f1', 'feeders', 'feeder1')),
+  );
+  await assertSucceeds(
+    setDoc(doc(member, 'farms', 'f1', 'feeders', 'feeder2'), {
+      farmId: 'f1',
+      name: 'Lucia',
+      active: true,
+    }),
+  );
+
+  const feeder = dbFor('feeder');
+  await assertFails(
+    setDoc(doc(feeder, 'farms', 'f1', 'feeders', 'feeder3'), {
+      farmId: 'f1',
+      name: 'Paolo',
+      active: true,
+    }),
+  );
+});
+
+test('an outsider cannot read feeders', async () => {
+  const other = dbFor('other');
+  await assertFails(
+    getDoc(doc(other, 'farms', 'f1', 'feeders', 'feeder1')),
   );
 });

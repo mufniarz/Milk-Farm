@@ -60,6 +60,14 @@ import { AuthService } from './core/services/auth.service';
             </a>
             <a
               mat-list-item
+              routerLink="/loading"
+              routerLinkActive="active-link"
+            >
+              <mat-icon matListItemIcon>scale</mat-icon>
+              <span matListItemTitle>{{ 'NAV.LOADING' | translate }}</span>
+            </a>
+            <a
+              mat-list-item
               routerLink="/groups"
               routerLinkActive="active-link"
             >

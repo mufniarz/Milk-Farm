@@ -942,8 +942,14 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
             line_id = line.get("lineId")
             if not item_snap.exists:
                 # The feed is not tracked; post the rest and surface the
-                # skipped line on the feeding for the UI to explain.
-                skipped.append(line_id)
+                # skipped line (with its feed identity) for the UI to explain.
+                skipped.append(
+                    {
+                        "lineId": line_id,
+                        "feedId": line.get("feedId"),
+                        "feedName": line.get("feedName"),
+                    }
+                )
                 continue
             feed_id = line.get("feedId")
             item_data = item_snap.to_dict() or {}
@@ -987,6 +993,15 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
             )
         posted = len(ledger_writes)
 
+        posted_summary = [
+            {
+                "feedId": feed_id,
+                "deltaKgAsFed": -update["loaded"],
+                "onHandBeforeKgAsFed": update["before"],
+                "onHandAfterKgAsFed": update["before"] - update["loaded"],
+            }
+            for feed_id, update in item_updates.items()
+        ]
         transaction.update(
             feeding_ref,
             {
@@ -1005,7 +1020,8 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
                 "feedingId": feeding_id,
                 "herdGroupId": current_data.get("herdGroupId"),
                 "postedLines": posted,
-                "skippedLines": skipped,
+                "inventoryPosted": posted_summary,
+                "skipped": skipped,
                 "actorUid": current_data.get("createdBy"),
                 "actorEmail": None,
                 "at": firestore.SERVER_TIMESTAMP,

@@ -62,6 +62,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'loading',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/loading/loading.component').then(
+        (m) => m.LoadingComponent
+      ),
+  },
+  {
     path: 'groups',
     canActivate: [authGuard],
     loadComponent: () =>

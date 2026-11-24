@@ -496,7 +496,18 @@ def test_feeding_trigger_posts_each_line_once():
         .collection("auditLog")
         .stream()
     ]
-    assert any(entry["action"] == "feeding.confirm" for entry in audits)
+    confirm_audit = next(
+        entry for entry in audits if entry["action"] == "feeding.confirm"
+    )
+    assert confirm_audit["inventoryPosted"] == [
+        {
+            "feedId": "feed1",
+            "deltaKgAsFed": -150.0,
+            "onHandBeforeKgAsFed": 1000.0,
+            "onHandAfterKgAsFed": 850.0,
+        }
+    ]
+    assert confirm_audit["skipped"] == []
 
     # A retry (the trigger fires again after its own update) must not
     # double-deplete.
@@ -533,5 +544,21 @@ def test_feeding_trigger_skips_an_untracked_feed():
         .get()
         .to_dict()
     )
-    assert feeding["inventorySkippedLines"] == ["line-x"]
+    assert feeding["inventorySkippedLines"] == [
+        {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
+    ]
     assert feeding["inventoryPostedAt"] is not None
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    confirm_audit = next(
+        entry for entry in audits if entry["action"] == "feeding.confirm"
+    )
+    assert confirm_audit["inventoryPosted"] == []
+    assert confirm_audit["skipped"] == [
+        {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
+    ]
