@@ -251,23 +251,45 @@ inventory, target overrides and milk records require `farmMembers`.
 ## Deployment record — 2026-11-25
 
 Deployed to the production project `nicola-milk-farm` (the only Firebase
-project configured; no staging project exists, so the staging rehearsal in
-the checklist could not be performed).
+project configured; no staging project exists).
 
 - **Membership backfill:** dry run reported `3 would be created, 0 unchanged`
   across 3 farms / 3 users; the real run created 3 memberships and verified
   every farm has an owner and every user an active membership.
-- **Indexes:** deployed successfully. Two unnecessary single-field indexes
-  (`groups.animalGroupId` and `feedingTriggerFailures.status`) were removed
-  because Firestore rejects them; the `(status, deadAt)` collection-group
-  index for abandonment remains.
-- **Functions:** 13 deployed — the 11 callables, `on_feeding_confirmed`, and
-  the `scheduled_feeding_retry` scheduled function. The first trigger create
-  failed while the Eventarc service agent propagated; the scoped retry
-  succeeded. Cloud Scheduler was enabled automatically.
-- **Rules and hosting:** compatibility rules released and
-  `https://nicola-milk-farm.web.app` returns 200.
-- **Not yet verified in production:** authenticated smoke tests of the
-  loading sheet, trigger → queue path, and IOFC/milk flows; composite-index
-  build completion. These need a signed-in farm user and are the next
-  operational check.
+- **Region:** Firestore `(default)` is in **`nam5` (US multi-region)**;
+  Cloud Functions are in `europe-west1`. This is a data-residency mismatch
+  for an Italian farm and a GDPR/DPA decision, not a code detail.
+- **Indexes:** the first deploy removed `feedingTriggerFailures.status` as an
+  "unnecessary" single-field index. That broke the scheduler in production:
+  the collection-group equality/IN query requires a `COLLECTION_GROUP_ASC`
+  index on `status`, which the `(status, deadAt)` composite alone does not
+  serve. Fixed with a `fieldOverrides` entry enabling the collection-group
+  single-field index and by changing the scan to two equality queries. The
+  production scan was then exercised: a temporary pending failure transitioned
+  `pending → retrying → resolved` (`resolvedBy` scheduled) and was cleaned up.
+- **Functions:** 13 deployed — 11 callables plus `on_feeding_confirmed` and
+  `scheduled_feeding_retry`. Callables: `set_target_override`,
+  `clear_target_override`, `upsert_inventory_item`, `record_delivery`,
+  `adjust_inventory`, `set_farm_milk_price`, `post_skipped_consumption`,
+  `retry_feeding_failures`, `mark_feeding_failure_handled`, plus the existing
+  `optimize_ration` and `export_recipe`. The first trigger create failed while
+  the Eventarc service agent propagated; the scoped retry succeeded. Cloud
+  Scheduler was enabled.
+- **Rules and hosting:** the compatibility rules are released and
+  `https://nicola-milk-farm.web.app` returns 200. The backfill condition was
+  met, so the strict membership rules are live; no compatibility window
+  remains.
+- **Authenticated smoke:** a custom-token test user with an owner membership
+  read the farm (200), created and confirmed a feeding (200), and the trigger
+  posted 100 kg (on-hand 1000 → 900, one consumption ledger entry, no failure
+  doc). A milk record write/read and a feeding read also returned 200. The
+  test farm, feed, membership and user were deleted.
+- **Not browser-tested:** the Angular loading/IOFC/accuracy screens and the
+  actual queued-failure UI were exercised through the API/SDK, not a browser
+  session.
+- **No staging:** the mitigation is production-only: full local gate before
+  every deploy, the authenticated smoke after every deploy, and a manual
+  rollback of the previous functions/rules version. Creating
+  `nicola-milk-farm-staging` is the recommended follow-up.
+- **Deferred:** the four-decimal solver/fixture fix and the 90-day resolved
+  TTL are not part of this deploy.

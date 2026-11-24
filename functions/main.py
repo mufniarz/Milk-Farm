@@ -1526,17 +1526,21 @@ def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
     """Retry pending trigger failures; stale claims are reclaimed after 10m."""
     db = firestore.client()
     instance_id = f"scheduled-{uuid.uuid4()}"
-    docs = list(
-        db.collection_group("feedingTriggerFailures")
-        .where("status", "in", ["pending", "retrying"])
-        .limit(20)
-        .stream()
-    )
-    for doc in docs:
-        data = doc.to_dict() or {}
-        farm_id = data.get("farmId")
-        if farm_id:
-            _retry_one_failure(db, farm_id, doc.id, instance_id)
+    # Equality queries use the (status, deadAt) composite prefix. An `in`
+    # query would additionally require a collection-group single-field index;
+    # the two scans avoid that dependency.
+    for scan_status in ("pending", "retrying"):
+        docs = list(
+            db.collection_group("feedingTriggerFailures")
+            .where("status", "==", scan_status)
+            .limit(20)
+            .stream()
+        )
+        for doc in docs:
+            data = doc.to_dict() or {}
+            farm_id = data.get("farmId")
+            if farm_id:
+                _retry_one_failure(db, farm_id, doc.id, instance_id)
 
     cutoff = datetime.now(timezone.utc) - timedelta(
         days=_ABANDON_AFTER_DAYS

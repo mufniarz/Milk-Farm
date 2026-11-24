@@ -384,6 +384,15 @@ sheet ship together.
   needs-review count separately; the row actions are Mark handled, Write off
   and No ledger entry needed. This rendering is UI-only (not separately
   spec'd); the state transitions are covered by pytest.
+- **Production index dependency:** the scan uses collection-group equality
+  queries on `status`; these require a `COLLECTION_GROUP_ASC` single-field
+  index, configured via `fieldOverrides` (Firestore rejects it under
+  `indexes`). The `(status, deadAt)` composite serves the abandonment query.
+  Removing the single-field index broke the scheduler in production until the
+  override was added; the scan is exercised in production.
+- **Region:** Firestore is `nam5` (US multi-region) while functions are
+  `europe-west1`; the data-residency/GDPR decision is open and must be stated
+  in the DPA before a broader rollout.
 - **Scheduled deploy:** `scheduled_feeding_retry` uses the `*/5 * * * *`
   decorator; enable `cloudscheduler.googleapis.com` before
   `firebase deploy --only functions` or the schedule never runs. The dead
