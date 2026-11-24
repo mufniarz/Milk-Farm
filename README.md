@@ -61,10 +61,12 @@ For more information on using the Angular CLI, including detailed command refere
 ## Project checks
 
 ```bash
-npm run verify                                                     # parser diff + calculator smoke + i18n
-npm run build
+npm run verify   # parser diff + calculator smoke + i18n + build
 npx ng test --watch=false --browsers=ChromeHeadlessNoSandbox
 cd functions && ./venv/bin/python -m pytest -q
+# Callable transaction tests need the emulator:
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
+  ./venv/bin/python -m pytest tests/test_callables.py -q
 FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
   npx firebase emulators:exec --only firestore --project demo-milk-farm "npm run test:rules"
 ```
@@ -78,7 +80,10 @@ directly under Node's type stripping; keep the extension. The parity chain
 
 1. Run the membership backfill: `npm run backfill:members -- --dry-run`, then
    run it for real and confirm zero uncovered farms and zero users with a
-   `farmId` but no active membership.
+   `farmId` but no active membership. **The backfill has not yet been executed
+   against any dataset.** Inspect the dry-run report before the real run, and
+   do not treat a zero exit as proof of coverage until the two counts are
+   independently verified.
 2. Deploy `firestore.indexes.json` (the `farmMembers(uid,status)` lookup is on
    the hot path).
 3. Deploy the five callables in `functions/main.py`.

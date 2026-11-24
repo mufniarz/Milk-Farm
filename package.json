@@ -11,7 +11,7 @@
     "backfill:members": "npx ts-node --transpile-only scripts/backfill-members.ts",
     "check:calculator": "node --no-warnings --experimental-strip-types scripts/check-calculator.mts",
     "check:i18n": "node scripts/check-i18n.cjs",
-    "verify": "node scripts/parse-excel.cjs && git diff --exit-code && npm run check:calculator && npm run check:i18n",
+    "verify": "node scripts/parse-excel.cjs && git diff --exit-code && npm run check:calculator && npm run check:i18n && npm run build",
     "test:rules": "node --test tests/rules/firestore.rules.test.mjs"
   },
   "private": true,

@@ -365,7 +365,7 @@ def _validate_override(data, require_reason=True):
                 code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
                 message="minValue/maxValue must be numbers or null.",
             )
-    if min_value is None and max_value is None:
+    if require_reason and min_value is None and max_value is None:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
             message="At least one of minValue or maxValue is required.",

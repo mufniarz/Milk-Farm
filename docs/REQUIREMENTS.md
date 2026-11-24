@@ -29,7 +29,8 @@ numbers.
 | Check | Command | Result |
 |---|---|---|
 | Type/build | `npx ng build` | pass |
-| Solver + export + golden ration | `pytest tests -q` | 18 passed |
+| Solver + export + golden ration | `pytest tests -q` | 18 passed (the 7 callable tests skip without the emulator) |
+| Callable transaction logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 7 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
 | Client engine vs workbook (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 3 passed — 17 codes at 0.03 pp, totals at 0.01 kg / 0.001 €, moisture/forage |
@@ -38,6 +39,11 @@ numbers.
 | Membership backfill | `npm run backfill:members` | implemented and idempotent; **not run against the target database** because deploy access is locked. Run the dry-run, then the real run, and confirm zero uncovered farms/users before deploying compatibility rules. |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
+
+The callable integration tests caught a real defect: the clear-override path
+required `minValue`/`maxValue`, so reverting an override failed validation.
+`_validate_override` now requires at least one bound only when setting an
+override; the clear path accepts the nutrient code alone.
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 

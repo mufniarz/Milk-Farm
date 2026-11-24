@@ -51,12 +51,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - run: npm ci --legacy-peer-deps
 
       - name: Install emulator test dependencies
-        run: npm install --no-save --legacy-peer-deps firebase-tools @firebase/rules-unit-testing
+        run: |
+          npm install --no-save --legacy-peer-deps firebase-tools @firebase/rules-unit-testing
+          python -m pip install --upgrade pip
+          python -m pip install -r functions/requirements.txt
 
-      - name: Firestore rules tests
+      - name: Firestore rules and callable tests
         env:
           FIREBASE_CLI_DISABLE_UPDATE_CHECK: 'true'
-        run: npx firebase emulators:exec --only firestore --project demo-milk-farm "npm run test:rules"
+        run: |
+          npx firebase emulators:exec --only firestore --project demo-milk-farm \
+            "npm run test:rules && cd functions && python -m pytest tests/test_callables.py -q"
