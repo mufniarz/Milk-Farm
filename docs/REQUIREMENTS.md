@@ -28,14 +28,16 @@ numbers.
 
 | Check | Command | Result |
 |---|---|---|
-| Type/build | `npx ng build` | pass, 3.1 s |
-| Solver + export + golden ration | `pytest tests -q` | 8 passed |
-| Client engine vs workbook | calculator run against the golden lactating ration | all 17 metrics within 0.03 pp (observed max 0.0249); 48,3 kg t.q. and €9,885 match; `Kg s.s.` within 0.01 kg of 23.10246 |
+| Type/build | `npx ng build` | pass |
+| Solver + export + golden ration | `pytest tests -q` | 18 passed |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
-| Solver + export + parity | `pytest tests -q` | 18 passed |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
+| Client engine vs workbook (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 3 passed — 17 codes at 0.03 pp, totals at 0.01 kg / 0.001 €, moisture/forage |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
-| Angular unit spec | `ng test` | not runnable in this environment — Chrome's sandbox is blocked (`sandbox initialization failed`). The spec exists and is the CI check for the same numbers. |
+| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 9 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership |
+| Membership backfill | `npm run backfill:members` | implemented and idempotent; **not run against the target database** because deploy access is locked. Run the dry-run, then the real run, and confirm zero uncovered farms/users before deploying compatibility rules. |
+
+No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 

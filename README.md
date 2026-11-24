@@ -57,3 +57,32 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Project checks
+
+```bash
+npm run verify                                                     # parser diff + calculator smoke + i18n
+npm run build
+npx ng test --watch=false --browsers=ChromeHeadlessNoSandbox
+cd functions && ./venv/bin/python -m pytest -q
+FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
+  npx firebase emulators:exec --only firestore --project demo-milk-farm "npm run test:rules"
+```
+
+`scripts/check-calculator.mts` is ESM TypeScript (`.mts`) because it runs
+directly under Node's type stripping; keep the extension. The parity chain
+(workbook -> fixtures -> computed) is described in
+[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+
+## Before deploying
+
+1. Run the membership backfill: `npm run backfill:members -- --dry-run`, then
+   run it for real and confirm zero uncovered farms and zero users with a
+   `farmId` but no active membership.
+2. Deploy `firestore.indexes.json` (the `farmMembers(uid,status)` lookup is on
+   the hot path).
+3. Deploy the five callables in `functions/main.py`.
+4. Deploy the compatibility rules and hosting in the same window.
+
+Do not deploy the new collections' rules before the backfill: groups,
+inventory and target overrides require `farmMembers`.

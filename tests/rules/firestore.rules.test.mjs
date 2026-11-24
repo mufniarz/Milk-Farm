@@ -75,6 +75,15 @@ beforeEach(async () => {
       isAvailable: true,
       nutrients: {},
     });
+    await setDoc(doc(db, 'recipes', 'r1'), {
+      name: 'Reference ration',
+      farmId: 'f1',
+      animalGroupId: 'lactating',
+      totalAsFed: 48.3,
+      totalDM: 23.095,
+      cost: 9.885,
+      nutrientAnalysis: {},
+    });
     await setDoc(doc(db, 'farms', 'f1', 'groups', 'g1'), {
       name: 'High',
       animalGroupId: 'lactating',
@@ -94,6 +103,14 @@ beforeEach(async () => {
       nutrients: {},
       version: 1,
     });
+    // A user from before the farmMembers backfill: profile only.
+    await setDoc(doc(db, 'users', 'legacy'), {
+      uid: 'legacy',
+      farmId: 'f1',
+      displayName: 'Legacy User',
+      email: 'legacy@example.com',
+      language: 'it',
+    });
   });
 });
 
@@ -106,6 +123,13 @@ test('member can read the farm and its feed', async () => {
   await assertSucceeds(getDoc(doc(db, 'farms', 'f1')));
   await assertSucceeds(getDoc(doc(db, 'feeds', 'feed1')));
   await assertSucceeds(getDoc(doc(db, 'farms', 'f1', 'groups', 'g1')));
+});
+
+test('legacy user with only users.farmId can read during the window', async () => {
+  const db = dbFor('legacy');
+  await assertSucceeds(getDoc(doc(db, 'farms', 'f1')));
+  await assertSucceeds(getDoc(doc(db, 'feeds', 'feed1')));
+  await assertSucceeds(getDoc(doc(db, 'recipes', 'r1')));
 });
 
 test('outsider cannot read the farm or its feed', async () => {

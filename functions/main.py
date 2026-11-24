@@ -386,6 +386,14 @@ def _validate_override(data, require_reason=True):
     return farm_id, animal_group_id, nutrient_code, min_value, max_value, reason
 
 
+def _write_audit(transaction, db, farm_id, payload):
+    """Append one audit entry inside the caller's transaction."""
+    audit_ref = (
+        db.collection("farms").document(farm_id).collection("auditLog").document()
+    )
+    transaction.set(audit_ref, payload)
+
+
 @https_fn.on_call(
     memory=options.MemoryOption.MB_256,
     timeout_sec=30,
@@ -409,10 +417,6 @@ def set_target_override(req: https_fn.CallableRequest):
         .collection("targetOverrides")
         .document(animal_group_id)
     )
-    audit_ref = (
-        db.collection("farms").document(farm_id).collection("auditLog").document()
-    )
-
     @firestore.transactional
     def apply(transaction):
         snapshot = override_ref.get(transaction=transaction)
@@ -437,8 +441,10 @@ def set_target_override(req: https_fn.CallableRequest):
             },
             merge=True,
         )
-        transaction.set(
-            audit_ref,
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
             {
                 "action": "target.override.set",
                 "farmId": farm_id,
@@ -487,10 +493,6 @@ def clear_target_override(req: https_fn.CallableRequest):
         .collection("targetOverrides")
         .document(animal_group_id)
     )
-    audit_ref = (
-        db.collection("farms").document(farm_id).collection("auditLog").document()
-    )
-
     @firestore.transactional
     def apply(transaction):
         snapshot = override_ref.get(transaction=transaction)
@@ -514,8 +516,10 @@ def clear_target_override(req: https_fn.CallableRequest):
             )
         else:
             transaction.delete(override_ref)
-        transaction.set(
-            audit_ref,
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
             {
                 "action": "target.override.clear",
                 "farmId": farm_id,
@@ -604,13 +608,6 @@ def _inventory_item_ref(db, farm_id, feed_id):
     )
 
 
-def _write_audit(transaction, db, farm_id, payload):
-    audit_ref = (
-        db.collection("farms").document(farm_id).collection("auditLog").document()
-    )
-    transaction.set(audit_ref, payload)
-
-
 @https_fn.on_call(
     memory=options.MemoryOption.MB_256,
     timeout_sec=30,
@@ -650,19 +647,41 @@ def upsert_inventory_item(req: https_fn.CallableRequest):
     )
 
     item_ref = _inventory_item_ref(db, farm_id, feed_id)
-    existing = item_ref.get()
-    payload = {
+    audit_after = {
         "feedId": feed_id,
         "feedName": feed_data.get("name", feed_id),
         "reorderPointDays": max(0, int(reorder_point_days)),
         "location": str(data.get("location") or ""),
         "unitCostPerKgAsFed": unit_cost,
-        "updatedAt": firestore.SERVER_TIMESTAMP,
     }
-    if not existing.exists:
-        payload["onHandKgAsFed"] = 0
-        payload["createdAt"] = firestore.SERVER_TIMESTAMP
-    item_ref.set(payload, merge=True)
+
+    @firestore.transactional
+    def apply(transaction):
+        existing = item_ref.get(transaction=transaction)
+        payload = dict(audit_after)
+        payload["updatedAt"] = firestore.SERVER_TIMESTAMP
+        if not existing.exists:
+            payload["onHandKgAsFed"] = 0
+            payload["createdAt"] = firestore.SERVER_TIMESTAMP
+        transaction.set(item_ref, payload, merge=True)
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "inventory.item.upsert",
+                "farmId": farm_id,
+                "itemId": feed_id,
+                "before": existing.to_dict() if existing.exists else None,
+                "after": audit_after,
+                "reason": "inventory settings",
+                "actorUid": req.auth.uid,
+                "actorEmail": (req.auth.token or {}).get("email"),
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
     return {"ok": True, "itemId": feed_id}
 
 
