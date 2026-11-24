@@ -39,6 +39,13 @@ export interface AdjustInventoryInput {
   idempotencyKey: string;
 }
 
+export interface RetroPostResult {
+  ok: boolean;
+  postedLines: number;
+  feedings: number;
+  onHandKgAsFed: number;
+}
+
 export interface UpsertInventoryItemInput {
   farmId: string;
   feedId: string;
@@ -118,6 +125,22 @@ export class InventoryService {
       'record_delivery',
     );
     await callable(input);
+  }
+
+  /**
+   * Post previously skipped feeding lines after the item was created.
+   * Owner/admin only; the callable audits every line it posts.
+   */
+  async postSkipped(feedId: string): Promise<RetroPostResult> {
+    const callable = httpsCallable<
+      { farmId: string; feedId: string },
+      RetroPostResult
+    >(this.functions, 'post_skipped_consumption');
+    const { data } = await callable({
+      farmId: this.farmContext.activeFarmId(),
+      feedId,
+    });
+    return data;
   }
 
   async adjustInventory(input: AdjustInventoryInput): Promise<void> {

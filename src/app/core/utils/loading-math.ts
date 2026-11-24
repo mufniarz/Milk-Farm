@@ -23,6 +23,14 @@ export interface OverdrawnFeed {
   resultingKgAsFed: number;
 }
 
+/** Local calendar date as YYYY-MM-DD (not the UTC date). */
+export function localDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /** Called quantity for a line: recipe per-head kg x group head count. */
 export function computeCalledKg(kgPerHead: number, headCount: number): number {
   return kgPerHead * headCount;

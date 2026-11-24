@@ -7,9 +7,10 @@
  * `posted` or `pending`. Corrections are counted and flagged, never dropped.
  */
 import { Feeding } from '../models/feeding.model';
-import { computeDeviationPct } from './loading-math';
+import { computeDeviationPct, localDateKey } from './loading-math';
 
 export interface AccuracyRow {
+  feedingId: string;
   date: string;
   herdGroupId: string;
   feederId: string;
@@ -45,6 +46,10 @@ export interface FeederAccuracy {
   lineCount: number;
   meanAbsDeviationPct: number;
   loadWeightedDeviationPct: number;
+  loadedKgAsFed: number;
+  refusedKgAsFed: number;
+  /** 100 x (1 - refused / loaded); null when loaded is zero. */
+  intakeEfficiencyPct: number | null;
   overdrawnLoads: number;
   skippedLoads: number;
   worstIngredients: IngredientAccuracy[];
@@ -63,6 +68,7 @@ export function buildAccuracyRows(feedings: readonly Feeding[]): AccuracyRow[] {
     const hasSkipped = (feeding.inventorySkippedLines?.length ?? 0) > 0;
     for (const line of feeding.lines ?? []) {
       rows.push({
+        feedingId: feeding.id ?? `${feeding.date}|${feeding.herdGroupId}|${feeding.feederId}`,
         date: feeding.date,
         herdGroupId: feeding.herdGroupId,
         feederId: feeding.feederId,
@@ -87,9 +93,11 @@ export function buildAccuracyRows(feedings: readonly Feeding[]): AccuracyRow[] {
 
 /** Keep rows on/after the cutoff date (YYYY-MM-DD). */
 export function filterRowsSince(rows: readonly AccuracyRow[], days: number, now = new Date()): AccuracyRow[] {
+  // The window filters the stored local calendar date, not the UTC
+  // createdAt timestamp; this is what the feeder sees on the sheet.
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - Math.max(1, days));
-  const cutoffKey = cutoff.toISOString().slice(0, 10);
+  const cutoffKey = localDateKey(cutoff);
   return rows.filter((row) => row.date >= cutoffKey);
 }
 
@@ -122,6 +130,21 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
     }
     const weighted = calledSum > 0 ? (absDeltaSum / calledSum) * 100 : 0;
 
+    const uniqueRefusals = new Map<string, number>();
+    let loadedSum = 0;
+    for (const row of feederRows) {
+      loadedSum += row.loadedKgAsFed;
+      if (!uniqueRefusals.has(row.feedingId)) {
+        uniqueRefusals.set(row.feedingId, row.refusedKgAsFed);
+      }
+    }
+    const refusedSum = [...uniqueRefusals.values()].reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+    const intakeEfficiencyPct =
+      loadedSum > 0 ? (1 - refusedSum / loadedSum) * 100 : null;
+
     const byIngredient = new Map<string, AccuracyRow[]>();
     for (const row of feederRows) {
       const list = byIngredient.get(row.feedId) ?? [];
@@ -151,7 +174,10 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
       });
     }
     ingredients.sort(
-      (a, b) => b.meanAbsDeviationPct - a.meanAbsDeviationPct,
+      (a, b) =>
+        b.meanAbsDeviationPct - a.meanAbsDeviationPct ||
+        a.feedName.localeCompare(b.feedName) ||
+        a.feedId.localeCompare(b.feedId),
     );
 
     result.push({
@@ -161,6 +187,9 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
       lineCount: feederRows.length,
       meanAbsDeviationPct: meanAbs,
       loadWeightedDeviationPct: weighted,
+      loadedKgAsFed: loadedSum,
+      refusedKgAsFed: refusedSum,
+      intakeEfficiencyPct,
       overdrawnLoads: uniqueLoadCount(
         feederRows.filter((row) => row.hasOverdrawn),
       ),

@@ -14,6 +14,7 @@ import { HerdGroup } from '../../core/models/group.model';
 import { FeedingService } from '../../core/services/feeding.service';
 import { FeederService } from '../../core/services/feeder.service';
 import { GroupService } from '../../core/services/group.service';
+import { FarmContextService } from '../../core/services/farm-context.service';
 import {
   AccuracyRow,
   FeederAccuracy,
@@ -49,6 +50,11 @@ import {
       <h1 class="page-title">{{ 'ACCURACY.TITLE' | translate }}</h1>
       <p class="page-subtitle">{{ 'ACCURACY.SUBTITLE' | translate }}</p>
 
+      @if (!canView) {
+        <div class="banner warning">
+          {{ 'ACCURACY.RESTRICTED' | translate }}
+        </div>
+      } @else {
       <mat-card appearance="outlined" class="toolbar-card">
         <mat-card-content class="toolbar-row">
           <mat-form-field appearance="outline">
@@ -99,9 +105,16 @@ import {
             <span>{{ 'ACCURACY.LINE_COUNT' | translate }}</span>
             <span>{{ 'ACCURACY.MEAN_ABS' | translate }}</span>
             <span>{{ 'ACCURACY.WEIGHTED' | translate }}</span>
+            <span [title]="'ACCURACY.INTAKE_TOOLTIP' | translate">{{
+              'ACCURACY.INTAKE_EFF' | translate
+            }}</span>
             <span>{{ 'ACCURACY.ANOMALIES' | translate }}</span>
-            <span>{{ 'ACCURACY.WORST' | translate }}</span>
-            <span>{{ 'ACCURACY.TREND' | translate }}</span>
+            <span [title]="'ACCURACY.WORST_TOOLTIP' | translate">{{
+              'ACCURACY.WORST' | translate
+            }}</span>
+            <span [title]="'ACCURACY.TREND_TOOLTIP' | translate">{{
+              'ACCURACY.TREND' | translate
+            }}</span>
           </div>
           @for (summary of summaries; track summary.feederId) {
             <div class="row body">
@@ -110,6 +123,13 @@ import {
               <span>{{ summary.lineCount }}</span>
               <span>{{ summary.meanAbsDeviationPct | number: '1.1-1' }}%</span>
               <span>{{ summary.loadWeightedDeviationPct | number: '1.1-1' }}%</span>
+              <span>
+                {{
+                  summary.intakeEfficiencyPct === null
+                    ? '—'
+                    : (summary.intakeEfficiencyPct | number: '1.1-1') + '%'
+                }}
+              </span>
               <span
                 [class.alert]="
                   summary.overdrawnLoads > 0 || summary.skippedLoads > 0
@@ -141,6 +161,7 @@ import {
       </mat-card>
 
       <p class="note">{{ 'ACCURACY.PENDING_NOTE' | translate }}</p>
+      }
     </div>
   `,
   styles: `
@@ -165,6 +186,14 @@ import {
       align-items: center;
       flex-wrap: wrap;
     }
+    .banner.warning {
+      background: #fff4e0;
+      color: #8a5300;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
     .line-count {
       color: rgba(0, 0, 0, 0.6);
       font-size: 13px;
@@ -172,7 +201,7 @@ import {
     }
     .row {
       display: grid;
-      grid-template-columns: 1.1fr 0.5fr 0.5fr 0.7fr 0.7fr 0.7fr 1.6fr 1.4fr;
+      grid-template-columns: 1.1fr 0.5fr 0.5fr 0.7fr 0.7fr 0.7fr 0.7fr 1.6fr 1.4fr;
       gap: 12px;
       align-items: center;
       padding: 8px 4px;
@@ -229,6 +258,7 @@ export class AccuracyComponent implements OnInit {
   private feedingService = inject(FeedingService);
   private feederService = inject(FeederService);
   private groupService = inject(GroupService);
+  private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
 
@@ -248,6 +278,12 @@ export class AccuracyComponent implements OnInit {
     this.groupService
       .getGroups()
       .subscribe((groups) => (this.groups = groups));
+  }
+
+  get canView(): boolean {
+    if (this.farmContext.loading()) return true;
+    const role = this.farmContext.activeRole();
+    return role === 'owner' || role === 'farmAdmin' || role === 'consultant';
   }
 
   get rows(): AccuracyRow[] {

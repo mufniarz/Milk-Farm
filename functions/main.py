@@ -996,6 +996,13 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
             )
         posted = len(ledger_writes)
 
+        skipped_feed_ids = sorted(
+            {
+                item["feedId"]
+                for item in skipped
+                if item.get("feedId")
+            }
+        )
         posted_summary = [
             {
                 "feedId": feed_id,
@@ -1026,6 +1033,7 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
                 "inventoryPostedAt": firestore.SERVER_TIMESTAMP,
                 "inventoryPostedLines": posted,
                 "inventorySkippedLines": skipped,
+                "inventorySkippedFeedIds": skipped_feed_ids,
                 "inventoryOverdrawn": overdrawn,
             },
         )
@@ -1044,6 +1052,7 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
                 "postedLines": posted,
                 "inventoryPosted": posted_summary,
                 "skipped": skipped,
+                "skippedFeedIds": skipped_feed_ids,
                 "overdrawn": overdrawn,
                 "actorUid": current_data.get("createdBy"),
                 "actorEmail": None,
@@ -1052,3 +1061,198 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
         )
 
     apply(db.transaction())
+
+
+# ── Retroactive posting ─────────────────────────────────────────────────────
+# A feed may have been loaded before it had an inventory item; the trigger
+# recorded those lines in inventorySkippedLines / inventorySkippedFeedIds.
+# Once the item exists, an owner/admin can post them as retoractive
+# adjustments. This is a separate, auditable action, not part of the trigger.
+
+
+def _retro_post_feeding(db, farm_id, feed_id, feeding_id, uid, email):
+    feeding_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("feedings")
+        .document(feeding_id)
+    )
+    item_ref = _inventory_item_ref(db, farm_id, feed_id)
+
+    @firestore.transactional
+    def apply(transaction):
+        current = feeding_ref.get(transaction=transaction)
+        if not current.exists:
+            return 0
+        current_data = current.to_dict() or {}
+        skipped = list(current_data.get("inventorySkippedLines") or [])
+        matching = [line for line in skipped if line.get("feedId") == feed_id]
+        if not matching:
+            return 0
+        lines_by_id = {
+            line.get("lineId"): line for line in (current_data.get("lines") or [])
+        }
+        item = item_ref.get(transaction=transaction)
+        if not item.exists:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+                message="Create the inventory item before posting retroactively.",
+            )
+        item_data = item.to_dict() or {}
+        before = float(item_data.get("onHandKgAsFed") or 0)
+
+        prepared = []
+        for skipped_line in matching:
+            line_id = skipped_line.get("lineId")
+            full_line = lines_by_id.get(line_id) or {}
+            loaded = float(full_line.get("loadedKgAsFed") or 0)
+            if loaded <= 0:
+                continue
+            ledger_ref = (
+                db.collection("farms")
+                .document(farm_id)
+                .collection("inventoryTransactions")
+                .document(f"{farm_id}_{feeding_id}_{line_id}")
+            )
+            ledger_snap = ledger_ref.get(transaction=transaction)
+            prepared.append((skipped_line, ledger_ref, ledger_snap, loaded))
+
+        total = 0.0
+        posted = 0
+        running = before
+        audit_lines = []
+        for skipped_line, ledger_ref, ledger_snap, loaded in prepared:
+            if ledger_snap.exists:
+                continue
+            line_id = skipped_line.get("lineId")
+            transaction.set(
+                ledger_ref,
+                {
+                    "itemId": feed_id,
+                    "type": "adjustment",
+                    "deltaKgAsFed": -loaded,
+                    "unitCostPerKgAsFed": float(
+                        item_data.get("unitCostPerKgAsFed") or 0
+                    ),
+                    "sourceType": "retroactive",
+                    "sourceId": line_id,
+                    "idempotencyKey": f"{farm_id}_{feeding_id}_{line_id}",
+                    "createdBy": uid,
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                    "note": f"retroactive feeding {feeding_id}",
+                },
+            )
+            total += loaded
+            posted += 1
+            audit_lines.append((line_id, running, running - loaded))
+            running -= loaded
+
+        if total > 0:
+            transaction.update(
+                item_ref,
+                {
+                    "onHandKgAsFed": before - total,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                },
+            )
+
+        # Remove the lines that were just posted from the skipped surface.
+        remaining = [line for line in skipped if line.get("feedId") != feed_id]
+        remaining_feed_ids = sorted(
+            {
+                line["feedId"]
+                for line in remaining
+                if line.get("feedId")
+            }
+        )
+        transaction.update(
+            feeding_ref,
+            {
+                "inventorySkippedLines": remaining,
+                "inventorySkippedFeedIds": remaining_feed_ids,
+            },
+        )
+        for line_id, line_before, line_after in audit_lines:
+            _write_audit(
+                transaction,
+                db,
+                farm_id,
+                {
+                    "action": "inventory.retroactive",
+                    "farmId": farm_id,
+                    "itemId": feed_id,
+                    "sourceFeedingId": feeding_id,
+                    "sourceLineId": line_id,
+                    "deltaKgAsFed": -(line_before - line_after),
+                    "onHandBeforeKgAsFed": line_before,
+                    "onHandAfterKgAsFed": line_after,
+                    "actorUid": uid,
+                    "actorEmail": email,
+                    "at": firestore.SERVER_TIMESTAMP,
+                },
+            )
+        return posted
+
+    return apply(db.transaction())
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=60,
+    region="europe-west1",
+)
+def post_skipped_consumption(req: https_fn.CallableRequest):
+    """Post previously skipped feeding lines once the inventory item exists."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    farm_id = _require_string(data, "farmId")
+    feed_id = _require_string(data, "feedId")
+    db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
+
+    feedings = list(
+        db.collection("farms")
+        .document(farm_id)
+        .collection("feedings")
+        .where("inventorySkippedFeedIds", "array_contains", feed_id)
+        .where("status", "==", "confirmed")
+        .stream()
+    )
+    posted = 0
+    touched = 0
+    email = (req.auth.token or {}).get("email")
+    for feeding in feedings:
+        count = _retro_post_feeding(
+            db, farm_id, feed_id, feeding.id, req.auth.uid, email
+        )
+        posted += count
+        if count > 0:
+            touched += 1
+
+    # Reconcile the item from the ledger so an existing drift is corrected
+    # immediately rather than waiting for the next scheduled pass.
+    item_ref = _inventory_item_ref(db, farm_id, feed_id)
+    item = item_ref.get()
+    total = 0.0
+    if item.exists:
+        for entry in (
+            db.collection("farms")
+            .document(farm_id)
+            .collection("inventoryTransactions")
+            .where("itemId", "==", feed_id)
+            .stream()
+        ):
+            total += float((entry.to_dict() or {}).get("deltaKgAsFed") or 0)
+        item_ref.update(
+            {"onHandKgAsFed": total, "updatedAt": firestore.SERVER_TIMESTAMP}
+        )
+
+    return {
+        "ok": True,
+        "postedLines": posted,
+        "feedings": touched,
+        "onHandKgAsFed": total,
+    }

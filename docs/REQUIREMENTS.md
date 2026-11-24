@@ -30,14 +30,14 @@ numbers.
 |---|---|---|
 | Type/build | `npx ng build` | pass |
 | Solver + export + golden ration | `pytest tests -q` | 18 passed (the 10 callable/trigger tests skip without the emulator) |
-| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 11 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged) |
+| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 12 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading and accuracy math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 13 passed — 3 calculator parity + 5 loading math + 5 accuracy (drafts excluded, pending included, corrections/anomalies flagged, aggregation, Italian CSV) |
+| Client engine, loading and accuracy math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 17 passed — 3 calculator parity + 6 loading math (incl. local date) + 8 accuracy (drafts excluded, pending included, corrections/anomalies flagged, aggregation, intake efficiency, Italian CSV) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 13 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 29 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 11 callable/trigger) |
+| Full suite incl. callables | `npm run test:functions` | 30 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 12 callable/trigger) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -148,12 +148,16 @@ The feeding document/trigger half is in place; the loading sheet is next.
   concurrent invocations read the feeding inside their transaction, Firestore
   serializes them, the loser retries, sees `inventoryPostedAt`, and returns.
   Do not replace the transaction with a non-transactional create/set.
-- **Retry configuration.** The installed `firebase-functions==0.6.0` does not
-  expose `retry` on `on_document_written` (`FirestoreOptions` rejects it), so
-  it cannot be set in the decorator. Set the retry policy on the deployed
-  function (or add an application-level failure queue) before relying on
-  automatic retries; the `inventoryPostedAt` guard makes a retry safe
-  whenever it happens.
+- **Retry configuration.** PyPI shows `0.6.0` as the latest stable release
+  and `0.7.0rc0` as a release candidate. Both hardcode `retry=False` in
+  `FirestoreOptions._endpoint` (`0.7.0rc0` still constructs
+  `EventTrigger(retry=False)`); the decorator cannot enable retry. Concrete
+  paths: (a) prefer an application-level failure queue — wrap the trigger body
+  in try/except, write `farms/{farmId}/feedingTriggerFailures/{feedingId}`
+  with the error, and retry from a scheduled/admin action; (b) if using the
+  deploy-level option, `gcloud functions deploy on_feeding_confirmed --gen2
+  --retry ...` is a full redeploy with the complete source/trigger config, not
+  a toggle. The `inventoryPostedAt` guard makes either path safe.
 
 ## I. Feeder accuracy report
 
@@ -172,7 +176,25 @@ The report is the first consumer of the ingestion/loading trail. Decisions:
   `date; herdGroupId; feederId; feedId; feedName; calledKgAsFed;
   loadedKgAsFed; deviationPct; refusedKgAsFed; status; isCorrection;
   hasOverdrawn; hasSkipped`. `;` delimiter, `,` decimal, UTF-8 BOM for
-  Italian Excel. The on-screen table aggregates; the CSV does not.
+  Italian Excel. Booleans are `true`/`false`; dates are `YYYY-MM-DD` (text,
+  not date-typed). The on-screen table aggregates; the CSV does not.
+- **Window semantics.** The 7/28/90-day window filters the feeding's stored
+  local calendar `date` (`YYYY-MM-DD`), not the UTC `createdAt`. The loading
+  sheet writes the date with `localDateKey()` so a load at 23:30 local stays
+  on that local day.
+- **Definitions.** Worst ingredients = highest mean absolute deviation, ties
+  broken alphabetically by feed name. Weekly trend = Monday-start weeks,
+  mean absolute deviation per week. Both are shown in the column tooltips.
+- **Intake efficiency.** The on-screen summary now shows
+  `100 x (1 - refused / loaded)` alongside deviation; the CSV keeps the
+  per-line refusal.
+- **Access control.** The page shows a restricted message for feeder-role
+  users (owner/admin/consultant only). The Firestore rules still allow any
+  member to read feedings, so this is a UI restriction, not enforcement; a
+  callable/report collection is the eventual rule-level fix.
+- **Identical feeder names.** Feeder identity is a name; two people called
+  "Marco" aggregate. The report is where that becomes visible; a true feeder
+  account is the eventual fix.
 - **Aggregation.** Per feeder (filterable by herd group and 7/28/90-day
   window): load count, line count, mean absolute deviation,
   load-weighted deviation (`sum |loaded - called| / sum called`), worst three
@@ -183,19 +205,27 @@ The report is the first consumer of the ingestion/loading trail. Decisions:
 - **Independence.** The report does not read inventory, so it can ship before
   retroactive posting if the pilot scorecard is the nearer deadline.
 
-## J. Retroactive posting (next)
+## J. Retroactive posting
 
-Decisions to implement, not yet built:
+Implemented as a separate, auditable action:
 
-- **Window:** all historical skipped lines, not a rolling window.
-- **Trigger:** a separate callable on inventory-item creation scans feedings
-  whose `inventorySkippedLines` contain the feed and posts `adjustment`
-  entries; it is not automatic in `on_feeding_confirmed`.
-- **Audit type:** `inventory.retroactive` with `sourceFeedingId` and
-  `sourceLineId`, distinct from `feeding.confirm`.
-- **Reconciliation:** rerun for affected items immediately; do not wait for
-  the next nightly job.
-- **Approval:** owner/admin only, not feeder.
+- **Queryable field.** The trigger writes `inventorySkippedFeedIds` alongside
+  `inventorySkippedLines`; the retroactive scan uses
+  `where inventorySkippedFeedIds array-contains feedId and status == confirmed`
+  (composite index in `firestore.indexes.json`). This avoids the
+  array-of-objects query problem.
+- **Callable.** `post_skipped_consumption` is owner/admin only. For each
+  feeding it reads the full line by `lineId`, posts `adjustment` ledger
+  entries with `sourceType: 'retroactive'`, updates on-hand in the same
+  transaction, removes the posted lines from `inventorySkippedLines` /
+  `inventorySkippedFeedIds`, and writes `inventory.retroactive` audit entries
+  with `sourceFeedingId` and `sourceLineId`.
+- **Reconciliation.** After posting, the callable recomputes the item's
+  on-hand from the ledger, so an existing drift is corrected immediately.
+- **Retry-safe.** Deterministic ledger ids mean a replay posts nothing twice;
+  the test asserts a second call returns `postedLines: 0`.
+- **UI.** The inventory page has a "Post skipped loads" action on the
+  selected item; the callable reports how many lines it posted.
 
 ## A. Output metrics — lactating cows (VACCHE DA LATTE)
 

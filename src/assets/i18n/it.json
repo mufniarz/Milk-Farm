@@ -199,7 +199,10 @@
     "DELIVERY_SAVED": "Consegna registrata.",
     "ADJUST_SAVED": "Correzione registrata.",
     "OVERDRAWN_BY": "sotto zero di",
-    "OVERDRAWN_ALERT": "alimenti sotto zero — registra una consegna"
+    "OVERDRAWN_ALERT": "alimenti sotto zero — registra una consegna",
+    "RETRO_POST": "Registra carichi non scaricati",
+    "RETRO_POSTED": "Righe registrate",
+    "RETRO_FAILED": "Registrazione retroattiva non riuscita."
   },
   "LOADING": {
     "TITLE": "Carico in stalla",
@@ -252,6 +255,11 @@
     "TREND": "Settimane",
     "EMPTY": "Nessun dato nel periodo.",
     "PENDING_NOTE": "I carichi confermati ma non ancora scaricati sono inclusi; il CSV riporta lo stato posted o pending.",
-    "EXPORTED": "CSV esportato."
+    "EXPORTED": "CSV esportato.",
+    "INTAKE_EFF": "Efficienza ingestione",
+    "INTAKE_TOOLTIP": "100 × (1 − rifiuti / caricato)",
+    "WORST_TOOLTIP": "Media dello scostamento assoluto; primi tre, a parità in ordine alfabetico.",
+    "TREND_TOOLTIP": "Settimane da lunedì; media dello scostamento assoluto.",
+    "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere questo report."
   }
 }

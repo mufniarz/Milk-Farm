@@ -146,12 +146,22 @@ inventory and target overrides require `farmMembers`.
   hasOverdrawn; hasSkipped`) with `;` delimiter, `,` decimal and a UTF-8 BOM
   for Italian Excel. Drafts are excluded; confirmed-but-posting loads are
   included with `status=pending`; corrections and anomalies are flagged. The
-  report is independent of inventory.
+  summary also shows intake efficiency (`1 - refused / loaded`), uses the
+  local calendar `date` for the window, and defines worst ingredients by mean
+  absolute deviation (ties alphabetical) and weeks as Monday-start.
+- The report loads the farm's feedings and groups in memory; the
+  `feedings(feederId, date)` index is reserved for the future per-feeder
+  drill-down query. The feeder-role UI sees a restricted message, but the
+  rules still allow member reads until a report callable exists.
 - The ledger uses `transaction.set` with deterministic ids. Concurrent trigger
   invocations are serialized by the transaction; the loser retries, sees
   `inventoryPostedAt`, and returns. Do not replace this with a
   non-transactional write.
-- `firebase-functions==0.6.0` does not expose `retry` on
-  `on_document_written`; set the retry policy on the deployed function (or add
-  a failure queue) before relying on automatic retries. The
-  `inventoryPostedAt` guard makes retry safe when it is enabled.
+- PyPI shows `firebase-functions` 0.6.0 as the latest stable release;
+  `0.7.0rc0` also hardcodes `retry=False` for Firestore triggers, so the
+  decorator cannot enable retry. Prefer an application-level failure
+  queue/alert; a `gcloud functions deploy --gen2 --retry` is a full redeploy,
+  not a toggle. The `inventoryPostedAt` guard makes retry safe when enabled.
+- Feeds that were loaded before they had an inventory item can be posted
+  after the fact from the inventory page ("Post skipped loads"), which calls
+  `post_skipped_consumption` and audits each line as `inventory.retroactive`.

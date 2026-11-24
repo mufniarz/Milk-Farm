@@ -8,6 +8,7 @@ import {
 
 function feeding(overrides: Partial<Feeding> = {}): Feeding {
   return {
+    id: 'feeding-1',
     farmId: 'f1',
     date: '2026-11-20',
     herdGroupId: 'g1',
@@ -92,8 +93,67 @@ describe('feeder accuracy math', () => {
     expect(summary.loadWeightedDeviationPct).toBeCloseTo(8, 6);
     expect(summary.worstIngredients[0].feedId).toBe('silage');
     expect(summary.worstIngredients[0].meanAbsDeviationPct).toBeCloseTo(10, 6);
+    expect(summary.loadedKgAsFed).toBe(250);
+    expect(summary.refusedKgAsFed).toBe(5);
+    expect(summary.intakeEfficiencyPct).toBeCloseTo(98, 6);
     expect(summary.weekly.length).toBe(1);
     expect(summary.weekly[0].weekStart).toBe('2026-11-16');
+  });
+
+  it('returns an empty summary for an empty window', () => {
+    expect(summarizeByFeeder([])).toEqual([]);
+  });
+
+  it('ignores zero-called lines in the deviations but keeps them in the rows', () => {
+    const rows = buildAccuracyRows([
+      feeding({
+        lines: [
+          {
+            lineId: 'z1',
+            feedId: 'hay',
+            feedName: 'Hay',
+            calledKgAsFed: 0,
+            loadedKgAsFed: 10,
+            costPerKgAsFed: 0.2,
+          },
+        ],
+      }),
+    ]);
+    expect(rows.length).toBe(1);
+    expect(rows[0].deviationPct).toBeNull();
+    const [summary] = summarizeByFeeder(rows);
+    expect(summary.meanAbsDeviationPct).toBe(0);
+    expect(summary.loadWeightedDeviationPct).toBe(0);
+  });
+
+  it('breaks worst-ingredient ties alphabetically', () => {
+    const rows = buildAccuracyRows([
+      feeding({
+        lines: [
+          {
+            lineId: 'a',
+            feedId: 'z-feed',
+            feedName: 'Zeta',
+            calledKgAsFed: 100,
+            loadedKgAsFed: 110,
+            costPerKgAsFed: 0.1,
+          },
+          {
+            lineId: 'b',
+            feedId: 'a-feed',
+            feedName: 'Alfa',
+            calledKgAsFed: 100,
+            loadedKgAsFed: 110,
+            costPerKgAsFed: 0.1,
+          },
+        ],
+      }),
+    ]);
+    const [summary] = summarizeByFeeder(rows);
+    expect(summary.worstIngredients.map((item) => item.feedName)).toEqual([
+      'Alfa',
+      'Zeta',
+    ]);
   });
 
   it('filters rows by the report window', () => {

@@ -147,6 +147,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "feedings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "inventorySkippedFeedIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -488,6 +488,7 @@ def test_feeding_trigger_posts_each_line_once():
     assert feeding["inventoryPostedAt"] is not None
     assert feeding["inventoryPostedLines"] == 2
     assert feeding["inventorySkippedLines"] == []
+    assert feeding["inventorySkippedFeedIds"] == []
     assert feeding["inventoryOverdrawn"] == []
 
     audits = [
@@ -510,6 +511,7 @@ def test_feeding_trigger_posts_each_line_once():
         }
     ]
     assert confirm_audit["skipped"] == []
+    assert confirm_audit["skippedFeedIds"] == []
     assert confirm_audit["overdrawn"] == []
 
     # A retry (the trigger fires again after its own update) must not
@@ -550,6 +552,7 @@ def test_feeding_trigger_skips_an_untracked_feed():
     assert feeding["inventorySkippedLines"] == [
         {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
     ]
+    assert feeding["inventorySkippedFeedIds"] == ["missing-feed"]
     assert feeding["inventoryOverdrawn"] == []
     assert feeding["inventoryPostedAt"] is not None
     audits = [
@@ -566,6 +569,7 @@ def test_feeding_trigger_skips_an_untracked_feed():
     assert confirm_audit["skipped"] == [
         {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
     ]
+    assert confirm_audit["skippedFeedIds"] == ["missing-feed"]
 
 
 def test_feeding_trigger_flags_overdrawn_on_hand():
@@ -639,6 +643,132 @@ def test_feeding_trigger_flags_overdrawn_on_hand():
                 entry
                 for entry in audits_after
                 if entry["action"] == "feeding.confirm"
+            ]
+        )
+        == 1
+    )
+
+
+def test_retroactive_posting_posts_skipped_lines_once():
+    _prepare_inventory(1000)  # seed farm, feed1 and its item
+
+    DB.collection("feeds").document("feed2").set(
+        {
+            "name": "Hay",
+            "farmId": "f1",
+            "category": "forage",
+            "pricePerKg": 0.1,
+            "moisturePct": 10,
+            "isAvailable": True,
+            "nutrients": {},
+        }
+    )
+    _handler(main.upsert_inventory_item)(
+        _Req(
+            "owner",
+            {"farmId": "f1", "feedId": "feed2", "unitCostPerKgAsFed": 0.1},
+        )
+    )
+    _handler(main.record_delivery)(
+        _Req(
+            "owner",
+            {
+                "farmId": "f1",
+                "feedId": "feed2",
+                "quantityKgAsFed": 100,
+                "unitCostPerKgAsFed": 0.1,
+                "idempotencyKey": "delivery-feed2",
+            },
+        )
+    )
+
+    # A confirmed feeding that skipped feed2 before it had an item.
+    DB.collection("farms").document("f1").collection("feedings").document(
+        "feeding-skip"
+    ).set(
+        {
+            "farmId": "f1",
+            "date": "2026-11-20",
+            "herdGroupId": "g1",
+            "recipeId": "r1",
+            "animalCount": 100,
+            "feederId": "feeder-1",
+            "status": "confirmed",
+            "lines": [
+                {
+                    "lineId": "sl1",
+                    "feedId": "feed2",
+                    "feedName": "Hay",
+                    "calledKgAsFed": 40,
+                    "loadedKgAsFed": 40,
+                    "costPerKgAsFed": 0.1,
+                }
+            ],
+            "refusedKgAsFed": 0,
+            "idempotencyKey": "skip-1",
+            "createdBy": "owner",
+            "inventoryPostedAt": firestore.SERVER_TIMESTAMP,
+            "inventorySkippedLines": [
+                {"lineId": "sl1", "feedId": "feed2", "feedName": "Hay"}
+            ],
+            "inventorySkippedFeedIds": ["feed2"],
+        }
+    )
+
+    result = _handler(main.post_skipped_consumption)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed2"})
+    )
+    assert result["postedLines"] == 1
+    assert result["feedings"] == 1
+    assert result["onHandKgAsFed"] == 60
+    assert _on_hand("feed2")["onHandKgAsFed"] == 60
+
+    adjustments = [
+        entry
+        for entry in _ledger()
+        if entry["itemId"] == "feed2" and entry["type"] == "adjustment"
+    ]
+    assert len(adjustments) == 1
+    assert adjustments[0]["deltaKgAsFed"] == -40
+    assert adjustments[0]["sourceType"] == "retroactive"
+
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding-skip")
+        .get()
+        .to_dict()
+    )
+    assert feeding["inventorySkippedLines"] == []
+    assert feeding["inventorySkippedFeedIds"] == []
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    retro = [entry for entry in audits if entry["action"] == "inventory.retroactive"]
+    assert len(retro) == 1
+    assert retro[0]["sourceFeedingId"] == "feeding-skip"
+    assert retro[0]["sourceLineId"] == "sl1"
+    assert retro[0]["deltaKgAsFed"] == -40
+
+    # Replaying the callable must not double-post.
+    again = _handler(main.post_skipped_consumption)(
+        _Req("owner", {"farmId": "f1", "feedId": "feed2"})
+    )
+    assert again["postedLines"] == 0
+    assert _on_hand("feed2")["onHandKgAsFed"] == 60
+    assert (
+        len(
+            [
+                entry
+                for entry in _ledger()
+                if entry["itemId"] == "feed2"
+                and entry["type"] == "adjustment"
             ]
         )
         == 1

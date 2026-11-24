@@ -35,7 +35,7 @@ export interface InventoryTransaction {
   type: InventoryTransactionType;
   deltaKgAsFed: number;
   unitCostPerKgAsFed: number;
-  sourceType: 'manual' | 'feeding';
+  sourceType: 'manual' | 'feeding' | 'retroactive';
   sourceId: string;
   idempotencyKey: string;
   createdBy?: string;

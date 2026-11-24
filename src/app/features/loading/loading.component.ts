@@ -24,6 +24,7 @@ import {
   computeDeviationPct,
   findOverdrawnFeeds,
   findUntrackedFeedIds,
+  localDateKey,
 } from '../../core/utils/loading-math';
 
 /**
@@ -428,7 +429,7 @@ export class LoadingComponent implements OnInit, OnDestroy {
   postingDelayed = false;
   private postingTimer?: ReturnType<typeof setTimeout>;
 
-  readonly today = new Date().toISOString().slice(0, 10);
+  readonly today = localDateKey();
 
   ngOnInit(): void {
     this.groupService

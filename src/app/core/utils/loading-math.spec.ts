@@ -3,12 +3,17 @@ import {
   computeDeviationPct,
   findOverdrawnFeeds,
   findUntrackedFeedIds,
+  localDateKey,
 } from './loading-math';
 
 describe('loading math', () => {
   it('computes called kg from the recipe per-head quantity and head count', () => {
     expect(computeCalledKg(3.5, 100)).toBeCloseTo(350, 6);
     expect(computeCalledKg(0, 100)).toBe(0);
+  });
+
+  it('formats the local calendar date, not the UTC date', () => {
+    expect(localDateKey(new Date(2026, 10, 24, 23, 30))).toBe('2026-11-24');
   });
 
   it('computes the deviation and returns null when called is zero', () => {

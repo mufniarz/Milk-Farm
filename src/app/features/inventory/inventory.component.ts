@@ -177,6 +177,15 @@ import { FarmContextService } from '../../core/services/farm-context.service';
             >
               {{ 'INVENTORY.ADJUST' | translate }}
             </button>
+            @if (canAdmin) {
+              <button
+                mat-stroked-button
+                (click)="postSkipped(selectedItem)"
+                [disabled]="saving"
+              >
+                {{ 'INVENTORY.RETRO_POST' | translate }}
+              </button>
+            }
           </mat-card-content>
         </mat-card>
       }
@@ -313,6 +322,11 @@ export class InventoryComponent implements OnInit {
 
   readonly loading = signal(false);
 
+  get canAdmin(): boolean {
+    const role = this.farmContext.activeRole();
+    return role === 'owner' || role === 'farmAdmin';
+  }
+
   get overdrawnCount(): number {
     return this.covers.filter((cover) => cover.level === 'overdrawn').length;
   }
@@ -401,6 +415,28 @@ export class InventoryComponent implements OnInit {
         this.translate.instant('INVENTORY.DELIVERY_SAVED'),
         undefined,
         { duration: 3000 },
+      );
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  async postSkipped(item: InventoryItem): Promise<void> {
+    this.saving = true;
+    try {
+      const result = await this.inventoryService.postSkipped(item.feedId);
+      await this.refreshCover();
+      this.snackBar.open(
+        `${this.translate.instant('INVENTORY.RETRO_POSTED')}: ${result.postedLines}`,
+        undefined,
+        { duration: 4000 },
+      );
+    } catch (error) {
+      console.error('Failed to post skipped consumption', error);
+      this.snackBar.open(
+        this.translate.instant('INVENTORY.RETRO_FAILED'),
+        undefined,
+        { duration: 5000 },
       );
     } finally {
       this.saving = false;

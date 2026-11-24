@@ -39,6 +39,8 @@ export interface Feeding {
   /** Set by the inventory trigger; a client must never write it. */
   inventoryPostedAt?: Date | null;
   inventoryPostedLines?: number;
+  /** Unique feed ids for the skipped lines; the retroactive query uses this. */
+  inventorySkippedFeedIds?: string[];
   /** Lines whose feed had no inventory item; the trigger could not post them. */
   inventorySkippedLines?: {
     lineId: string;
