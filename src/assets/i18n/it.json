@@ -222,6 +222,9 @@
     "EMPTY": "Nessun carico registrato.",
     "CONFIRMED": "Carico confermato.",
     "DRAFT_SAVED": "Bozza salvata.",
-    "SAVE_FAILED": "Salvataggio non riuscito."
+    "SAVE_FAILED": "Salvataggio non riuscito.",
+    "OVERDRAWN_BANNER": "il carico supera la giacenza: lo scarico andrà sotto zero",
+    "OVERDRAWN": "sotto zero",
+    "POSTING": "registrazione…"
   }
 }

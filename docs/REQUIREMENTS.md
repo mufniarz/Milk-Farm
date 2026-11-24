@@ -30,14 +30,14 @@ numbers.
 |---|---|---|
 | Type/build | `npx ng build` | pass |
 | Solver + export + golden ration | `pytest tests -q` | 18 passed (the 10 callable/trigger tests skip without the emulator) |
-| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 10 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped) |
+| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 11 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged) |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine vs workbook (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 3 passed — 17 codes at 0.03 pp, totals at 0.01 kg / 0.001 €, moisture/forage |
+| Client engine and loading math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 8 passed — 3 calculator parity + 5 loading math (called kg, deviation incl. null, untracked, per-feed overdraft) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 13 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 28 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 10 callable/trigger) |
+| Full suite incl. callables | `npm run test:functions` | 29 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 11 callable/trigger) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -89,18 +89,31 @@ The feeding document/trigger half is in place; the loading sheet is next.
   sums the line deltas so the second line cannot overwrite the first with a
   stale snapshot. Reconciliation and the accuracy report are per line.
 - **Audit shape.** `feeding.confirm` carries
-  `inventoryPosted: [{feedId, deltaKgAsFed, onHandBeforeKgAsFed,
-  onHandAfterKgAsFed}]` and `skipped: [{lineId, feedId, feedName}]`, so an
-  on-hand/ledger disagreement can be reconstructed from the audit entry.
+  `inventoryPosted: [{feedId, lineIds, deltaKgAsFed, onHandBeforeKgAsFed,
+  onHandAfterKgAsFed}]`, `skipped: [{lineId, feedId, feedName}]` and
+  `overdrawn: [{feedId, feedName, onHandKgAsFed, consumptionKgAsFed,
+  resultingKgAsFed}]`. The audit is a per-feed summary (with its contributing
+  `lineIds`); the ledger is per line, so an audit-to-ledger diff must expand
+  the `lineIds`.
 - **Loading sheet.** `/loading` selects a herd group and feeder, shows the
   called quantity (`recipe line x head count`) and the loaded quantity per
   line, and confirms the load. It warns before confirmation when a line's
-  feed has no inventory item (the trigger would skip it) and the recent-loads
-  list shows `inventorySkippedLines` once the trigger has run.
+  feed has no inventory item (the trigger would skip it) or when the
+  aggregate load exceeds on-hand (`findOverdrawnFeeds`). The trigger posts the
+  negative value (the feed left the mixer) but stores `inventoryOverdrawn` on
+  the feeding and `overdrawn` in the audit; the recent-loads list shows it.
+- **Retry-safe draft.** The loading sheet generates the feeding id client-side
+  and `saveDraft` writes that same document. A failed confirmation can be
+  retried, and a draft can be edited and re-saved, without creating a second
+  draft. The recent list shows "posting…" until the trigger sets
+  `inventoryPostedAt`.
 - **Feeder identity.** Feeders are names in `farms/{farmId}/feeders`, not
   logins. `Feeding.feederId` points at that name; `Feeding.createdBy` records
   the logged-in operator who entered the load. The accuracy report will
   attribute by feeder name.
+- **Snapshot semantics.** `animalCount` is captured from the group at confirm
+  time; `feedName` in the feeding is denormalized and intentionally
+  historical, so a later feed rename does not rewrite old loads.
 - **Trigger retries.** Firestore retries a failing trigger; the
   `inventoryPostedAt` guard makes retries safe, and malformed/untracked lines
   are skipped rather than thrown. A persistently failing feeding is not

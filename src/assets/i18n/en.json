@@ -222,6 +222,9 @@
     "EMPTY": "No loads recorded yet.",
     "CONFIRMED": "Load confirmed.",
     "DRAFT_SAVED": "Draft saved.",
-    "SAVE_FAILED": "Could not save."
+    "SAVE_FAILED": "Could not save.",
+    "OVERDRAWN_BANNER": "the load exceeds on-hand stock: the posting will go negative",
+    "OVERDRAWN": "negative",
+    "POSTING": "posting…"
   }
 }

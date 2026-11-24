@@ -488,6 +488,7 @@ def test_feeding_trigger_posts_each_line_once():
     assert feeding["inventoryPostedAt"] is not None
     assert feeding["inventoryPostedLines"] == 2
     assert feeding["inventorySkippedLines"] == []
+    assert feeding["inventoryOverdrawn"] == []
 
     audits = [
         entry.to_dict()
@@ -502,12 +503,14 @@ def test_feeding_trigger_posts_each_line_once():
     assert confirm_audit["inventoryPosted"] == [
         {
             "feedId": "feed1",
+            "lineIds": ["line-1", "line-2"],
             "deltaKgAsFed": -150.0,
             "onHandBeforeKgAsFed": 1000.0,
             "onHandAfterKgAsFed": 850.0,
         }
     ]
     assert confirm_audit["skipped"] == []
+    assert confirm_audit["overdrawn"] == []
 
     # A retry (the trigger fires again after its own update) must not
     # double-deplete.
@@ -547,6 +550,7 @@ def test_feeding_trigger_skips_an_untracked_feed():
     assert feeding["inventorySkippedLines"] == [
         {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
     ]
+    assert feeding["inventoryOverdrawn"] == []
     assert feeding["inventoryPostedAt"] is not None
     audits = [
         entry.to_dict()
@@ -562,3 +566,48 @@ def test_feeding_trigger_skips_an_untracked_feed():
     assert confirm_audit["skipped"] == [
         {"lineId": "line-x", "feedId": "missing-feed", "feedName": "Silage"}
     ]
+
+
+def test_feeding_trigger_flags_overdrawn_on_hand():
+    _prepare_inventory(50)
+    after = _create_feeding(
+        lines=_feeding_lines(line_ids=("line-1",), loaded=(80,))
+    )
+
+    _trigger(_TriggerEvent(after, {"farmId": "f1", "feedingId": "feeding1"}))
+
+    # The feed left the mixer, so the ledger keeps the true negative value.
+    assert _on_hand()["onHandKgAsFed"] == -30
+    ledger = _consumption_ledger()
+    assert len(ledger) == 1
+    assert ledger[0]["deltaKgAsFed"] == -80
+
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding1")
+        .get()
+        .to_dict()
+    )
+    assert feeding["inventoryOverdrawn"] == [
+        {
+            "feedId": "feed1",
+            "feedName": "Silage",
+            "onHandKgAsFed": 50.0,
+            "consumptionKgAsFed": 80.0,
+            "resultingKgAsFed": -30.0,
+        }
+    ]
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    confirm_audit = next(
+        entry for entry in audits if entry["action"] == "feeding.confirm"
+    )
+    assert confirm_audit["overdrawn"] == feeding["inventoryOverdrawn"]

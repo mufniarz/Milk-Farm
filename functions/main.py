@@ -957,10 +957,13 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
             if feed_id not in item_updates:
                 item_updates[feed_id] = {
                     "ref": item_ref,
+                    "feedName": line.get("feedName"),
                     "before": float(item_data.get("onHandKgAsFed") or 0),
                     "loaded": 0.0,
+                    "lineIds": [],
                 }
             item_updates[feed_id]["loaded"] += loaded
+            item_updates[feed_id]["lineIds"].append(line_id)
             ledger_writes.append((ledger_ref, line, item_data))
 
         for update in item_updates.values():
@@ -996,11 +999,26 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
         posted_summary = [
             {
                 "feedId": feed_id,
+                "lineIds": update["lineIds"],
                 "deltaKgAsFed": -update["loaded"],
                 "onHandBeforeKgAsFed": update["before"],
                 "onHandAfterKgAsFed": update["before"] - update["loaded"],
             }
             for feed_id, update in item_updates.items()
+        ]
+        # The ledger is authoritative and keeps the negative value (the feed
+        # left the mixer). The feeding and audit flag the shortfall so the
+        # operator can see it rather than discovering it in reconciliation.
+        overdrawn = [
+            {
+                "feedId": feed_id,
+                "feedName": update["feedName"],
+                "onHandKgAsFed": update["before"],
+                "consumptionKgAsFed": update["loaded"],
+                "resultingKgAsFed": update["before"] - update["loaded"],
+            }
+            for feed_id, update in item_updates.items()
+            if update["before"] - update["loaded"] < 0
         ]
         transaction.update(
             feeding_ref,
@@ -1008,6 +1026,7 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
                 "inventoryPostedAt": firestore.SERVER_TIMESTAMP,
                 "inventoryPostedLines": posted,
                 "inventorySkippedLines": skipped,
+                "inventoryOverdrawn": overdrawn,
             },
         )
         _write_audit(
@@ -1022,6 +1041,7 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
                 "postedLines": posted,
                 "inventoryPosted": posted_summary,
                 "skipped": skipped,
+                "overdrawn": overdrawn,
                 "actorUid": current_data.get("createdBy"),
                 "actorEmail": None,
                 "at": firestore.SERVER_TIMESTAMP,

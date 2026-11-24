@@ -116,8 +116,17 @@ inventory and target overrides require `farmMembers`.
   feed" step only sums the line deltas for the item's on-hand update; it does
   not collapse the ledger entries.
 - The loading sheet at `/loading` warns before confirmation when a line's
-  feed has no inventory item. The trigger records those in
-  `inventorySkippedLines` (line id, feed id, feed name) and the recent-loads
-  list shows them; the rest of the load still posts.
+  feed has no inventory item, and when the aggregate load exceeds on-hand.
+  The trigger records skipped feeds in `inventorySkippedLines` and overdrawn
+  feeds in `inventoryOverdrawn` (with before/consumption/resulting kg); the
+  recent-loads list shows both.
+- The trigger posts the true negative on-hand value when a load exceeds
+  stock, because the feed left the mixer. The ledger stays truthful and the
+  feeding/audit carry the shortfall for the operator.
+- The `feeding.confirm` audit is a per-feed summary with `lineIds`; the
+  ledger is per line. An audit-to-ledger diff must expand `lineIds`.
+- The feeding id is client-generated and `saveDraft` is idempotent, so a
+  failed confirm can be retried without creating a duplicate draft. The
+  recent list shows "posting…" until `inventoryPostedAt` is set.
 - Feeders are names in `farms/{farmId}/feeders`, not logins. `feederId` is
   the name record; `createdBy` is the operator who entered the load.

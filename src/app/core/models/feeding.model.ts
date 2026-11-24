@@ -43,6 +43,14 @@ export interface Feeding {
     feedId: string;
     feedName: string;
   }[];
+  /** Feeds whose load exceeded on-hand; the ledger keeps the negative value. */
+  inventoryOverdrawn?: {
+    feedId: string;
+    feedName: string;
+    onHandKgAsFed: number;
+    consumptionKgAsFed: number;
+    resultingKgAsFed: number;
+  }[];
   createdBy?: string;
   createdAt?: Date;
   confirmedAt?: Date | null;

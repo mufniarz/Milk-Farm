@@ -18,6 +18,13 @@ import { RecipeService } from '../../core/services/recipe.service';
 import { FeedingService } from '../../core/services/feeding.service';
 import { InventoryService } from '../../core/services/inventory.service';
 import { FeederService } from '../../core/services/feeder.service';
+import {
+  OverdrawnFeed,
+  computeCalledKg,
+  computeDeviationPct,
+  findOverdrawnFeeds,
+  findUntrackedFeedIds,
+} from '../../core/utils/loading-math';
 
 /**
  * The barn loading sheet.
@@ -107,6 +114,13 @@ import { FeederService } from '../../core/services/feeder.service';
               {{ untrackedNames() }}
             </div>
           }
+          @if (overdrawnFeeds.length > 0) {
+            <div class="banner danger">
+              <mat-icon>error</mat-icon>
+              {{ 'LOADING.OVERDRAWN_BANNER' | translate }}:
+              {{ overdrawnNames() }}
+            </div>
+          }
 
           <mat-card appearance="outlined">
             <mat-card-content>
@@ -127,7 +141,7 @@ import { FeederService } from '../../core/services/feeder.service';
                     [(ngModel)]="line.loadedKgAsFed"
                   />
                   <span [class]="'deviation ' + deviationClass(line)">
-                    {{ line.calledKgAsFed > 0 ? (deviation(line) | number: '1.1-1') : '—' }}%
+                    {{ deviationLabel(line) }}
                   </span>
                 </div>
               }
@@ -171,7 +185,15 @@ import { FeederService } from '../../core/services/feeder.service';
               <span>{{ feederName(feeding.feederId) }}</span>
               <span class="status">{{ feeding.status }}</span>
               <span>{{ totalLoadedFor(feeding) | number: '1.0-1' }} kg</span>
-              @if (feeding.inventorySkippedLines?.length) {
+              @if (feeding.status === 'confirmed' && !feeding.inventoryPostedAt) {
+                <span class="posting">{{ 'LOADING.POSTING' | translate }}</span>
+              } @else if (feeding.inventoryOverdrawn?.length) {
+                <span class="overdrawn" [title]="feedingOverdrawnNames(feeding)">
+                  <mat-icon>error</mat-icon>
+                  {{ feeding.inventoryOverdrawn!.length }}
+                  {{ 'LOADING.OVERDRAWN' | translate }}
+                </span>
+              } @else if (feeding.inventorySkippedLines?.length) {
                 <span class="skipped" [title]="skippedNames(feeding)">
                   <mat-icon>warning</mat-icon>
                   {{ feeding.inventorySkippedLines!.length }}
@@ -227,6 +249,10 @@ import { FeederService } from '../../core/services/feeder.service';
     .banner.warning {
       background: #fff4e0;
       color: #8a5300;
+    }
+    .banner.danger {
+      background: #fdecea;
+      color: #a02525;
     }
     .line-header,
     .line-row {
@@ -296,17 +322,26 @@ import { FeederService } from '../../core/services/feeder.service';
       font-size: 11px;
       color: rgba(0, 0, 0, 0.5);
     }
-    .skipped {
+    .skipped,
+    .overdrawn {
       color: #8a5300;
       display: inline-flex;
       align-items: center;
       gap: 4px;
       font-weight: 600;
     }
-    .skipped mat-icon {
+    .overdrawn {
+      color: #a02525;
+    }
+    .skipped mat-icon,
+    .overdrawn mat-icon {
       font-size: 16px;
       width: 16px;
       height: 16px;
+    }
+    .posting {
+      color: rgba(0, 0, 0, 0.5);
+      font-style: italic;
     }
     .ok {
       color: #2b7a5b;
@@ -348,6 +383,8 @@ export class LoadingComponent implements OnInit {
 
   selectedGroupId = '';
   selectedFeederId = '';
+  /** Client-generated id: a failed confirm retries the same draft. */
+  feedingId = '';
   newFeederName = '';
   refusedKgAsFed = 0;
   lines: FeedingLine[] = [];
@@ -374,12 +411,13 @@ export class LoadingComponent implements OnInit {
   async selectGroup(): Promise<void> {
     const group = this.groups.find((g) => g.id === this.selectedGroupId);
     this.lines = [];
+    this.feedingId = crypto.randomUUID();
     this.recipeId = group?.activeRecipeId ?? '';
     if (!group || !this.recipeId) return;
 
     const recipe = await this.recipeService.getRecipeWithFeeds(this.recipeId);
     this.lines = (recipe?.feeds ?? []).map((line) => {
-      const calledKgAsFed = line.kgAsFed * group.headCount;
+      const calledKgAsFed = computeCalledKg(line.kgAsFed, group.headCount);
       return {
         lineId: crypto.randomUUID(),
         feedId: line.feedId,
@@ -392,8 +430,25 @@ export class LoadingComponent implements OnInit {
   }
 
   get untrackedLines(): FeedingLine[] {
-    const tracked = new Set(this.inventoryItems.map((item) => item.feedId));
-    return this.lines.filter((line) => !tracked.has(line.feedId));
+    const ids = findUntrackedFeedIds(
+      this.lines,
+      this.inventoryItems.map((item) => item.feedId),
+    );
+    return this.lines.filter((line) => ids.includes(line.feedId));
+  }
+
+  get overdrawnFeeds(): OverdrawnFeed[] {
+    return findOverdrawnFeeds(this.lines, this.inventoryItems);
+  }
+
+  overdrawnNames(): string {
+    return this.overdrawnFeeds.map((feed) => feed.feedName).join(', ');
+  }
+
+  feedingOverdrawnNames(feeding: Feeding): string {
+    return (feeding.inventoryOverdrawn ?? [])
+      .map((feed) => feed.feedName || feed.feedId)
+      .join(', ');
   }
 
   untrackedNames(): string {
@@ -402,13 +457,18 @@ export class LoadingComponent implements OnInit {
     );
   }
 
-  deviation(line: FeedingLine): number {
-    if (line.calledKgAsFed <= 0) return 0;
-    return ((line.loadedKgAsFed - line.calledKgAsFed) / line.calledKgAsFed) * 100;
+  deviation(line: FeedingLine): number | null {
+    return computeDeviationPct(line.loadedKgAsFed, line.calledKgAsFed);
+  }
+
+  deviationLabel(line: FeedingLine): string {
+    const value = this.deviation(line);
+    return value === null ? '—' : `${value.toFixed(1)}%`;
   }
 
   deviationClass(line: FeedingLine): 'over' | 'under' | 'ok' {
     const value = this.deviation(line);
+    if (value === null) return 'ok';
     if (value > 1) return 'over';
     if (value < -1) return 'under';
     return 'ok';
@@ -457,7 +517,8 @@ export class LoadingComponent implements OnInit {
     }
     this.saving = true;
     try {
-      const feedingId = await this.feedingService.createDraft({
+      if (!this.feedingId) this.feedingId = crypto.randomUUID();
+      await this.feedingService.saveDraft(this.feedingId, {
         date: this.today,
         herdGroupId: group.id,
         recipeId: this.recipeId,
@@ -467,19 +528,26 @@ export class LoadingComponent implements OnInit {
         refusedKgAsFed: this.refusedKgAsFed,
       });
       if (confirm) {
-        await this.feedingService.confirm(feedingId);
+        await this.feedingService.confirm(this.feedingId);
+        this.snackBar.open(
+          this.translate.instant('LOADING.CONFIRMED'),
+          undefined,
+          { duration: 4000 },
+        );
+        this.feedingId = '';
+        this.lines = [];
+        this.selectedGroupId = '';
+        this.selectedFeederId = '';
+        this.refusedKgAsFed = 0;
+      } else {
+        // Keep the load on screen (and the same id) so a later edit or
+        // confirm updates this draft rather than creating a duplicate.
+        this.snackBar.open(
+          this.translate.instant('LOADING.DRAFT_SAVED'),
+          undefined,
+          { duration: 3000 },
+        );
       }
-      this.snackBar.open(
-        this.translate.instant(
-          confirm ? 'LOADING.CONFIRMED' : 'LOADING.DRAFT_SAVED',
-        ),
-        undefined,
-        { duration: 4000 },
-      );
-      this.lines = [];
-      this.selectedGroupId = '';
-      this.selectedFeederId = '';
-      this.refusedKgAsFed = 0;
     } catch (error) {
       console.error('Failed to save feeding', error);
       this.snackBar.open(

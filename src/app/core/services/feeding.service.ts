@@ -2,13 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import {
   Firestore,
-  addDoc,
   collection,
   collectionData,
   deleteDoc,
   doc,
   orderBy,
   query,
+  setDoc,
   updateDoc,
   where,
 } from '@angular/fire/firestore';
@@ -63,23 +63,39 @@ export class FeedingService {
     );
   }
 
-  async createDraft(input: CreateFeedingInput): Promise<string> {
+  /**
+   * Create or update a draft with a client-generated id. The deterministic
+   * id is what makes "save draft, then confirm" retry-safe: a failed
+   * confirmation writes the same document again instead of creating a
+   * duplicate draft.
+   */
+  async saveDraft(
+    feedingId: string,
+    input: CreateFeedingInput,
+  ): Promise<void> {
     const farmId = this.farmContext.activeFarmId();
     if (!farmId) throw new Error('No active farm');
     const uid = this.auth.currentUser()?.uid ?? '';
-    const ref = await addDoc(
-      collection(this.firestore, 'farms', farmId, 'feedings'),
+    await setDoc(
+      doc(this.firestore, 'farms', farmId, 'feedings', feedingId),
       {
         ...input,
         farmId,
         status: 'draft',
-        idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+        idempotencyKey: input.idempotencyKey ?? feedingId,
         createdBy: uid,
         createdAt: new Date(),
+        updatedAt: new Date(),
         inventoryPostedAt: null,
       },
+      { merge: true },
     );
-    return ref.id;
+  }
+
+  async createDraft(input: CreateFeedingInput): Promise<string> {
+    const feedingId = crypto.randomUUID();
+    await this.saveDraft(feedingId, input);
+    return feedingId;
   }
 
   /** Confirm a draft; the trigger posts inventory from this transition. */
