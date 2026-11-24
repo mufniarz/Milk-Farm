@@ -196,7 +196,9 @@
     "REASON": "Motivo",
     "ADJUST": "Correggi",
     "DELIVERY_SAVED": "Consegna registrata.",
-    "ADJUST_SAVED": "Correzione registrata."
+    "ADJUST_SAVED": "Correzione registrata.",
+    "OVERDRAWN_BY": "sotto zero di",
+    "OVERDRAWN_ALERT": "alimenti sotto zero — registra una consegna"
   },
   "LOADING": {
     "TITLE": "Carico in stalla",
@@ -225,6 +227,9 @@
     "SAVE_FAILED": "Salvataggio non riuscito.",
     "OVERDRAWN_BANNER": "il carico supera la giacenza: lo scarico andrà sotto zero",
     "OVERDRAWN": "sotto zero",
-    "POSTING": "registrazione…"
+    "POSTING": "registrazione…",
+    "OVERDRAFT_ACK": "Ho capito: il carico supera la giacenza",
+    "OVERDRAFT_ACK_REQUIRED": "Conferma la casella per procedere con il carico in eccedenza.",
+    "POSTING_DELAYED": "registrazione in ritardo — riprova più tardi"
   }
 }

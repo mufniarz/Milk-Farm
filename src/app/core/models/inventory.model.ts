@@ -47,8 +47,11 @@ export interface InventoryTransaction {
 export interface InventoryCover {
   item: InventoryItem;
   dailyUsageKgAsFed: number;
+  /** Clamped to 0 when on-hand is negative; see shortfallKgAsFed. */
   daysOfCover: number | null;
-  level: 'ok' | 'caution' | 'urgent' | 'untracked';
+  level: 'ok' | 'caution' | 'urgent' | 'untracked' | 'overdrawn';
+  /** How far below zero the on-hand cache is. */
+  shortfallKgAsFed?: number;
 }
 
 export const URGENT_DAYS = 5;

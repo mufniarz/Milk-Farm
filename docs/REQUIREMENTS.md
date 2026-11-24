@@ -97,11 +97,24 @@ The feeding document/trigger half is in place; the loading sheet is next.
   the `lineIds`.
 - **Loading sheet.** `/loading` selects a herd group and feeder, shows the
   called quantity (`recipe line x head count`) and the loaded quantity per
-  line, and confirms the load. It warns before confirmation when a line's
-  feed has no inventory item (the trigger would skip it) or when the
-  aggregate load exceeds on-hand (`findOverdrawnFeeds`). The trigger posts the
-  negative value (the feed left the mixer) but stores `inventoryOverdrawn` on
-  the feeding and `overdrawn` in the audit; the recent-loads list shows it.
+  line, and confirms the load. Warnings share one region: untracked feeds are
+  informational; an overdraft requires an explicit **acknowledgment
+  checkbox**, and the confirm button stays disabled until it is checked.
+  Changing any loaded quantity resets the acknowledgment. The client warning
+  uses the cached on-hand; the trigger is authoritative, so a delivery from
+  another device can change the server-side result.
+- **Overdrawn inventory display.** `getCover` clamps negative on-hand at
+  0 days of cover and returns `level: 'overdrawn'` with the
+  `shortfallKgAsFed`. The inventory page says "overdrawn by N kg — record a
+  delivery" instead of showing a negative day count; the ledger keeps the
+  true negative value.
+- **Retry idempotence.** The trigger computes `inventoryOverdrawn` from the
+  lines posted in the current transaction and overwrites the field; it never
+  appends. A second invocation returns on the `inventoryPostedAt` guard. The
+  overdraft test calls the trigger twice and asserts the same field, one
+  ledger entry and one `feeding.confirm` audit. A partial write before
+  `inventoryPostedAt` is not reachable because the ledger, on-hand and
+  feeding updates share one transaction.
 - **Retry-safe draft.** The loading sheet generates the feeding id client-side
   and `saveDraft` writes that same document. A failed confirmation can be
   retried, and a draft can be edited and re-saved, without creating a second
@@ -117,7 +130,14 @@ The feeding document/trigger half is in place; the loading sheet is next.
 - **Trigger retries.** Firestore retries a failing trigger; the
   `inventoryPostedAt` guard makes retries safe, and malformed/untracked lines
   are skipped rather than thrown. A persistently failing feeding is not
-  dead-lettered yet; add a dead-letter/alert view when the report ships.
+  dead-lettered yet; the loading sheet flips "posting…" to "posting delayed —
+  check back" after 30 seconds, and a dead-letter/alert view is the proper
+  fix when the report ships.
+- **Accuracy report shape.** One CSV row per feeding line with
+  `date, herdGroupId, feederId, feedId, calledKgAsFed, loadedKgAsFed,
+  deviationPct, refusedKgAsFed`. The on-screen report aggregates; the CSV
+  does not. The report is independent of inventory, so it can ship before
+  retroactive posting if the scorecard is the nearer deadline.
 - **Accuracy-report index.** `feedings(herdGroupId, createdAt)` covers the
   loading list. The report will need `feedings(feederId, date)`; add it when
   the report lands.

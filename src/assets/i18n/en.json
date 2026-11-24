@@ -196,7 +196,9 @@
     "REASON": "Reason",
     "ADJUST": "Adjust",
     "DELIVERY_SAVED": "Delivery recorded.",
-    "ADJUST_SAVED": "Correction recorded."
+    "ADJUST_SAVED": "Correction recorded.",
+    "OVERDRAWN_BY": "overdrawn by",
+    "OVERDRAWN_ALERT": "feeds overdrawn — record a delivery"
   },
   "LOADING": {
     "TITLE": "Barn loading",
@@ -225,6 +227,9 @@
     "SAVE_FAILED": "Could not save.",
     "OVERDRAWN_BANNER": "the load exceeds on-hand stock: the posting will go negative",
     "OVERDRAWN": "negative",
-    "POSTING": "posting…"
+    "POSTING": "posting…",
+    "OVERDRAFT_ACK": "I understand the load exceeds on-hand stock",
+    "OVERDRAFT_ACK_REQUIRED": "Acknowledge the overdraft warning to confirm.",
+    "POSTING_DELAYED": "posting delayed — check back"
   }
 }

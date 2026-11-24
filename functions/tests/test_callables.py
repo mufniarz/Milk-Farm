@@ -611,3 +611,35 @@ def test_feeding_trigger_flags_overdrawn_on_hand():
         entry for entry in audits if entry["action"] == "feeding.confirm"
     )
     assert confirm_audit["overdrawn"] == feeding["inventoryOverdrawn"]
+
+    # A retry must recompute/retain the same overdraft record, not append a
+    # second one or double the ledger.
+    _trigger(_TriggerEvent(after, {"farmId": "f1", "feedingId": "feeding1"}))
+    assert _on_hand()["onHandKgAsFed"] == -30
+    assert len(_consumption_ledger()) == 1
+    retried = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding1")
+        .get()
+        .to_dict()
+    )
+    assert retried["inventoryOverdrawn"] == feeding["inventoryOverdrawn"]
+    audits_after = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    assert (
+        len(
+            [
+                entry
+                for entry in audits_after
+                if entry["action"] == "feeding.confirm"
+            ]
+        )
+        == 1
+    )

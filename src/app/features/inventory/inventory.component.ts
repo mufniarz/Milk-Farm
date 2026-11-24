@@ -47,7 +47,11 @@ import { FarmContextService } from '../../core/services/farm-context.service';
       <h1 class="page-title">{{ 'INVENTORY.TITLE' | translate }}</h1>
       <p class="page-subtitle">{{ 'INVENTORY.SUBTITLE' | translate }}</p>
 
-      @if (urgentCount > 0) {
+      @if (overdrawnCount > 0) {
+        <div class="alert urgent">
+          {{ overdrawnCount }} {{ 'INVENTORY.OVERDRAWN_ALERT' | translate }}
+        </div>
+      } @else if (urgentCount > 0) {
         <div class="alert urgent">
           {{ urgentCount }} {{ 'INVENTORY.URGENT_ALERT' | translate }}
         </div>
@@ -108,11 +112,14 @@ import { FarmContextService } from '../../core/services/farm-context.service';
               <span>{{ cover.item.onHandKgAsFed | number: '1.0-0' }} kg</span>
               <span>{{ cover.dailyUsageKgAsFed | number: '1.0-0' }} kg</span>
               <span [class]="'level ' + cover.level">
-                {{
-                  cover.daysOfCover === null
-                    ? ('INVENTORY.UNTRACKED' | translate)
-                    : (cover.daysOfCover | number: '1.1-1')
-                }}
+                @if (cover.level === 'overdrawn') {
+                  {{ 'INVENTORY.OVERDRAWN_BY' | translate }}
+                  {{ cover.shortfallKgAsFed | number: '1.0-0' }} kg
+                } @else if (cover.daysOfCover === null) {
+                  {{ 'INVENTORY.UNTRACKED' | translate }}
+                } @else {
+                  {{ cover.daysOfCover | number: '1.1-1' }}
+                }
               </span>
               <span>{{ cover.item.location || '—' }}</span>
               <button mat-icon-button (click)="selectItem(cover.item)">
@@ -251,6 +258,9 @@ import { FarmContextService } from '../../core/services/farm-context.service';
     .level.untracked {
       color: rgba(0, 0, 0, 0.4);
     }
+    .level.overdrawn {
+      color: #a02525;
+    }
     .empty {
       color: rgba(0, 0, 0, 0.5);
       padding: 16px 4px;
@@ -302,6 +312,10 @@ export class InventoryComponent implements OnInit {
   };
 
   readonly loading = signal(false);
+
+  get overdrawnCount(): number {
+    return this.covers.filter((cover) => cover.level === 'overdrawn').length;
+  }
 
   get urgentCount(): number {
     return this.covers.filter((cover) => cover.level === 'urgent').length;

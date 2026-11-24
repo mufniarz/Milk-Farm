@@ -172,6 +172,17 @@ export class InventoryService {
           level: 'untracked' as const,
         };
       }
+      // A negative on-hand cache is a data condition, not "0 days of
+      // cover": surface the shortfall rather than a negative day count.
+      if (item.onHandKgAsFed < 0) {
+        return {
+          item,
+          dailyUsageKgAsFed,
+          daysOfCover: 0,
+          level: 'overdrawn' as const,
+          shortfallKgAsFed: Math.abs(item.onHandKgAsFed),
+        };
+      }
       const daysOfCover = item.onHandKgAsFed / dailyUsageKgAsFed;
       let level: InventoryCover['level'] = 'ok';
       if (daysOfCover < URGENT_DAYS) level = 'urgent';

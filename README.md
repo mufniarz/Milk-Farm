@@ -117,12 +117,19 @@ inventory and target overrides require `farmMembers`.
   not collapse the ledger entries.
 - The loading sheet at `/loading` warns before confirmation when a line's
   feed has no inventory item, and when the aggregate load exceeds on-hand.
-  The trigger records skipped feeds in `inventorySkippedLines` and overdrawn
-  feeds in `inventoryOverdrawn` (with before/consumption/resulting kg); the
-  recent-loads list shows both.
+  The overdraft warning requires an explicit acknowledgment checkbox; the
+  confirm button stays disabled until it is checked, and editing a loaded
+  quantity resets it. The client warning uses cached on-hand; the trigger is
+  authoritative, so a delivery on another device can change the server-side
+  result.
 - The trigger posts the true negative on-hand value when a load exceeds
-  stock, because the feed left the mixer. The ledger stays truthful and the
-  feeding/audit carry the shortfall for the operator.
+  stock, because the feed left the mixer. The ledger stays truthful, the
+  feeding/audit carry the shortfall, and the inventory page labels the item
+  "overdrawn by N kg" with 0 days of cover rather than a negative day count.
+- `inventoryOverdrawn` is recomputed and overwritten, never appended; a
+  retried trigger returns on `inventoryPostedAt`. The test calls the trigger
+  twice and asserts one ledger entry, one audit entry and the same overdraft
+  record.
 - The `feeding.confirm` audit is a per-feed summary with `lineIds`; the
   ledger is per line. An audit-to-ledger diff must expand `lineIds`.
 - The feeding id is client-generated and `saveDraft` is idempotent, so a
@@ -130,3 +137,10 @@ inventory and target overrides require `farmMembers`.
   recent list shows "posting…" until `inventoryPostedAt` is set.
 - Feeders are names in `farms/{farmId}/feeders`, not logins. `feederId` is
   the name record; `createdBy` is the operator who entered the load.
+- The recent list shows "posting…" until the trigger sets
+  `inventoryPostedAt`, then "posting delayed — check back" after 30 seconds;
+  a dead-letter view is the next operational addition.
+- The accuracy report will export one row per feeding line (`date`,
+  `herdGroupId`, `feederId`, `feedId`, `calledKgAsFed`, `loadedKgAsFed`,
+  `deviationPct`, `refusedKgAsFed`). It is independent of inventory, so it can
+  ship before retroactive posting if that is the nearer deadline.

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -106,19 +106,30 @@ import {
         @if (!recipeId) {
           <div class="banner warning">{{ 'LOADING.NO_RECIPE' | translate }}</div>
         } @else if (lines.length > 0) {
-          @if (untrackedLines.length > 0) {
-            <div class="banner warning">
-              <mat-icon>warning</mat-icon>
-              {{ untrackedLines.length }}
-              {{ 'LOADING.UNTRACKED_BANNER' | translate }}:
-              {{ untrackedNames() }}
-            </div>
-          }
-          @if (overdrawnFeeds.length > 0) {
-            <div class="banner danger">
-              <mat-icon>error</mat-icon>
-              {{ 'LOADING.OVERDRAWN_BANNER' | translate }}:
-              {{ overdrawnNames() }}
+          @if (untrackedLines.length > 0 || overdrawnFeeds.length > 0) {
+            <div class="banner warning warning-stack">
+              @if (untrackedLines.length > 0) {
+                <div class="warning-line">
+                  <mat-icon>warning</mat-icon>
+                  {{ untrackedLines.length }}
+                  {{ 'LOADING.UNTRACKED_BANNER' | translate }}:
+                  {{ untrackedNames() }}
+                </div>
+              }
+              @if (overdrawnFeeds.length > 0) {
+                <div class="warning-line danger-line">
+                  <mat-icon>error</mat-icon>
+                  {{ 'LOADING.OVERDRAWN_BANNER' | translate }}:
+                  {{ overdrawnNames() }}
+                </div>
+                <label class="ack">
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="overdraftAcknowledged"
+                  />
+                  {{ 'LOADING.OVERDRAFT_ACK' | translate }}
+                </label>
+              }
             </div>
           }
 
@@ -139,6 +150,7 @@ import {
                     type="number"
                     min="0"
                     [(ngModel)]="line.loadedKgAsFed"
+                    (ngModelChange)="onLoadedChange()"
                   />
                   <span [class]="'deviation ' + deviationClass(line)">
                     {{ deviationLabel(line) }}
@@ -186,7 +198,13 @@ import {
               <span class="status">{{ feeding.status }}</span>
               <span>{{ totalLoadedFor(feeding) | number: '1.0-1' }} kg</span>
               @if (feeding.status === 'confirmed' && !feeding.inventoryPostedAt) {
-                <span class="posting">{{ 'LOADING.POSTING' | translate }}</span>
+                <span class="posting">
+                  {{
+                    (postingDelayed
+                      ? 'LOADING.POSTING_DELAYED'
+                      : 'LOADING.POSTING') | translate
+                  }}
+                </span>
               } @else if (feeding.inventoryOverdrawn?.length) {
                 <span class="overdrawn" [title]="feedingOverdrawnNames(feeding)">
                   <mat-icon>error</mat-icon>
@@ -250,9 +268,25 @@ import {
       background: #fff4e0;
       color: #8a5300;
     }
-    .banner.danger {
-      background: #fdecea;
+    .banner.warning-stack {
+      display: block;
+    }
+    .warning-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 0;
+    }
+    .danger-line {
       color: #a02525;
+    }
+    .ack {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      font-weight: 500;
+      cursor: pointer;
     }
     .line-header,
     .line-row {
@@ -367,7 +401,7 @@ import {
     }
   `,
 })
-export class LoadingComponent implements OnInit {
+export class LoadingComponent implements OnInit, OnDestroy {
   private groupService = inject(GroupService);
   private recipeService = inject(RecipeService);
   private feedingService = inject(FeedingService);
@@ -390,6 +424,9 @@ export class LoadingComponent implements OnInit {
   lines: FeedingLine[] = [];
   recipeId = '';
   saving = false;
+  overdraftAcknowledged = false;
+  postingDelayed = false;
+  private postingTimer?: ReturnType<typeof setTimeout>;
 
   readonly today = new Date().toISOString().slice(0, 10);
 
@@ -408,9 +445,26 @@ export class LoadingComponent implements OnInit {
       .subscribe((feedings) => (this.feedings = feedings));
   }
 
+  ngOnDestroy(): void {
+    if (this.postingTimer) clearTimeout(this.postingTimer);
+  }
+
+  onLoadedChange(): void {
+    this.overdraftAcknowledged = false;
+  }
+
+  private startPostingTimer(): void {
+    if (this.postingTimer) clearTimeout(this.postingTimer);
+    this.postingDelayed = false;
+    this.postingTimer = setTimeout(() => {
+      this.postingDelayed = true;
+    }, 30000);
+  }
+
   async selectGroup(): Promise<void> {
     const group = this.groups.find((g) => g.id === this.selectedGroupId);
     this.lines = [];
+    this.overdraftAcknowledged = false;
     this.feedingId = crypto.randomUUID();
     this.recipeId = group?.activeRecipeId ?? '';
     if (!group || !this.recipeId) return;
@@ -515,6 +569,18 @@ export class LoadingComponent implements OnInit {
     if (!group || !group.id || !this.selectedFeederId || this.lines.length === 0) {
       return;
     }
+    if (
+      confirm &&
+      this.overdrawnFeeds.length > 0 &&
+      !this.overdraftAcknowledged
+    ) {
+      this.snackBar.open(
+        this.translate.instant('LOADING.OVERDRAFT_ACK_REQUIRED'),
+        undefined,
+        { duration: 4000 },
+      );
+      return;
+    }
     this.saving = true;
     try {
       if (!this.feedingId) this.feedingId = crypto.randomUUID();
@@ -539,6 +605,8 @@ export class LoadingComponent implements OnInit {
         this.selectedGroupId = '';
         this.selectedFeederId = '';
         this.refusedKgAsFed = 0;
+        this.overdraftAcknowledged = false;
+        this.startPostingTimer();
       } else {
         // Keep the load on screen (and the same id) so a later edit or
         // confirm updates this draft rather than creating a duplicate.
