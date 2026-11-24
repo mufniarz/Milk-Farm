@@ -20,6 +20,8 @@ export interface MilkRecord {
   feedCostPerHeadSnapshot?: number | null;
   /** Head count at entry time, so historical IOFC does not move. */
   headCountSnapshot?: number | null;
+  /** True when the snapshot came from the day's confirmed feeding. */
+  hasFeedingSnapshot?: boolean;
   source: 'manual' | 'import';
   updatedAt?: Date;
 }

@@ -119,10 +119,17 @@ import { localDateKey } from '../../core/utils/loading-math';
       } @else if (isDry) {
         <div class="banner warning">{{ 'IOFC.DRY' | translate }}</div>
       } @else {
+        @if (!hasFeedingForDate && !hasRecordForDate) {
+          <div class="banner warning">
+            {{ 'IOFC.AWAITING_FEEDING' | translate }}
+          </div>
+        }
         @if (incompleteSnapshot) {
           <div class="banner warning">
             {{ 'IOFC.INCOMPLETE_SNAPSHOT' | translate }}
           </div>
+        } @else if (zeroHeadCount) {
+          <div class="banner warning">{{ 'IOFC.ZERO_HEAD' | translate }}</div>
         } @else if (!hasRecordForDate && milkKg === 0) {
           <p class="empty">{{ 'IOFC.NO_RECORD' | translate }}</p>
         } @else {
@@ -287,9 +294,30 @@ export class IofcComponent implements OnInit {
   }
 
   private get feedingForDate(): Feeding | undefined {
-    return this.feedings.find(
-      (feeding) => feeding.date === this.date && feeding.status === 'confirmed',
-    );
+    // TMR groups can have more than one feeding a day; the latest confirmed
+    // feeding reflects the herd at the time the milk record is entered.
+    return this.feedings
+      .filter(
+        (feeding) =>
+          feeding.date === this.date && feeding.status === 'confirmed',
+      )
+      .sort(
+        (a, b) =>
+          (b.createdAt?.getTime?.() ?? 0) -
+          (a.createdAt?.getTime?.() ?? 0),
+      )[0];
+  }
+
+  get hasFeedingForDate(): boolean {
+    return !!this.feedingForDate;
+  }
+
+  get zeroHeadCount(): boolean {
+    const record = this.recordForDate;
+    const count = record
+      ? record.headCountSnapshot
+      : this.headCountForEntry;
+    return count === 0;
   }
 
   private get headCountForEntry(): number {
@@ -321,7 +349,8 @@ export class IofcComponent implements OnInit {
     if (record) {
       if (
         record.feedCostPerHeadSnapshot == null ||
-        record.headCountSnapshot == null
+        record.headCountSnapshot == null ||
+        record.headCountSnapshot <= 0
       ) {
         return null;
       }
@@ -473,6 +502,7 @@ export class IofcComponent implements OnInit {
         milkPricePerKg: this.milkPricePerKg,
         feedCostPerHeadSnapshot: this.feedCostPerHead,
         headCountSnapshot: this.headCountForEntry,
+        hasFeedingSnapshot: this.hasFeedingForDate,
       });
       await this.loadRecords(group.id);
       this.applyRecordForDate();

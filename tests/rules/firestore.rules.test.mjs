@@ -119,6 +119,16 @@ beforeEach(async () => {
       idempotencyKey: 'feeding-key-other',
       createdBy: 'member',
     });
+    await setDoc(
+      doc(db, 'farms', 'f1', 'feedingTriggerFailures', 'feeding1'),
+      {
+        farmId: 'f1',
+        feedingId: 'feeding1',
+        error: 'boom',
+        status: 'pending',
+        retryCount: 1,
+      },
+    );
     await setDoc(doc(db, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20'), {
       farmId: 'f1',
       herdGroupId: 'g1',
@@ -372,5 +382,28 @@ test('milk records are owner/admin/consultant only', async () => {
   const other = dbFor('other');
   await assertFails(
     getDoc(doc(other, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20')),
+  );
+});
+
+
+test('trigger failures are operator-readable and client-write-denied', async () => {
+  const member = dbFor('member');
+  await assertSucceeds(
+    getDoc(
+      doc(member, 'farms', 'f1', 'feedingTriggerFailures', 'feeding1'),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      doc(member, 'farms', 'f1', 'feedingTriggerFailures', 'feeding1'),
+      { farmId: 'f1', status: 'resolved' },
+    ),
+  );
+
+  const feeder = dbFor('feeder');
+  await assertFails(
+    getDoc(
+      doc(feeder, 'farms', 'f1', 'feedingTriggerFailures', 'feeding1'),
+    ),
   );
 });

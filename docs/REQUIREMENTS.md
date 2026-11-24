@@ -30,14 +30,14 @@ numbers.
 |---|---|---|
 | Type/build | `npx ng build` | pass |
 | Solver + export + golden ration | `pytest tests -q` | 18 passed (the 10 callable/trigger tests skip without the emulator) |
-| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 14 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting (single, overdrawn, duplicate-feed, dedup, cleared audit) |
+| Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 18 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting, failure queue (claim/lock/resolve, bulk retry, dead audit), farm milk price |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 24 passed — 3 calculator parity + 6 loading math + 11 accuracy + 4 IOFC (3 math + 1 wiring) |
+| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 25 passed — 3 calculator parity + 6 loading math + 11 accuracy + 5 IOFC (3 math + 2 wiring) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
-| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 15 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, feeder-own feedings only, milk-record roles |
+| Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 16 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, operator-only feedings, milk-record roles, failure-queue read-only |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 32 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 14 callable/trigger/retroactive) |
+| Full suite incl. callables | `npm run test:functions` | 36 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 18 callable/trigger/failure/retroactive) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -152,10 +152,11 @@ The feeding document/trigger half is in place; the loading sheet is next.
   sheet**: feeds, recipes, targets, groups, inventory items/ledger (manual),
   accuracy, IOFC and retroactive posting. The loading sheet is gated on the
   trigger (inventory posting) and the failure queue (recovery path); shipping
-  it without them would show stale on-hand and lying alerts. IOFC and the
-  accuracy report are fully functional without the trigger. The failure queue
-  is deliberately ahead of the scenario increment because the trigger must
-  not ship without it.
+  it without them would show stale on-hand and lying alerts. With the queue
+  now implemented, the trigger + loading sheet + queue ship together after the
+  target backfill. IOFC and the accuracy report are fully functional without
+  the trigger. The failure queue was deliberately ahead of the scenario
+  increment because the trigger must not ship without it.
 - **Retry configuration.** PyPI shows `0.6.0` as the latest stable release
   and `0.7.0rc0` as a release candidate. Both hardcode `retry=False` in
   `FirestoreOptions._endpoint` (`0.7.0rc0` still constructs
@@ -275,29 +276,50 @@ Implemented as a separate, auditable action:
   selected item and a banner listing every item with pending skipped loads
   (`inventorySkippedFeedIds`), so an operator cannot fix one of three and
   forget the rest. The callable reports how many lines it posted.
+- **Deployable early, operational later.** Retroactive posting can be
+  deployed before the trigger, but it only becomes useful after feedings have
+  been confirmed and skipped; an empty state is expected.
+- **Valuation vs accounting.** The ledger uses the feeding line's load-time
+  `costPerKgAsFed`; that is not the farm's FIFO/weighted-average accounting
+  cost, so reconciliation against farm accounting may differ by price drift.
+  Both facts are on the ledger (`unitCostPerKgAsFed`).
 
-## K. Trigger failure queue (pre-deploy design)
+## K. Trigger failure queue
 
-The trigger must not deploy until this exists. The SDK cannot set retry
-(0.6.0 stable and 0.7.0rc0 both hardcode `retry=False`), so a transient
-failure is silent data loss.
+Implemented; it is still a pre-deploy gate because the trigger and loading
+sheet ship together.
 
 - **Storage:** `farms/{farmId}/feedingTriggerFailures/{feedingId}` with
   `feedingId`, `farmId`, `error`, `attemptedAt`, `retryCount`,
-  `lastRetryAt`, `status` (`pending` / `dead`).
-- **Writer:** the trigger wraps its transaction; on an exception it writes the
-  failure document. A successful post leaves no failure document (or marks it
-  resolved if one existed).
-- **Retry policy:** a scheduled function every 5 minutes scans `status =
-  pending` and `retryCount < 5`, re-invokes the same posting logic, increments
-  `retryCount`/`lastRetryAt`; after five failures it sets `status = dead`.
-- **Alerting:** the loading sheet's recent-loads list shows a
-  "posting delayed/failed" state; an admin can trigger a manual retry from the
-  same view. Email is optional.
-- **Replay semantics:** retries use the same `inventoryPostedAt` guard and
-  deterministic ledger ids, so a success after partial failure is idempotent.
-- **Deploy gate:** the trigger and the loading sheet are gated on this queue.
-  Everything else can ship first (see the deploy chain).
+  `lastRetryAt`, `status` (`pending` / `retrying` / `dead` / `resolved`),
+  `lockedBy`, `lockedAt`, `deadAt`, `resolvedAt`, `resolvedBy`.
+- **Writer:** `on_feeding_confirmed` wraps `_post_feeding_inventory`; on an
+  exception it writes the failure document and re-raises so the invocation is
+  logged. A success resolves any existing failure.
+- **Retry policy:** a scheduled function every 5 minutes scans
+  `collectionGroup('feedingTriggerFailures').where status in [pending,
+  retrying]` (collection-group index on `status`), claims each document in a
+  transaction (`pending|dead/stale -> retrying` with `lockedBy`/`lockedAt`),
+  retries, then resolves or increments. Five attempts -> `dead` with a
+  `feeding.trigger_dead` audit. A claim older than 10 minutes is reclaimable,
+  so a crashed scanner does not strand a document.
+- **Bulk retry:** owner/admin `retry_feeding_failures` callable retries all
+  `pending`/`dead` failures for a farm; the loading sheet has "Retry all".
+  The same callable/terminal state is used for manual retries.
+- **Terminal state:** success sets `status: resolved`, `resolvedBy`,
+  `resolvedAt`, clears the lock, and writes `feeding.trigger_resolved`;
+  a manual retry of a dead document therefore stops showing as failed.
+- **Alerting:** the loading sheet shows the open-failure count and a
+  per-feeding "Not posted" badge; the inventory page shows the count with a
+  link to the loading sheet. A `dead` document means "needs human attention
+  within 24 hours"; email is out of scope for v1.
+- **Retention:** resolved documents are retained; a 90-day TTL on
+  `resolvedAt` (or a cleanup job) is the follow-up, not a deploy blocker.
+- **Replay semantics:** every retry reuses `_post_feeding_inventory` and the
+  `inventoryPostedAt` guard plus deterministic ledger ids, so a retry after a
+  partial failure is idempotent.
+- **Rules:** failure documents are readable by owner/admin/consultant and
+  client-write-denied.
 
 ## L. IOFC
 
@@ -334,9 +356,15 @@ The first Stage 2 item is in place:
   applicable.
 - **Milk price.** The price is per record, with a farm-level default at
   `farms/{farmId}.milkPricePerKg` loaded into the form; the owner/admin can
-  save the current value as the default from the IOFC page. `fatPct`/
-  `proteinPct` are stored but not used by the flat-price IOFC, so no one
-  assumes component pricing is wired.
+  save the current value as the default from the IOFC page. The save goes
+  through the `set_farm_milk_price` callable and writes
+  `farm.milk_price_changed` with before/after. `fatPct`/`proteinPct` are
+  stored but not used by the flat-price IOFC, so no one assumes component
+  pricing is wired.
+- **Preview vs saved.** A new-date preview uses current data (the day's
+  feeding count if confirmed, otherwise the group count). Saving locks the
+  feeding snapshot when one exists; a milk record saved before the feeding is
+  confirmed keeps `hasFeedingSnapshot: false` until it is re-saved.
 - **Wiring test.** `iofc.component.spec.ts` uses a real group (headCount 100
   and 50) and a recipe cost of EUR 4.50, asserting feed cost 450 and 225, so
   the group/head-count/per-head wiring is tested, not just the arithmetic.

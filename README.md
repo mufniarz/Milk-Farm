@@ -177,7 +177,9 @@ inventory and target overrides require `farmMembers`.
   line's historical `costPerKgAsFed`, while their timestamps reflect the
   retroactive moment. Duplicate skipped lines for one feed post per-line
   entries and update on-hand once. The inventory page also lists every item
-  with pending skipped loads, so none are forgotten.
+  with pending skipped loads, so none are forgotten. The ledger's load-time
+  cost is not the farm's FIFO/weighted-average accounting cost; reconciliation
+  may differ by price drift.
 - Feeder-role accounts read only their own feedings at the rules level
   (`createdBy == uid`), and the report UI is restricted to
   owner/admin/consultant; a server-side report callable is the consultant-scale
@@ -188,23 +190,31 @@ inventory and target overrides require `farmMembers`.
   as not applicable. With no recipe and no snapshot the page shows n/a, never
   a zero feed cost; a record with a missing snapshot shows "incomplete
   snapshot" rather than falling back to today's herd. The record's
-  `headCountSnapshot` is the day's confirmed feeding `animalCount` when one
-  exists, otherwise the group head count. The trend is the last seven
-  records. The milk price is per record, with a farm-level default at
-  `farms/{farmId}.milkPricePerKg` that owner/admin can save from the page;
-  fat/protein are stored but not used by flat-price IOFC.
+  `headCountSnapshot` is the latest confirmed feeding's `animalCount` for the
+  group/date when one exists, otherwise the group head count; an "awaiting
+  feeding" warning shows when none is confirmed, and zero head renders
+  "0 head / IOFC not defined". The trend is the last seven records. The milk
+  price is per record, with a farm-level default at
+  `farms/{farmId}.milkPricePerKg` that owner/admin can save from the page
+  (audited as `farm.milk_price_changed`); fat/protein are stored but not used
+  by flat-price IOFC.
 - **Pre-deploy requirement:** the trigger failure queue/alert must exist
   before the trigger is deployed. The SDK cannot enable retry (0.6.0 stable and
   0.7.0rc0 both hardcode `retry=False`), so a transient failure otherwise
   loses the inventory posting silently.
-- **Failure queue design:** `farms/{farmId}/feedingTriggerFailures/{feedingId}`
-  holds the error, attempts and status; a scheduled function retries pending
-  failures up to five times and marks dead; the loading sheet shows delayed/
-  failed postings with a manual retry. This is a pre-deploy design, not just
-  a phrase.
+- **Failure queue:** `farms/{farmId}/feedingTriggerFailures/{feedingId}`
+  is written when `on_feeding_confirmed` fails. A scheduled function every
+  five minutes claims pending/stale documents in a transaction (so scanners
+  cannot double-retry), retries up to five times, and marks `dead` with a
+  `feeding.trigger_dead` audit. Owner/admin can retry all pending/dead
+  failures from the loading sheet; success sets `resolved` and audits
+  `feeding.trigger_resolved`. The loading sheet shows the open count and a
+  per-feeding "Not posted" badge; the inventory page shows the count too.
+  Resolved documents need a 90-day TTL/cleanup follow-up; email is out of
+  scope for v1, and `dead` means "human attention within 24 hours".
 - **Deploy chain:** everything except the trigger **and the loading sheet**
   can ship first — feeds, recipes, targets, groups, inventory/ledger
-  (manual), accuracy, IOFC and retroactive posting. The loading sheet is
-  gated on the trigger and the queue; shipping it without them would show
-  stale on-hand. The failure queue is deliberately ahead of the scenario
-  increment.
+  (manual), accuracy, IOFC and retroactive posting. With the queue
+  implemented, the trigger + loading sheet + queue ship together after the
+  target backfill. IOFC and the accuracy report are fully functional without
+  the trigger.

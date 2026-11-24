@@ -9,6 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { RouterLink } from '@angular/router';
 import { Feed } from '../../core/models/feed.model';
 import { HerdGroup } from '../../core/models/group.model';
 import {
@@ -19,6 +20,7 @@ import { FeedService } from '../../core/services/feed.service';
 import { GroupService } from '../../core/services/group.service';
 import { InventoryService } from '../../core/services/inventory.service';
 import { FeedingService } from '../../core/services/feeding.service';
+import { FeedingFailureService } from '../../core/services/feeding-failure.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
 
 /**
@@ -42,11 +44,19 @@ import { FarmContextService } from '../../core/services/farm-context.service';
     MatIconModule,
     MatSnackBarModule,
     TranslatePipe,
+    RouterLink,
   ],
   template: `
     <div class="inventory-page">
       <h1 class="page-title">{{ 'INVENTORY.TITLE' | translate }}</h1>
       <p class="page-subtitle">{{ 'INVENTORY.SUBTITLE' | translate }}</p>
+
+      @if (failureCount > 0) {
+        <div class="alert caution">
+          {{ 'INVENTORY.FAILURES' | translate }}: {{ failureCount }}
+          <a routerLink="/loading">{{ 'INVENTORY.VIEW_LOADING' | translate }}</a>
+        </div>
+      }
 
       @if (overdrawnCount > 0) {
         <div class="alert urgent">
@@ -311,6 +321,7 @@ export class InventoryComponent implements OnInit {
   private groupService = inject(GroupService);
   private inventoryService = inject(InventoryService);
   private feedingService = inject(FeedingService);
+  private failureService = inject(FeedingFailureService);
   private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
@@ -320,6 +331,7 @@ export class InventoryComponent implements OnInit {
   items: InventoryItem[] = [];
   covers: InventoryCover[] = [];
   pendingSkippedFeedIds = new Set<string>();
+  failureCount = 0;
   selectedItem: InventoryItem | null = null;
   saving = false;
 
@@ -382,6 +394,9 @@ export class InventoryComponent implements OnInit {
         void this.refreshCover();
       });
     if (this.canViewFeedings) {
+      this.failureService
+        .getOpenFailures()
+        .subscribe((failures) => (this.failureCount = failures.length));
       this.feedingService.getFeedings().subscribe((feedings) => {
         const ids = new Set<string>();
         for (const feeding of feedings) {

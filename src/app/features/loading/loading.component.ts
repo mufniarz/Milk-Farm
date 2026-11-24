@@ -13,11 +13,14 @@ import { HerdGroup } from '../../core/models/group.model';
 import { Feeder } from '../../core/models/feeder.model';
 import { InventoryItem } from '../../core/models/inventory.model';
 import { Feeding, FeedingLine } from '../../core/models/feeding.model';
+import { FeedingFailure } from '../../core/models/feeding-failure.model';
 import { GroupService } from '../../core/services/group.service';
 import { RecipeService } from '../../core/services/recipe.service';
 import { FeedingService } from '../../core/services/feeding.service';
 import { InventoryService } from '../../core/services/inventory.service';
 import { FeederService } from '../../core/services/feeder.service';
+import { FeedingFailureService } from '../../core/services/feeding-failure.service';
+import { FarmContextService } from '../../core/services/farm-context.service';
 import {
   OverdrawnFeed,
   computeCalledKg,
@@ -58,6 +61,22 @@ import {
     <div class="loading-page">
       <h1 class="page-title">{{ 'LOADING.TITLE' | translate }}</h1>
       <p class="page-subtitle">{{ 'LOADING.SUBTITLE' | translate }}</p>
+
+      @if (failures.length > 0) {
+        <div class="alert caution">
+          {{ 'LOADING.FAILURES' | translate }}: {{ failures.length }}
+          @if (canRetry) {
+            <button
+              mat-button
+              color="primary"
+              (click)="retryFailures()"
+              [disabled]="saving"
+            >
+              {{ 'LOADING.RETRY_ALL' | translate }}
+            </button>
+          }
+        </div>
+      }
 
       <mat-card appearance="outlined" class="form-card">
         <mat-card-content class="form-grid">
@@ -198,6 +217,12 @@ import {
               <span>{{ feederName(feeding.feederId) }}</span>
               <span class="status">{{ feeding.status }}</span>
               <span>{{ totalLoadedFor(feeding) | number: '1.0-1' }} kg</span>
+              @if (failureFor(feeding.id); as failure) {
+                <span class="failed" [title]="failure.error">
+                  <mat-icon>error</mat-icon>
+                  {{ 'LOADING.FAILED' | translate }}
+                </span>
+              }
               @if (feeding.status === 'confirmed' && !feeding.inventoryPostedAt) {
                 <span class="posting">
                   {{
@@ -352,6 +377,17 @@ import {
     .recent-row .date {
       font-weight: 600;
     }
+    .failed {
+      color: #a02525;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .failed mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      vertical-align: middle;
+    }
     .recent-row .status {
       text-transform: uppercase;
       font-size: 11px;
@@ -408,6 +444,8 @@ export class LoadingComponent implements OnInit, OnDestroy {
   private feedingService = inject(FeedingService);
   private inventoryService = inject(InventoryService);
   private feederService = inject(FeederService);
+  private failureService = inject(FeedingFailureService);
+  private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
 
@@ -415,6 +453,7 @@ export class LoadingComponent implements OnInit, OnDestroy {
   feeders: Feeder[] = [];
   inventoryItems: InventoryItem[] = [];
   feedings: Feeding[] = [];
+  failures: FeedingFailure[] = [];
 
   selectedGroupId = '';
   selectedFeederId = '';
@@ -444,6 +483,41 @@ export class LoadingComponent implements OnInit, OnDestroy {
     this.feedingService
       .getFeedings()
       .subscribe((feedings) => (this.feedings = feedings));
+    if (this.canRetry) {
+      this.failureService
+        .getOpenFailures()
+        .subscribe((failures) => (this.failures = failures));
+    }
+  }
+
+  get canRetry(): boolean {
+    const role = this.farmContext.activeRole();
+    return role === 'owner' || role === 'farmAdmin';
+  }
+
+  failureFor(feedingId: string | undefined): FeedingFailure | undefined {
+    return this.failures.find((failure) => failure.feedingId === feedingId);
+  }
+
+  async retryFailures(): Promise<void> {
+    this.saving = true;
+    try {
+      const result = await this.failureService.retryAll();
+      this.snackBar.open(
+        `${this.translate.instant('LOADING.RETRY_DONE')}: ${result.resolved}/${result.failed}`,
+        undefined,
+        { duration: 5000 },
+      );
+    } catch (error) {
+      console.error('Failed to retry feedings', error);
+      this.snackBar.open(
+        this.translate.instant('LOADING.RETRY_FAILED'),
+        undefined,
+        { duration: 5000 },
+      );
+    } finally {
+      this.saving = false;
+    }
   }
 
   ngOnDestroy(): void {

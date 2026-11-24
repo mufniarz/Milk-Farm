@@ -6,8 +6,10 @@ and the Excel export function for recipe downloads.
 """
 import base64
 import io
+import uuid
+from datetime import datetime, timezone
 
-from firebase_functions import firestore_fn, https_fn, options
+from firebase_functions import firestore_fn, https_fn, options, scheduler_fn
 from firebase_admin import firestore, initialize_app
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -871,26 +873,13 @@ def adjust_inventory(req: https_fn.CallableRequest):
 # cannot double-count.
 
 
-@firestore_fn.on_document_written(
-    document="farms/{farmId}/feedings/{feedingId}",
-    memory=options.MemoryOption.MB_256,
-    region="europe-west1",
-)
-def on_feeding_confirmed(event: firestore_fn.Event) -> None:
-    """Consume the loaded kg of a confirmed feeding from inventory."""
-    after = event.data.after if event.data else None
-    if after is None or not after.exists:
-        return
-    feeding = after.to_dict() or {}
-    if feeding.get("status") != "confirmed":
-        return
+def _post_feeding_inventory(db, farm_id, feeding_id):
+    """Post a confirmed feeding's loaded lines exactly once.
 
-    farm_id = event.params.get("farmId")
-    feeding_id = event.params.get("feedingId")
-    if not farm_id or not feeding_id:
-        return
+    Shared by the trigger and the retry queue. The transaction re-reads the
+    feeding, and the inventoryPostedAt guard makes a replay a no-op.
+    """
 
-    db = firestore.client()
     feeding_ref = (
         db.collection("farms")
         .document(farm_id)
@@ -1061,7 +1050,272 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
             },
         )
 
+    return apply(db.transaction())
+
+
+_FAILURE_RETRY_LIMIT = 5
+_FAILURE_STALE_SECONDS = 600
+
+
+def _failure_ref(db, farm_id, feeding_id):
+    return (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("feedingTriggerFailures")
+        .document(feeding_id)
+    )
+
+
+def _record_trigger_failure(db, farm_id, feeding_id, error):
+    ref = _failure_ref(db, farm_id, feeding_id)
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = ref.get(transaction=transaction)
+        existing = snapshot.to_dict() if snapshot.exists else {}
+        retry_count = int(existing.get("retryCount") or 0) + 1
+        transaction.set(
+            ref,
+            {
+                "farmId": farm_id,
+                "feedingId": feeding_id,
+                "error": str(error)[:1000],
+                "status": "pending",
+                "retryCount": retry_count,
+                "attemptedAt": existing.get("attemptedAt")
+                or firestore.SERVER_TIMESTAMP,
+                "lastRetryAt": firestore.SERVER_TIMESTAMP,
+                "lockedBy": None,
+                "lockedAt": None,
+            },
+            merge=True,
+        )
+
     apply(db.transaction())
+
+
+def _resolve_trigger_failure(db, farm_id, feeding_id, resolved_by):
+    ref = _failure_ref(db, farm_id, feeding_id)
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return
+        data = snapshot.to_dict() or {}
+        if data.get("status") == "resolved":
+            return
+        transaction.update(
+            ref,
+            {
+                "status": "resolved",
+                "resolvedAt": firestore.SERVER_TIMESTAMP,
+                "resolvedBy": resolved_by,
+                "lockedBy": None,
+                "lockedAt": None,
+            },
+        )
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "feeding.trigger_resolved",
+                "farmId": farm_id,
+                "feedingId": feeding_id,
+                "resolvedBy": resolved_by,
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
+
+
+def _claim_failure(db, farm_id, feeding_id, instance_id, allow_dead=False):
+    """Atomically claim a pending/dead/stale-retrying failure."""
+    ref = _failure_ref(db, farm_id, feeding_id)
+    now = datetime.now(timezone.utc)
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict() or {}
+        status = data.get("status")
+        stale = False
+        locked_at = data.get("lockedAt")
+        if status == "retrying" and locked_at is not None:
+            try:
+                stale = (
+                    now.timestamp() - locked_at.timestamp()
+                ) > _FAILURE_STALE_SECONDS
+            except Exception:
+                stale = True
+        allowed = (
+            status == "pending"
+            or stale
+            or (allow_dead and status == "dead")
+        )
+        if not allowed:
+            return None
+        transaction.update(
+            ref,
+            {
+                "status": "retrying",
+                "lockedBy": instance_id,
+                "lockedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        return data
+
+    return apply(db.transaction())
+
+
+def _fail_retry(db, farm_id, feeding_id, error):
+    ref = _failure_ref(db, farm_id, feeding_id)
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return
+        data = snapshot.to_dict() or {}
+        retry_count = int(data.get("retryCount") or 0) + 1
+        dead = retry_count >= _FAILURE_RETRY_LIMIT
+        update = {
+            "retryCount": retry_count,
+            "error": str(error)[:1000],
+            "lastRetryAt": firestore.SERVER_TIMESTAMP,
+            "lockedBy": None,
+            "lockedAt": None,
+        }
+        if dead:
+            update["status"] = "dead"
+            update["deadAt"] = firestore.SERVER_TIMESTAMP
+        else:
+            update["status"] = "pending"
+        transaction.update(ref, update)
+        if dead:
+            _write_audit(
+                transaction,
+                db,
+                farm_id,
+                {
+                    "action": "feeding.trigger_dead",
+                    "farmId": farm_id,
+                    "feedingId": feeding_id,
+                    "retryCount": retry_count,
+                    "error": str(error)[:1000],
+                    "at": firestore.SERVER_TIMESTAMP,
+                },
+            )
+
+    apply(db.transaction())
+
+
+def _retry_one_failure(db, farm_id, feeding_id, instance_id, allow_dead=False):
+    if _claim_failure(db, farm_id, feeding_id, instance_id, allow_dead) is None:
+        return False
+    try:
+        _post_feeding_inventory(db, farm_id, feeding_id)
+    except Exception as error:
+        _fail_retry(db, farm_id, feeding_id, error)
+        return False
+    _resolve_trigger_failure(db, farm_id, feeding_id, instance_id)
+    return True
+
+
+@firestore_fn.on_document_written(
+    document="farms/{farmId}/feedings/{feedingId}",
+    memory=options.MemoryOption.MB_256,
+    region="europe-west1",
+)
+def on_feeding_confirmed(event: firestore_fn.Event) -> None:
+    """Consume the loaded kg of a confirmed feeding from inventory.
+
+    On failure the posting is queued in feedingTriggerFailures; the scheduled
+    retry and the admin bulk retry both reuse _post_feeding_inventory.
+    """
+    after = event.data.after if event.data else None
+    if after is None or not after.exists:
+        return
+    feeding = after.to_dict() or {}
+    if feeding.get("status") != "confirmed":
+        return
+
+    farm_id = event.params.get("farmId")
+    feeding_id = event.params.get("feedingId")
+    if not farm_id or not feeding_id:
+        return
+
+    db = firestore.client()
+    try:
+        _post_feeding_inventory(db, farm_id, feeding_id)
+        _resolve_trigger_failure(db, farm_id, feeding_id, "trigger")
+    except Exception as error:
+        _record_trigger_failure(db, farm_id, feeding_id, error)
+        raise
+
+
+@scheduler_fn.on_schedule(
+    schedule="*/5 * * * *",
+    timezone=scheduler_fn.Timezone("Europe/Rome"),
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=300,
+    region="europe-west1",
+)
+def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
+    """Retry pending trigger failures; stale claims are reclaimed after 10m."""
+    db = firestore.client()
+    instance_id = f"scheduled-{uuid.uuid4()}"
+    docs = list(
+        db.collection_group("feedingTriggerFailures")
+        .where("status", "in", ["pending", "retrying"])
+        .limit(20)
+        .stream()
+    )
+    for doc in docs:
+        data = doc.to_dict() or {}
+        farm_id = data.get("farmId")
+        if farm_id:
+            _retry_one_failure(db, farm_id, doc.id, instance_id)
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=120,
+    region="europe-west1",
+)
+def retry_feeding_failures(req: https_fn.CallableRequest):
+    """Owner/admin bulk retry of pending or dead feeding postings."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    farm_id = _require_string(data, "farmId")
+    db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
+    status = data.get("status")
+    failures = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("feedingTriggerFailures")
+    )
+    if status in ("pending", "dead"):
+        query = failures.where("status", "==", status)
+    else:
+        query = failures.where("status", "in", ["pending", "dead"])
+    instance_id = f"manual-{req.auth.uid}-{uuid.uuid4()}"
+    resolved = 0
+    failed = 0
+    for doc in query.stream():
+        if _retry_one_failure(db, farm_id, doc.id, instance_id, allow_dead=True):
+            resolved += 1
+        else:
+            failed += 1
+    return {"ok": True, "resolved": resolved, "failed": failed}
 
 
 # ── Retroactive posting ─────────────────────────────────────────────────────
@@ -1294,3 +1548,61 @@ def post_skipped_consumption(req: https_fn.CallableRequest):
         "feedings": touched,
         "onHandKgAsFed": total,
     }
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def set_farm_milk_price(req: https_fn.CallableRequest):
+    """Owner/admin sets the farm-level IOFC milk price, with an audit entry."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    farm_id = _require_string(data, "farmId")
+    raw = data.get("milkPricePerKg")
+    if (
+        not isinstance(raw, (int, float))
+        or isinstance(raw, bool)
+        or raw < 0
+        or raw > 100
+    ):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="milkPricePerKg must be between 0 and 100.",
+        )
+    value = float(raw)
+    db = _require_farm_role(farm_id, req.auth.uid, _INVENTORY_ADMIN_ROLES)
+    farm_ref = db.collection("farms").document(farm_id)
+
+    @firestore.transactional
+    def apply(transaction):
+        snapshot = farm_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.NOT_FOUND,
+                message="Farm not found.",
+            )
+        before = (snapshot.to_dict() or {}).get("milkPricePerKg")
+        transaction.update(farm_ref, {"milkPricePerKg": value})
+        _write_audit(
+            transaction,
+            db,
+            farm_id,
+            {
+                "action": "farm.milk_price_changed",
+                "farmId": farm_id,
+                "before": before,
+                "after": value,
+                "actorUid": req.auth.uid,
+                "actorEmail": (req.auth.token or {}).get("email"),
+                "at": firestore.SERVER_TIMESTAMP,
+            },
+        )
+
+    apply(db.transaction())
+    return {"ok": True, "milkPricePerKg": value}

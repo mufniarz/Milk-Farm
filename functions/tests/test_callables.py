@@ -973,3 +973,167 @@ def test_retroactive_posting_handles_two_skipped_lines_for_one_feed():
     )
     assert feeding["inventorySkippedLines"] == []
     assert feeding["inventorySkippedFeedIds"] == []
+
+
+def _failure_doc(feeding_id, status="pending", retry_count=1):
+    ref = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .document(feeding_id)
+    )
+    ref.set(
+        {
+            "farmId": "f1",
+            "feedingId": feeding_id,
+            "error": "boom",
+            "status": status,
+            "retryCount": retry_count,
+        }
+    )
+    return ref
+
+
+def test_failure_claim_lock_resolve_and_record():
+    _prepare_inventory(1000)
+    ref = _failure_doc("feeding-claim")
+
+    claimed = main._claim_failure(DB, "f1", "feeding-claim", "instance-1")
+    assert claimed is not None
+    assert ref.get().to_dict()["status"] == "retrying"
+    # A second scanner cannot claim the same document.
+    assert (
+        main._claim_failure(DB, "f1", "feeding-claim", "instance-2") is None
+    )
+
+    main._resolve_trigger_failure(DB, "f1", "feeding-claim", "test")
+    data = ref.get().to_dict()
+    assert data["status"] == "resolved"
+    assert data["resolvedBy"] == "test"
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    assert any(
+        entry["action"] == "feeding.trigger_resolved"
+        and entry["feedingId"] == "feeding-claim"
+        for entry in audits
+    )
+
+    # A fresh failure records pending with an incremented retry count.
+    main._record_trigger_failure(
+        DB, "f1", "feeding-record", RuntimeError("cold start")
+    )
+    recorded = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedingTriggerFailures")
+        .document("feeding-record")
+        .get()
+        .to_dict()
+    )
+    assert recorded["status"] == "pending"
+    assert recorded["retryCount"] == 1
+    assert "cold start" in recorded["error"]
+
+
+def test_bulk_retry_posts_and_resolves_a_dead_failure():
+    _prepare_inventory(1000)
+    _create_feeding(
+        feeding_id="feeding-retry",
+        lines=_feeding_lines(loaded=(50,)),
+    )
+    ref = _failure_doc("feeding-retry", status="dead", retry_count=5)
+
+    result = _handler(main.retry_feeding_failures)(
+        _Req("owner", {"farmId": "f1"})
+    )
+    assert result["resolved"] == 1
+    assert result["failed"] == 0
+    assert _on_hand("feed1")["onHandKgAsFed"] == 950
+
+    feeding = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("feedings")
+        .document("feeding-retry")
+        .get()
+        .to_dict()
+    )
+    assert feeding["inventoryPostedAt"] is not None
+    assert ref.get().to_dict()["status"] == "resolved"
+    assert ref.get().to_dict()["resolvedBy"].startswith("manual-")
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    assert any(
+        entry["action"] == "feeding.trigger_resolved"
+        and entry["feedingId"] == "feeding-retry"
+        for entry in audits
+    )
+
+
+def test_failure_exhaustion_marks_dead_and_audits():
+    ref = _failure_doc("feeding-dead", status="retrying", retry_count=4)
+    main._fail_retry(
+        DB, "f1", "feeding-dead", RuntimeError("still down")
+    )
+    data = ref.get().to_dict()
+    assert data["status"] == "dead"
+    assert data["retryCount"] == 5
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    dead = [
+        entry for entry in audits if entry["action"] == "feeding.trigger_dead"
+    ]
+    assert len(dead) == 1
+    assert dead[0]["feedingId"] == "feeding-dead"
+    assert dead[0]["retryCount"] == 5
+
+
+def test_set_farm_milk_price_audits_and_denies_a_feeder():
+    seed()
+    result = _handler(main.set_farm_milk_price)(
+        _Req("owner", {"farmId": "f1", "milkPricePerKg": 0.55})
+    )
+    assert result["milkPricePerKg"] == 0.55
+    farm = DB.collection("farms").document("f1").get().to_dict()
+    assert farm["milkPricePerKg"] == 0.55
+
+    audits = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    changed = [
+        entry
+        for entry in audits
+        if entry["action"] == "farm.milk_price_changed"
+    ]
+    assert len(changed) == 1
+    assert changed[0]["before"] is None
+    assert changed[0]["after"] == 0.55
+    assert changed[0]["actorUid"] == "owner"
+
+    seed(member_uid="feeder_user", member_role="feeder")
+    with pytest.raises(https_fn.HttpsError):
+        _handler(main.set_farm_milk_price)(
+            _Req("feeder_user", {"farmId": "f1", "milkPricePerKg": 0.6})
+        )

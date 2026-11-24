@@ -162,6 +162,15 @@ service cloud.firestore {
         allow delete: if hasRole(farmId, ['owner', 'farmAdmin']);
       }
 
+      // ── Trigger failure queue (server-written, operator-readable) ──
+      match /feedingTriggerFailures/{failureId} {
+        allow read: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant']
+        );
+        allow write: if false;
+      }
+
       // ── Inventory (callable-written, member-readable) ──
       match /inventoryItems/{itemId} {
         allow read: if isMember(farmId);

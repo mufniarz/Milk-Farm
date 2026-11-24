@@ -204,7 +204,9 @@
     "RETRO_POST": "Registra carichi non scaricati",
     "RETRO_POSTED": "Righe registrate",
     "RETRO_FAILED": "Registrazione retroattiva non riuscita.",
-    "PENDING_SKIPPED": "Alimenti con carichi non scaricati"
+    "PENDING_SKIPPED": "Alimenti con carichi non scaricati",
+    "FAILURES": "Carichi non registrati",
+    "VIEW_LOADING": "Apri il caricamento"
   },
   "LOADING": {
     "TITLE": "Carico in stalla",
@@ -236,7 +238,12 @@
     "POSTING": "registrazione…",
     "OVERDRAFT_ACK": "Ho capito: il carico supera la giacenza",
     "OVERDRAFT_ACK_REQUIRED": "Conferma la casella per procedere con il carico in eccedenza.",
-    "POSTING_DELAYED": "registrazione in ritardo — riprova più tardi"
+    "POSTING_DELAYED": "registrazione in ritardo — riprova più tardi",
+    "FAILURES": "Carichi non registrati",
+    "RETRY_ALL": "Riprova tutti",
+    "FAILED": "Non registrato",
+    "RETRY_DONE": "Riprova completata",
+    "RETRY_FAILED": "Riprova non riuscita."
   },
   "ACCURACY": {
     "TITLE": "Precisione di caricamento",
@@ -288,6 +295,8 @@
     "EMPTY": "Seleziona un gruppo con una registrazione latte.",
     "NO_COST": "Nessun costo razione disponibile: assegna una razione attiva al gruppo o registra il costo. IOFC non calcolabile.",
     "NO_RECORD": "Nessuna registrazione latte per questa data. Inserisci il latte del gruppo per calcolare l'IOFC.",
-    "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere l'IOFC."
+    "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere l'IOFC.",
+    "AWAITING_FEEDING": "Nessun carico confermato per questa data: lo snapshot userà il numero di capi del gruppo. Conferma il carico e salva la registrazione latte.",
+    "ZERO_HEAD": "Gruppo con 0 capi: l'IOFC per vacca non è definito."
   }
 }
