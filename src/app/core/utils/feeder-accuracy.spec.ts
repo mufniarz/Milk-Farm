@@ -177,6 +177,55 @@ describe('feeder accuracy math', () => {
     ]);
   });
 
+  it('ranks worst ingredients by cumulative deviation, not average', () => {
+    const lines = [
+      {
+        lineId: 'a1',
+        feedId: 'a',
+        feedName: 'A',
+        calledKgAsFed: 100,
+        loadedKgAsFed: 120,
+        costPerKgAsFed: 0.1,
+      },
+      ...Array.from({ length: 5 }, (_, index) => ({
+        lineId: `b${index}`,
+        feedId: 'b',
+        feedName: 'B',
+        calledKgAsFed: 100,
+        loadedKgAsFed: 105,
+        costPerKgAsFed: 0.1,
+      })),
+    ];
+    const rows = buildAccuracyRows([feeding({ lines })]);
+    const [summary] = summarizeByFeeder(rows);
+    // A: 20% average, 20 kg cumulative. B: 5% average, 25 kg cumulative.
+    expect(summary.worstIngredients[0].feedName).toBe('B');
+    expect(summary.worstIngredients[0].totalAbsDeviationKg).toBe(25);
+    expect(summary.worstIngredients[1].feedName).toBe('A');
+    expect(summary.worstIngredients[1].totalAbsDeviationKg).toBe(20);
+  });
+
+  it('clamps a negative intake efficiency and flags the data error', () => {
+    const rows = buildAccuracyRows([
+      feeding({
+        refusedKgAsFed: 300,
+        lines: [
+          {
+            lineId: 'x',
+            feedId: 'hay',
+            feedName: 'Hay',
+            calledKgAsFed: 250,
+            loadedKgAsFed: 250,
+            costPerKgAsFed: 0.1,
+          },
+        ],
+      }),
+    ]);
+    const [summary] = summarizeByFeeder(rows);
+    expect(summary.intakeEfficiencyPct).toBe(0);
+    expect(summary.refusalError).toBeTrue();
+  });
+
   it('filters rows by the report window', () => {
     const rows = buildAccuracyRows([
       feeding({ date: '2026-11-20' }),

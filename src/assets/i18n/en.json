@@ -259,9 +259,10 @@
     "EXPORTED": "CSV exported.",
     "INTAKE_EFF": "Intake efficiency",
     "INTAKE_TOOLTIP": "100 × (1 − refused / loaded)",
-    "WORST_TOOLTIP": "Mean absolute deviation, highest first; ties alphabetical.",
+    "WORST_TOOLTIP": "Cumulative absolute deviation in kg; ties by mean deviation, then alphabetical.",
     "TREND_TOOLTIP": "Monday-start weeks; mean absolute deviation.",
-    "RESTRICTED": "Only the owner, farm admin or consultant can view this report."
+    "RESTRICTED": "Only the owner, farm admin or consultant can view this report.",
+    "REFUSAL_ERROR": "Refused exceeds loaded: check the data."
   },
   "IOFC": {
     "TITLE": "Income over feed cost",
@@ -279,9 +280,11 @@
     "IOFC_COW": "IOFC / cow / day",
     "MILK_COW": "Milk / cow",
     "FEED_PER_KG": "Feed cost / kg milk",
-    "TREND": "Recent days",
+    "TREND": "Last 7 days",
     "NO_RECIPE": "This group has no active ration: feed cost is zero until you assign one.",
     "DRY": "IOFC does not apply to dry groups.",
-    "EMPTY": "Select a group with a milk record."
+    "EMPTY": "Select a group with a milk record.",
+    "NO_COST": "No feed cost available: assign an active recipe to the group or record the cost. IOFC is not calculable.",
+    "NO_RECORD": "No milk record for this date. Enter the group's milk to calculate IOFC."
   }
 }

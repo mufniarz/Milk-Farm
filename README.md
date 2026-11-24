@@ -136,7 +136,10 @@ inventory and target overrides require `farmMembers`.
   failed confirm can be retried without creating a duplicate draft. The
   recent list shows "posting…" until `inventoryPostedAt` is set.
 - Feeders are names in `farms/{farmId}/feeders`, not logins. `feederId` is
-  the name record; `createdBy` is the operator who entered the load.
+  the name record; `createdBy` is the operator who entered the load. The
+  loading sheet is operated by owner/admin/consultant; a feeder-role account
+  cannot read or write feedings. If feeder logins become a requirement, add
+  an explicit `feederUid` and scope on it.
 - The recent list shows "posting…" until the trigger sets
   `inventoryPostedAt`, then "posting delayed — check back" after 30 seconds;
   a dead-letter view is the next operational addition.
@@ -177,8 +180,19 @@ inventory and target overrides require `farmMembers`.
 - IOFC lives at `/iofc`: milk records keyed by group and local date, feed
   cost from the active recipe, IOFC/day, per cow, milk per cow and feed cost
   per kg. Milk records are owner/admin/consultant only. Dry groups show IOFC
-  as not applicable.
+  as not applicable. With no recipe and no snapshot the page shows n/a, never
+  a zero feed cost; existing records use their `feedCostPerHeadSnapshot` and
+  `headCountSnapshot` so historical IOFC does not move. The trend is the last
+  seven records. The milk price is per record (form default EUR 0.50); a
+  farm-level default is not implemented, and fat/protein are stored but not
+  used by flat-price IOFC.
 - **Pre-deploy requirement:** the trigger failure queue/alert must exist
   before the trigger is deployed. The SDK cannot enable retry (0.6.0 stable and
   0.7.0rc0 both hardcode `retry=False`), so a transient failure otherwise
   loses the inventory posting silently.
+- **Deploy chain:** everything except the trigger can ship first — feeds,
+  recipes, targets, groups, inventory items/ledger (manual), loading sheet,
+  accuracy and IOFC. Loading works without automatic inventory posting; IOFC
+  and the accuracy report are fully functional. The failure queue is the
+  gate for the trigger only, and it is deliberately ahead of the scenario
+  increment.

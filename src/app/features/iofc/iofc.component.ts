@@ -22,10 +22,10 @@ import { localDateKey } from '../../core/utils/loading-math';
 /**
  * Income over feed cost for one herd group and day.
  *
- * Milk is entered as the whole-group daily total; per-cow figures are derived
- * from the group head count. Feed cost uses the active recipe's per-head cost
- * and is snapshotted on each milk record so later recipe changes do not
- * rewrite history.
+ * The current date uses the active recipe's per-head cost; an existing milk
+ * record uses its own snapshot (per-head cost and head count) so historical
+ * IOFC does not move when the herd or the recipe changes. A group without a
+ * recipe and without a snapshot renders n/a, never a zero feed cost.
  */
 @Component({
   selector: 'mf-iofc',
@@ -103,11 +103,10 @@ import { localDateKey } from '../../core/utils/loading-math';
       } @else if (isDry) {
         <div class="banner warning">{{ 'IOFC.DRY' | translate }}</div>
       } @else {
-        @if (!feedCostPerHead) {
-          <div class="banner warning">{{ 'IOFC.NO_RECIPE' | translate }}</div>
-        }
-
-        @if (result; as r) {
+        @if (!hasRecordForDate && milkKg === 0) {
+          <p class="empty">{{ 'IOFC.NO_RECORD' | translate }}</p>
+        } @else {
+          @if (result; as r) {
           <div class="stats-grid">
             <mat-card appearance="outlined"><mat-card-content>
               <span class="stat-value">€{{ r.milkRevenuePerDay | number: '1.2-2' }}</span>
@@ -140,6 +139,9 @@ import { localDateKey } from '../../core/utils/loading-math';
               <span class="stat-label">{{ 'IOFC.FEED_PER_KG' | translate }}</span>
             </mat-card-content></mat-card>
           </div>
+          } @else {
+            <div class="banner warning">{{ 'IOFC.NO_COST' | translate }}</div>
+          }
         }
 
         <mat-card appearance="outlined" class="trend-card">
@@ -222,7 +224,8 @@ export class IofcComponent implements OnInit {
   date = localDateKey();
   milkKg = 0;
   milkPricePerKg = 0.5;
-  feedCostPerHead = 0;
+  feedCostPerHead: number | null = null;
+  hasRecordForDate = false;
   saving = false;
 
   ngOnInit(): void {
@@ -239,6 +242,10 @@ export class IofcComponent implements OnInit {
     return this.groups.find((group) => group.id === this.selectedGroupId);
   }
 
+  private get recordForDate(): MilkRecord | undefined {
+    return this.records.find((record) => record.date === this.date);
+  }
+
   get isDry(): boolean {
     return this.group?.animalGroupId === 'dry';
   }
@@ -246,45 +253,57 @@ export class IofcComponent implements OnInit {
   get result(): IofcResult | null {
     const group = this.group;
     if (!group || group.headCount <= 0) return null;
+    const record = this.recordForDate;
+    const feedCost =
+      record?.feedCostPerHeadSnapshot ?? this.feedCostPerHead;
+    if (feedCost === null) return null;
+    const headCount = record?.headCountSnapshot ?? group.headCount;
+    if (!headCount || headCount <= 0) return null;
     return computeIofc({
-      headCount: group.headCount,
+      headCount,
       milkKg: this.milkKg,
       milkPricePerKg: this.milkPricePerKg,
-      feedCostPerHead: this.feedCostPerHead,
+      feedCostPerHead: feedCost,
     });
   }
 
   get trend(): { date: string; milkKg: number; iofcPerCow: number }[] {
     const group = this.group;
-    if (!group || group.headCount <= 0) return [];
-    return this.records.slice(0, 4).map((record) => {
+    if (!group) return [];
+    const points: { date: string; milkKg: number; iofcPerCow: number }[] = [];
+    for (const record of this.records.slice(0, 7)) {
+      const headCount = record.headCountSnapshot ?? group.headCount;
+      const feedCost =
+        record.feedCostPerHeadSnapshot ?? this.feedCostPerHead;
+      if (!headCount || headCount <= 0 || feedCost === null) continue;
       const result = computeIofc({
-        headCount: group.headCount,
+        headCount,
         milkKg: record.milkKg,
         milkPricePerKg: record.milkPricePerKg,
-        feedCostPerHead:
-          record.feedCostPerHeadSnapshot ?? this.feedCostPerHead,
+        feedCostPerHead: feedCost,
       });
-      return {
+      points.push({
         date: record.date,
         milkKg: record.milkKg,
         iofcPerCow: result.iofcPerCowPerDay,
-      };
-    });
+      });
+    }
+    return points;
   }
 
   async onGroupChange(): Promise<void> {
     const group = this.group;
-    this.feedCostPerHead = 0;
+    this.feedCostPerHead = null;
     this.records = [];
     this.milkKg = 0;
     this.milkPricePerKg = 0.5;
+    this.hasRecordForDate = false;
     if (!group?.id) return;
     if (group.activeRecipeId) {
       const recipe = await this.recipeService.getRecipeWithFeeds(
         group.activeRecipeId,
       );
-      this.feedCostPerHead = recipe?.cost ?? 0;
+      this.feedCostPerHead = recipe?.cost ?? null;
     }
     await this.loadRecords(group.id);
     this.applyRecordForDate();
@@ -301,7 +320,8 @@ export class IofcComponent implements OnInit {
   }
 
   private applyRecordForDate(): void {
-    const record = this.records.find((entry) => entry.date === this.date);
+    const record = this.recordForDate;
+    this.hasRecordForDate = !!record;
     if (record) {
       this.milkKg = record.milkKg;
       this.milkPricePerKg = record.milkPricePerKg;
@@ -322,8 +342,10 @@ export class IofcComponent implements OnInit {
         milkKg: this.milkKg,
         milkPricePerKg: this.milkPricePerKg,
         feedCostPerHeadSnapshot: this.feedCostPerHead,
+        headCountSnapshot: group.headCount,
       });
       await this.loadRecords(group.id);
+      this.applyRecordForDate();
       this.snackBar.open(
         this.translate.instant('IOFC.SAVED'),
         undefined,

@@ -163,20 +163,6 @@
       ]
     },
     {
-      "collectionGroup": "feedings",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "createdBy",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "milkRecords",
       "queryScope": "COLLECTION",
       "fields": [

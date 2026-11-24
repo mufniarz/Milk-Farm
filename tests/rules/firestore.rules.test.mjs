@@ -257,13 +257,13 @@ test('inactive membership is denied', async () => {
 });
 
 
-test('a feeder can create and confirm a draft feeding once', async () => {
-  const feeder = dbFor('feeder');
+test('a farm admin can create and confirm a draft feeding once', async () => {
+  const member = dbFor('member');
   await assertSucceeds(
-    getDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1')),
+    getDoc(doc(member, 'farms', 'f1', 'feedings', 'feeding1')),
   );
   await assertSucceeds(
-    setDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding2'), {
+    setDoc(doc(member, 'farms', 'f1', 'feedings', 'feeding2'), {
       farmId: 'f1',
       herdGroupId: 'g1',
       status: 'draft',
@@ -272,14 +272,30 @@ test('a feeder can create and confirm a draft feeding once', async () => {
     }),
   );
   await assertSucceeds(
-    updateDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1'), {
+    updateDoc(doc(member, 'farms', 'f1', 'feedings', 'feeding1'), {
       status: 'confirmed',
     }),
   );
   // Once confirmed, the client can no longer edit the feeding.
   await assertFails(
-    updateDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1'), {
+    updateDoc(doc(member, 'farms', 'f1', 'feedings', 'feeding1'), {
       status: 'draft',
+    }),
+  );
+});
+
+test('a feeder account cannot read or write feedings', async () => {
+  const feeder = dbFor('feeder');
+  await assertFails(
+    getDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1')),
+  );
+  await assertFails(
+    setDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding3'), {
+      farmId: 'f1',
+      herdGroupId: 'g1',
+      status: 'draft',
+      lines: [],
+      idempotencyKey: 'feeding-key-3',
     }),
   );
 });
@@ -329,20 +345,7 @@ test('an outsider cannot read feeders', async () => {
 });
 
 
-test('a feeder account reads only the feedings it entered', async () => {
-  const feeder = dbFor('feeder');
-  await assertSucceeds(
-    getDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding1')),
-  );
-  await assertFails(
-    getDoc(doc(feeder, 'farms', 'f1', 'feedings', 'feeding-other')),
-  );
 
-  const member = dbFor('member');
-  await assertSucceeds(
-    getDoc(doc(member, 'farms', 'f1', 'feedings', 'feeding-other')),
-  );
-});
 
 
 test('milk records are owner/admin/consultant only', async () => {

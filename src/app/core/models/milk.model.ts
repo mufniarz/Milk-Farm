@@ -1,6 +1,6 @@
 /**
  * One day's milk record for a herd group, stored at
- * `/farms/{farmId}/milkRecords/{groupId}_{date}`.
+ * `/farms/{farmId}/milkRecords/{herdGroupId}_{date}`.
  *
  * `milkKg` is the whole-group total for the day; per-cow figures are derived
  * by dividing by the group head count. `feedCostPerHeadSnapshot` preserves
@@ -18,6 +18,8 @@ export interface MilkRecord {
   fatPct?: number | null;
   proteinPct?: number | null;
   feedCostPerHeadSnapshot?: number | null;
+  /** Head count at entry time, so historical IOFC does not move. */
+  headCountSnapshot?: number | null;
   source: 'manual' | 'import';
   updatedAt?: Date;
 }

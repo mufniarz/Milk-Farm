@@ -30,6 +30,8 @@ export interface IngredientAccuracy {
   feedId: string;
   feedName: string;
   meanAbsDeviationPct: number;
+  /** Cumulative |loaded - called| in kg; this is what ranks "worst". */
+  totalAbsDeviationKg: number;
   loadWeightedDeviationPct: number;
   lineCount: number;
 }
@@ -48,8 +50,10 @@ export interface FeederAccuracy {
   loadWeightedDeviationPct: number;
   loadedKgAsFed: number;
   refusedKgAsFed: number;
-  /** 100 x (1 - refused / loaded); null when loaded is zero. */
+  /** 100 x (1 - refused / loaded), clamped at 0; null when loaded is zero. */
   intakeEfficiencyPct: number | null;
+  /** True when the recorded refusals exceed the loaded quantity. */
+  refusalError: boolean;
   overdrawnLoads: number;
   skippedLoads: number;
   worstIngredients: IngredientAccuracy[];
@@ -142,8 +146,11 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
       (sum, value) => sum + value,
       0,
     );
-    const intakeEfficiencyPct =
+    const rawIntake =
       loadedSum > 0 ? (1 - refusedSum / loadedSum) * 100 : null;
+    const intakeEfficiencyPct =
+      rawIntake === null ? null : Math.max(0, rawIntake);
+    const refusalError = loadedSum > 0 && refusedSum > loadedSum;
 
     const byIngredient = new Map<string, AccuracyRow[]>();
     for (const row of feederRows) {
@@ -168,13 +175,17 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
         feedId,
         feedName: ingredientRows[0]?.feedName ?? feedId,
         meanAbsDeviationPct: mean(values),
+        totalAbsDeviationKg: ingredientDelta,
         loadWeightedDeviationPct:
           ingredientCalled > 0 ? (ingredientDelta / ingredientCalled) * 100 : 0,
         lineCount: ingredientRows.length,
       });
     }
+    // Rank by cumulative absolute deviation: a feed off by a lot once is
+    // less costly than a feed off by a little on every load.
     ingredients.sort(
       (a, b) =>
+        b.totalAbsDeviationKg - a.totalAbsDeviationKg ||
         b.meanAbsDeviationPct - a.meanAbsDeviationPct ||
         a.feedName.localeCompare(b.feedName) ||
         a.feedId.localeCompare(b.feedId),
@@ -190,6 +201,7 @@ export function summarizeByFeeder(rows: readonly AccuracyRow[]): FeederAccuracy[
       loadedKgAsFed: loadedSum,
       refusedKgAsFed: refusedSum,
       intakeEfficiencyPct,
+      refusalError,
       overdrawnLoads: uniqueLoadCount(
         feederRows.filter((row) => row.hasOverdrawn),
       ),

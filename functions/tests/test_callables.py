@@ -787,6 +787,14 @@ def test_retroactive_posting_posts_skipped_lines_once():
         )
         == 1
     )
+    audits_after = [
+        entry.to_dict()
+        for entry in DB.collection("farms")
+        .document("f1")
+        .collection("auditLog")
+        .stream()
+    ]
+    assert len(audits_after) == len(audits)
 
 
 def test_retroactive_posting_flags_an_overdraft():

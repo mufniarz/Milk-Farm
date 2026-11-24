@@ -123,7 +123,14 @@ import {
               <span>{{ summary.lineCount }}</span>
               <span>{{ summary.meanAbsDeviationPct | number: '1.1-1' }}%</span>
               <span>{{ summary.loadWeightedDeviationPct | number: '1.1-1' }}%</span>
-              <span>
+              <span
+                [class.alert]="summary.refusalError"
+                [title]="
+                  summary.refusalError
+                    ? ('ACCURACY.REFUSAL_ERROR' | translate)
+                    : ''
+                "
+              >
                 {{
                   summary.intakeEfficiencyPct === null
                     ? '—'
@@ -141,7 +148,8 @@ import {
                 @for (item of summary.worstIngredients; track item.feedId) {
                   <span class="chip">
                     {{ item.feedName }}
-                    {{ item.meanAbsDeviationPct | number: '1.1-1' }}%
+                    {{ item.totalAbsDeviationKg | number: '1.0-0' }} kg
+                    ({{ item.meanAbsDeviationPct | number: '1.1-1' }}%)
                   </span>
                 }
               </span>

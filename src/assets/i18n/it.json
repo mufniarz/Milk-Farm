@@ -259,9 +259,10 @@
     "EXPORTED": "CSV esportato.",
     "INTAKE_EFF": "Efficienza ingestione",
     "INTAKE_TOOLTIP": "100 × (1 − rifiuti / caricato)",
-    "WORST_TOOLTIP": "Media dello scostamento assoluto; primi tre, a parità in ordine alfabetico.",
+    "WORST_TOOLTIP": "Scostamento assoluto cumulato in kg; a parità, scostamento medio e ordine alfabetico.",
     "TREND_TOOLTIP": "Settimane da lunedì; media dello scostamento assoluto.",
-    "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere questo report."
+    "RESTRICTED": "Solo titolare, amministratore o consulente possono vedere questo report.",
+    "REFUSAL_ERROR": "Rifiuti superiori al caricato: verificare i dati."
   },
   "IOFC": {
     "TITLE": "Income over feed cost",
@@ -279,9 +280,11 @@
     "IOFC_COW": "IOFC / vacca / giorno",
     "MILK_COW": "Latte / vacca",
     "FEED_PER_KG": "Costo razione / kg latte",
-    "TREND": "Ultimi giorni",
+    "TREND": "Ultimi 7 giorni",
     "NO_RECIPE": "Il gruppo non ha una razione attiva: il costo razione è zero finché non ne assegni una.",
     "DRY": "L'IOFC non si applica ai gruppi in asciutta.",
-    "EMPTY": "Seleziona un gruppo con una registrazione latte."
+    "EMPTY": "Seleziona un gruppo con una registrazione latte.",
+    "NO_COST": "Nessun costo razione disponibile: assegna una razione attiva al gruppo o registra il costo. IOFC non calcolabile.",
+    "NO_RECORD": "Nessuna registrazione latte per questa data. Inserisci il latte del gruppo per calcolare l'IOFC."
   }
 }

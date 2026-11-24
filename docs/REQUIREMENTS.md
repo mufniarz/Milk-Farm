@@ -33,7 +33,7 @@ numbers.
 | Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 14 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting (single, overdrawn, duplicate-feed, dedup, cleared audit) |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading, accuracy and IOFC math (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 21 passed — 3 calculator parity + 6 loading math + 9 accuracy + 3 IOFC |
+| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 24 passed — 3 calculator parity + 6 loading math + 11 accuracy + 4 IOFC (3 math + 1 wiring) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 15 passed — tenant boundary, legacy fallback, owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, feeder-own feedings only, milk-record roles |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
@@ -148,6 +148,12 @@ The feeding document/trigger half is in place; the loading sheet is next.
   concurrent invocations read the feeding inside their transaction, Firestore
   serializes them, the loser retries, sees `inventoryPostedAt`, and returns.
   Do not replace the transaction with a non-transactional create/set.
+- **Deploy chain.** Deploy everything except the trigger: feeds, recipes,
+  targets, groups, inventory items/ledger (manual), loading sheet, accuracy
+  and IOFC. Loading works but inventory posting is manual until the trigger's
+  failure queue exists; IOFC and the accuracy report are fully functional
+  without the trigger. The failure queue is deliberately ahead of the
+  scenario increment because the trigger must not ship without it.
 - **Retry configuration.** PyPI shows `0.6.0` as the latest stable release
   and `0.7.0rc0` as a release candidate. Both hardcode `retry=False` in
   `FirestoreOptions._endpoint` (`0.7.0rc0` still constructs
@@ -185,18 +191,25 @@ The report is the first consumer of the ingestion/loading trail. Decisions:
   local calendar `date` (`YYYY-MM-DD`), not the UTC `createdAt`. The loading
   sheet writes the date with `localDateKey()` so a load at 23:30 local stays
   on that local day.
-- **Definitions.** Worst ingredients = highest mean absolute deviation, ties
-  broken alphabetically by feed name. Weekly trend = Monday-start weeks,
-  mean absolute deviation per week. Both are shown in the column tooltips.
+- **Definitions.** Worst ingredients = highest **cumulative** absolute
+  deviation in kg (`Σ |loaded - called|`), so a feed off by a little on every
+  load outranks a feed off by a lot once; ties by mean deviation, then
+  alphabetical. Weekly trend = Monday-start weeks, mean absolute deviation
+  per week. Both are in the column tooltips.
+- **Refusal clamp.** Intake efficiency is clamped at 0 and the row is flagged
+  (`refusalError`) when refusals exceed the loaded quantity, rather than
+  rendering a negative percentage.
 - **Intake efficiency.** The on-screen summary now shows
   `100 x (1 - refused / loaded)` alongside deviation; the CSV keeps the
   per-line refusal.
-- **Access control.** The page shows a restricted message for feeder-role
-  users (owner/admin/consultant only). The feedings read rule now also scopes
-  feeder-role accounts to documents whose `createdBy` is their own uid, so a
-  feeder cannot read colleagues' loads through the collection (the accuracy
-  page's `getFeedings` query carries the matching `createdBy` filter). A
-  server-side report callable is still the right consultant-scale path.
+- **Access control.** Feeders are names, not logins: the loading sheet is
+  operated by the owner, farm admin or consultant, and the `feedings` rules
+  allow only those roles to read/write. A feeder-role account cannot read
+  feedings at all, so it cannot see colleagues' loads through the collection;
+  the accuracy page is restricted to owner/admin/consultant. If feeder logins
+  become a product requirement, add an explicit `feederUid` to the feeding
+  and scope on that. A server-side report callable is still the right
+  consultant-scale path.
 - **Intake divide-by-zero.** `loaded = 0` yields `intakeEfficiencyPct: null`
   (rendered `—`), consistent with `computeDeviationPct`.
 - **Identical feeder names.** Feeder identity is a name; two people called
@@ -239,9 +252,14 @@ Implemented as a separate, auditable action:
 - **Cleared audit.** Removing posted lines from `inventorySkippedLines` is
   itself audited as `feeding.skipped_cleared` with
   `clearedSkippedLineIds`, so the feeding mutation is not invisible.
-- **Reconciliation scope.** The callable reconciles the affected item from
-  its ledger; the nightly global reconciliation still runs and should agree.
-  Both `consumption` and `adjustment` entries count as on-hand deltas.
+- **Reconciliation scope.** Each feeding's on-hand update is inside its
+  transaction. After all feedings, the callable recomputes the affected
+  item's on-hand from its ledger as a separate best-effort correction; the
+  nightly global reconciliation still runs and should agree. Both
+  `consumption` and `adjustment` entries count as on-hand deltas.
+- **Replay audit.** A replay returns `postedLines: 0, alreadyPosted: N` and
+  writes no new `inventory.retroactive` or `feeding.skipped_cleared` entry;
+  the test asserts the audit count is unchanged.
 - **Dates.** Ledger entries carry the original feeding's local `date`; their
   `createdAt` timestamp and the audit `at` reflect the retroactive moment.
 - **Retry-safe.** Deterministic ledger ids mean a replay posts nothing twice;
@@ -266,10 +284,28 @@ The first Stage 2 item is in place:
 - **Acceptance:** 100 cows x 30 kg x EUR 0.50 = EUR 1,500 revenue; 100 x
   EUR 4.50 = EUR 450 feed; IOFC EUR 1,050/day, EUR 10.50/cow/day,
   EUR 0.15/kg feed cost. Covered by `iofc.spec.ts`.
+- **No cost means n/a, not zero.** If the group has no active recipe and the
+  selected date has no feed-cost snapshot, `result` is null and the page
+  renders a n/a warning; a missing cost never produces a fictional IOFC.
+- **Live vs snapshot.** A new date uses the active recipe's current per-head
+  cost; an existing milk record uses its own `feedCostPerHeadSnapshot` and
+  `headCountSnapshot`, so historical IOFC does not move when the recipe or
+  herd changes. Older records without a snapshot fall back to the current
+  cost and head count.
+- **No record.** A date with no milk record and zero entered milk shows "no
+  record for this date", not a zero-revenue/negative-IOFC day. Entering milk
+  previews the result until saved.
 - **Dashboard** at `/iofc`: group, date, group milk and price; cards for
   revenue, feed cost, IOFC/day, IOFC/cow, milk/cow and feed cost/kg; a
-  four-day trend from the stored records. Dry groups show IOFC as not
-  applicable; a group without an active recipe warns that feed cost is zero.
+  seven-day trend from the stored records. Dry groups show IOFC as not
+  applicable.
+- **Milk price.** The price is per record; the form defaults to EUR 0.50.
+  A farm-level default setting is not implemented yet. `fatPct`/`proteinPct`
+  are stored but not used by the flat-price IOFC, so no one assumes component
+  pricing is wired.
+- **Wiring test.** `iofc.component.spec.ts` uses a real group (headCount 100
+  and 50) and a recipe cost of EUR 4.50, asserting feed cost 450 and 225, so
+  the group/head-count/per-head wiring is tested, not just the arithmetic.
 - **Still to do in Stage 2:** what-if scenarios, sensitivity at +/-5/10% for
   the top ingredients, saved scenario library, and the comparison export.
 
