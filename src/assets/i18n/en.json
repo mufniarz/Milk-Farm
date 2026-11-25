@@ -134,7 +134,8 @@
     "TOTAL_DM_CONSTRAINT": "Total DM (kg)",
     "MIN_FORAGE_RATIO": "Minimum forage ratio",
     "MAX_FORAGE_RATIO": "Maximum forage ratio",
-    "DELETE_CONFIRM": "Are you sure you want to delete this recipe?"
+    "DELETE_CONFIRM": "Are you sure you want to delete this recipe?",
+    "UNREACHABLE_HINT": "These targets cannot be met with the current feeds. Use relaxed mode for the closest ration, or override the targets."
   },
   "COMMON": {
     "LOADING": "Loading...",
@@ -162,7 +163,8 @@
     "REASON_REQUIRED": "Enter a reason of at least 10 characters.",
     "SAVED": "Target updated.",
     "REVERTED": "Target reverted to the reference.",
-    "SAVE_FAILED": "Could not save."
+    "SAVE_FAILED": "Could not save.",
+    "FIBRE_WARNING": "This fibre target is below the reference floor: herd-health risk. Record the reason for the override."
   },
   "GROUPS": {
     "TITLE": "Herd groups",

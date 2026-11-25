@@ -17,7 +17,7 @@ is expected to be **≤ €9.885**, not equal to it.
 
 | Scenario | Status | Total DM | Total cost |
 |---|---|---|---|
-| Full targets, `strict` | `infeasible` | — | — |
+| Full targets, `strict` | `infeasible` (ADF/aNDF in `unreachableTargets`) | — | — |
 | Full targets, `relaxed` | `relaxed` | **23.1** | **€9.373** |
 | Protein/starch targets, `relaxed` | `optimal` | **23.1** | **€6.031** |
 
@@ -43,7 +43,14 @@ fibre class" ration: the absolute fibre floors hold.
 
 The €6.031 protein/starch-only result is a sensitivity data point, not a
 recommended ration: disabling fibre targets collapses cost and would be
-unsafe. The override UI should warn when a fibre target is disabled.
+unsafe. The targets screen now warns when a fibre target is set below the
+reference floor.
+
+The solution hugs boundaries (ADF exactly 18.0, uNDF/aNDF at 36.5001). That is
+a cost-minimisation consequence and makes the safety check sensitive to feed
+analysis changes; repeat it whenever the feed library changes. The
+uNDF/aNDF value is within tolerance but at the edge, so it is not listed as a
+warning.
 
 ## Reproduce
 

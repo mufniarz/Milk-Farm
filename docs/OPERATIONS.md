@@ -26,7 +26,8 @@ underlying log entries. Grant them to the deployment account, then run the
 script with an operator email.
 
 The out-of-band alert is a precondition for the first invoice, not for the
-free design-partner pilot. The gate is **delivery**, not creation: cause one
+free design-partner pilot. Owner: the farm operator. Blocker: operator email
+and the Monitoring IAM grant; resolve at the first paying customer. The gate is **delivery**, not creation: cause one
 synthetic error (or use a `--test` run once the script supports it) and
 confirm the operator receives it. A policy that has never fired does not
 satisfy the gate.

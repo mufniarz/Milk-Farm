@@ -134,7 +134,8 @@
     "TOTAL_DM_CONSTRAINT": "SS Totale (kg)",
     "MIN_FORAGE_RATIO": "Rapporto foraggio minimo",
     "MAX_FORAGE_RATIO": "Rapporto foraggio massimo",
-    "DELETE_CONFIRM": "Sei sicuro di voler eliminare questa ricetta?"
+    "DELETE_CONFIRM": "Sei sicuro di voler eliminare questa ricetta?",
+    "UNREACHABLE_HINT": "Questi obiettivi non sono raggiungibili con gli alimenti attuali. Usa la modalità rilassata per la razione più vicina o modifica gli obiettivi."
   },
   "COMMON": {
     "LOADING": "Caricamento...",
@@ -162,7 +163,8 @@
     "REASON_REQUIRED": "Inserisci una motivazione di almeno 10 caratteri.",
     "SAVED": "Obiettivo aggiornato.",
     "REVERTED": "Obiettivo ripristinato al riferimento.",
-    "SAVE_FAILED": "Salvataggio non riuscito."
+    "SAVE_FAILED": "Salvataggio non riuscito.",
+    "FIBRE_WARNING": "Questo obiettivo fibra è sotto il minimo di riferimento: rischio per la salute del gruppo. Motiva la deroga."
   },
   "GROUPS": {
     "TITLE": "Gruppi di animali",

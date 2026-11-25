@@ -317,6 +317,11 @@ interface RecipeFeedEntry {
                 }
 
                 @if (optimizationWarnings().length) {
+                  @if (optimizationStatus() === 'infeasible') {
+                    <p class="optimization-hint">
+                      {{ 'RECIPES.UNREACHABLE_HINT' | translate }}
+                    </p>
+                  }
                   <ul class="optimization-warnings">
                     @for (warning of optimizationWarnings(); track warning.code) {
                       <li>
@@ -1101,6 +1106,9 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
         this.optimizationStatus.set('infeasible');
         this.optimizationMessage.set(
           result.message || this.translate.instant('RECIPES.INFEASIBLE'),
+        );
+        this.optimizationWarnings.set(
+          result.unreachableTargets ?? result.warnings ?? [],
         );
       }
     } catch (e: any) {

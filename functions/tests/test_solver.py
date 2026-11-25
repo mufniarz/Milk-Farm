@@ -131,6 +131,9 @@ def test_strict_mode_rejects_relaxed_reference():
     )
     assert result["status"] == "infeasible"
     assert "strict" in result["message"].lower()
+    assert "ADF_aNDF" in {
+        target["code"] for target in result["unreachableTargets"]
+    }
 
 
 def test_relaxed_reference_keeps_absolute_fibre_floors():

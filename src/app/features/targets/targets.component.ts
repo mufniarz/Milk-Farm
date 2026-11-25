@@ -14,6 +14,7 @@ import { AnimalGroupId } from '../../core/models/recipe.model';
 import { EffectiveNutrientTarget } from '../../core/models/nutrient.model';
 import { TargetService } from '../../core/services/target.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
+import { isFibreBelowReference } from '../../core/utils/target-safety';
 
 interface TargetDraft {
   minValue: number | null;
@@ -94,6 +95,13 @@ interface TargetDraft {
                     class="override-icon"
                     [matTooltip]="target.reason ?? ''"
                     >edit</mat-icon
+                  >
+                }
+                @if (fibreWarning(target)) {
+                  <mat-icon
+                    class="fibre-warning"
+                    [matTooltip]="'TARGETS.FIBRE_WARNING' | translate"
+                    >warning</mat-icon
                   >
                 }
               </span>
@@ -225,6 +233,14 @@ interface TargetDraft {
       gap: 4px;
       font-weight: 600;
     }
+    .fibre-warning {
+      color: #a02525;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
     .override-icon {
       font-size: 15px;
       width: 15px;
@@ -284,6 +300,16 @@ export class TargetsComponent implements OnInit {
   targets: EffectiveNutrientTarget[] = [];
   drafts: Record<string, TargetDraft> = {};
   saving = false;
+
+  fibreWarning(target: EffectiveNutrientTarget): boolean {
+    const draft = this.drafts[target.nutrientCode];
+    return isFibreBelowReference(
+      target.nutrientCode,
+      draft?.minValue,
+      draft?.maxValue,
+      target.referenceMinValue,
+    );
+  }
 
   get canEdit(): boolean {
     const role = this.farmContext.activeRole();

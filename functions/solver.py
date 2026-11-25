@@ -67,12 +67,14 @@ def solve_ration(feeds, targets, constraints, mode="relaxed"):
         return result
 
     if mode == "strict":
+        relaxed = _solve_relaxed(feeds, targets, constraints)
         return {
             "status": "infeasible",
             "message": (
                 "Targets cannot be met in strict mode. "
                 "Relax the targets or use relaxed mode."
             ),
+            "unreachableTargets": relaxed.get("warnings", []),
         }
     return _solve_relaxed(feeds, targets, constraints)
 

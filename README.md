@@ -314,7 +314,8 @@ project configured; no staging project exists).
   [`docs/BROWSER_SMOKE.md`](docs/BROWSER_SMOKE.md). The stale banner was
   remade visible on an empty queue, and the CSV download was byte-checked
   (BOM + `;` header), though not opened in Excel. The i18n check now scans
-  used keys and found two more missing default-price keys.
+  used keys and found two more missing default-price keys. Dynamic keys built
+  by concatenation are not scanned; user-visible keys must be literal.
 - **No staging:** the mitigation is production-only: full local gate before
   every deploy, the authenticated smoke after every deploy, and a manual
   rollback of the previous functions/rules version. Creating

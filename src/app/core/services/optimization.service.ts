@@ -47,6 +47,8 @@ export interface OptimizationResult {
   nutrientAnalysis?: Record<string, number>;
   /** Present when status is 'relaxed': nutrients that remain out of range. */
   warnings?: OptimizationWarning[];
+  /** Strict mode: targets the solver could not satisfy. */
+  unreachableTargets?: OptimizationWarning[];
   message: string;
 }
 
