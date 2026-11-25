@@ -151,7 +151,10 @@ A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
 
 `applyScenario` returns **`status: computed | infeasible`**, not the solver's
 `optimal`/`relaxed`; empty changes reproduce the same values and `computed`
-status. The `Stato` column in `Scenari` uses these values.
+status. `infeasible` means the base cannot be evaluated (missing feed,
+invalid line, or zero total DM). A computed ration with unreachable targets
+is `computed` with warnings, not `infeasible`. The `Stato` column in
+`Scenari` uses these values.
 
 ### Columns
 
@@ -185,18 +188,26 @@ effective targets** (base + `targetOverrides`). This is what makes an
 override scenario visible when its value deltas are zero.
 
 The export **recomputes server-side** from saved `changes` + current base
-(one TS scenario recompute callable feeding the Python workbook formatter;
-not client-side, so a stale browser cannot export stale numbers).
-`computed_at` records the recomputation. `scenario_cost_saved`, `saved_at`
-and `diverged` come from comparing against the stored `resultSnapshot`.
-`Sensibilità` uses the same recomputed values.
+with the Python `apply_scenario` (`functions/scenario.py`). The server runtime
+stays Python: no second functions runtime. The TS `applyScenario` is the
+client preview and is pinned to the Python implementation by the shared value
+fixture. The export formatter reads the server recompute; a stale browser
+cannot export stale numbers.
+`computed_at` is **server time** (ISO 8601 UTC). `scenario_cost_saved`,
+`saved_at` and `diverged` come from comparing against the stored
+`resultSnapshot`; `saved_at` is server time because the save callable writes
+the snapshot. `diverged` uses a relative tolerance of **0.1% of the saved
+value with a 0.001 absolute floor** (`abs(diff) > max(0.001, 0.001 *
+abs(saved))`). `Sensibilità` uses the same server recomputed values.
 
-**Classification parity:** `applyScenario` produces the scenario values,
-compliance and warnings; the solver uses Python's `classify_target`. Both
-implement the same 0.001 rule, and a shared fixture
-(`src/assets/boundary-cases.json`) is asserted by both a Karma spec and a
-pytest, so a change to one threshold fails the other. Do not change one
-without the other.
+**Classification parity:** the TS `applyScenario` and Python
+`apply_scenario` both use the shared boundary fixture
+(`src/assets/boundary-cases.json`). The **value parity** fixture
+(`scenario-parity-cases.json`) runs the base plus eight change cases through
+both implementations and asserts DM, as-fed, cost, compliance and warning
+codes. Changing either implementation without the other fails Karma or
+pytest. The server runtime is Python; the TS implementation is the client
+preview.
 
 Deltas are **scenario − base**; a cheaper scenario has a negative
 `delta_cost`. A header note states this. `computed_at`/`saved_at` are ISO
@@ -228,11 +239,19 @@ An infeasible scenario is `NA()` in every numeric cell, with
 Sensitivity is **per scenario** and lives in a third sheet, `Sensibilità`:
 one row per scenario, **12 delta-cost columns** (top 3 ingredients × ±5%/±10%
 price shocks), plus the scenario/base identification. Rows-per-shock is
-rejected for readability. It is ranked **per scenario**, because an inclusion
-change can alter the top 3. Only saved scenarios are exported; the builder's
-unsaved state is not. The pure function is
-`topThreeByCostContribution`; price shocks are ±5%/±10%, not inclusion
-shocks. It is unit-tested independently.
+rejected for readability.
+
+- **Input:** the server `ScenarioSnapshot` (same recompute as `Scenari`), not
+  the saved snapshot or the client payload.
+- **Ranking:** per scenario, `unitCostPerKgAsFed × kgAsFed` summed per feed,
+  descending; ties by `feedId` alphabetically, take 3.
+- **Shock:** ±5%/±10% on the feed's unit cost, quantity fixed; the delta is
+  `newCost − scenarioCost`.
+- **Output:** 12 `delta_cost` values per scenario; infeasible scenarios are
+  `NA()`.
+- Only saved scenarios; the builder's unsaved state is not exported. The pure
+  function is `topThreeByCostContribution`; price shocks are price-only, not
+  inclusion.
 
 ## Build acceptance tests
 
@@ -265,6 +284,19 @@ The first build must assert:
 - save rejects a `targetOverrides` key not in the farm's current overrides and
   an `inclusions`/`feedPrices` key not in the base's line list;
 - the server recompute, not the client payload, writes the audit snapshot;
+- base recipe deleted: scenarios remain, replay returns
+  `status: infeasible`, `reason: base-deleted`; export row is `NA()` with a
+  note;
+- feed removed: existing scenarios replay with the feed ignored and
+  `diverged = true`; new saves with that feed are rejected;
+- target override removed: existing scenarios replay against the saved
+  scenario overrides (audit) and the server recompute uses the current
+  overrides; `diverged` exposes the difference; new saves validate against
+  the current overrides;
+- `save_scenario` is a Python callable (owner/admin/consultant), not a
+  client write; `export_comparison` stays Python;
+- scenarios rules: owner/admin/consultant read/write, feeder denied; rules
+  test 18 → 19 ("scenario read denied for feeder; admin write allowed").
 - sensitivity: top-3 ordering, ties, ±5/±10% **price**, per-scenario ranking,
   base unchanged, infeasible scenario `NA()`.
 

@@ -1,0 +1,245 @@
+{
+  "base": {
+    "baseSource": "saved-recipe",
+    "recipeId": "r1",
+    "recipeName": "Base",
+    "feeds": [
+      {
+        "id": "silage",
+        "name": "Silage",
+        "moisturePct": 50,
+        "nutrients": {
+          "proteina": 10,
+          "aNDF": 40,
+          "ADF": 25
+        },
+        "pricePerKg": 0.1,
+        "category": "forage",
+        "kgAsFed": 10
+      },
+      {
+        "id": "soy",
+        "name": "Soy",
+        "moisturePct": 10,
+        "nutrients": {
+          "proteina": 40,
+          "aNDF": 10,
+          "ADF": 5
+        },
+        "pricePerKg": 0.5,
+        "category": "concentrate",
+        "kgAsFed": 2
+      }
+    ],
+    "targets": [
+      {
+        "nutrientCode": "proteina",
+        "minValue": 14,
+        "maxValue": 18,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "aNDF",
+        "minValue": 28,
+        "maxValue": 35,
+        "isActive": true
+      },
+      {
+        "nutrientCode": "ADF",
+        "minValue": 18,
+        "maxValue": 22,
+        "isActive": true
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "empty",
+      "changes": {},
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 12,
+        "totalDM": 6.8,
+        "totalCost": 2,
+        "compliance": {
+          "proteina": "met",
+          "aNDF": "met",
+          "ADF": "met"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "price",
+      "changes": {
+        "feedPrices": {
+          "silage": 0.2
+        }
+      },
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 12,
+        "totalDM": 6.8,
+        "totalCost": 3,
+        "compliance": {
+          "proteina": "met",
+          "aNDF": "met",
+          "ADF": "met"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "include",
+      "changes": {
+        "inclusions": {
+          "soy": 4
+        }
+      },
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 14,
+        "totalDM": 8.6,
+        "totalCost": 3,
+        "compliance": {
+          "proteina": "above_max",
+          "aNDF": "below_min",
+          "ADF": "below_min"
+        },
+        "warnings": [
+          "ADF",
+          "aNDF",
+          "proteina"
+        ]
+      }
+    },
+    {
+      "name": "override",
+      "changes": {
+        "targetOverrides": {
+          "aNDF": {
+            "min": 40,
+            "max": 45
+          }
+        }
+      },
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 12,
+        "totalDM": 6.8,
+        "totalCost": 2,
+        "compliance": {
+          "proteina": "met",
+          "aNDF": "below_min",
+          "ADF": "met"
+        },
+        "warnings": [
+          "aNDF"
+        ]
+      }
+    },
+    {
+      "name": "combined",
+      "changes": {
+        "feedPrices": {
+          "silage": 0.2
+        },
+        "inclusions": {
+          "soy": 3
+        },
+        "targetOverrides": {
+          "aNDF": {
+            "min": 40,
+            "max": 45
+          }
+        }
+      },
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 13,
+        "totalDM": 7.7,
+        "totalCost": 3.5,
+        "compliance": {
+          "proteina": "above_max",
+          "aNDF": "below_min",
+          "ADF": "below_min"
+        },
+        "warnings": [
+          "ADF",
+          "aNDF",
+          "proteina"
+        ]
+      }
+    },
+    {
+      "name": "unknown",
+      "changes": {
+        "feedPrices": {
+          "unknown": 9
+        },
+        "inclusions": {
+          "unknown": 5
+        }
+      },
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 12,
+        "totalDM": 6.8,
+        "totalCost": 2,
+        "compliance": {
+          "proteina": "met",
+          "aNDF": "met",
+          "ADF": "met"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "remove",
+      "changes": {
+        "inclusions": {
+          "soy": 0
+        }
+      },
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 10,
+        "totalDM": 5,
+        "totalCost": 1,
+        "compliance": {
+          "proteina": "below_min",
+          "aNDF": "above_max",
+          "ADF": "above_max"
+        },
+        "warnings": [
+          "ADF",
+          "aNDF",
+          "proteina"
+        ]
+      }
+    },
+    {
+      "name": "unconstrained",
+      "changes": {
+        "targetOverrides": {
+          "aNDF": {
+            "min": null,
+            "max": null
+          }
+        }
+      },
+      "expected": {
+        "status": "computed",
+        "totalAsFed": 12,
+        "totalDM": 6.8,
+        "totalCost": 2,
+        "compliance": {
+          "proteina": "met",
+          "aNDF": "met",
+          "ADF": "met"
+        },
+        "warnings": []
+      }
+    }
+  ]
+}
