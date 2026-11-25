@@ -135,7 +135,8 @@
     "MIN_FORAGE_RATIO": "Rapporto foraggio minimo",
     "MAX_FORAGE_RATIO": "Rapporto foraggio massimo",
     "DELETE_CONFIRM": "Sei sicuro di voler eliminare questa ricetta?",
-    "UNREACHABLE_HINT": "Questi obiettivi non sono raggiungibili con gli alimenti attuali. Usa la modalità rilassata per la razione più vicina o modifica gli obiettivi."
+    "UNREACHABLE_HINT": "Questi obiettivi non sono raggiungibili con gli alimenti attuali. Usa la modalità rilassata per la razione più vicina o modifica gli obiettivi.",
+    "AT_BOUNDARY": "al limite (fragile)"
   },
   "COMMON": {
     "LOADING": "Caricamento...",

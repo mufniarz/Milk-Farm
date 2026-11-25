@@ -299,7 +299,9 @@ only ADF/aNDF. The €9.885 workbook ration is the hand ration reproduced by
 the parity test, not the cost minimum. Details and the fibre safety table are
 in [`docs/SOLVER_SMOKE.md`](SOLVER_SMOKE.md). The targets screen warns when a
 fibre target is set below the reference floor; the reason remains required
-for the override.
+for the override. The Stage 2 comparison is a separate XLSX `Confronto` sheet
+with workbook/relaxed/strict rows and separate warnings columns; see
+[`docs/COMPARISON_EXPORT.md`](COMPARISON_EXPORT.md).
 
 ## K. Trigger failure queue
 

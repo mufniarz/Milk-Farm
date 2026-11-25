@@ -6,6 +6,9 @@ main.py wraps solve_ration() in the Cloud Function entry point.
 """
 from pulp import LpProblem, LpMinimize, LpVariable, lpSum, PULP_CBC_CMD, constants
 
+FIBRE_CODES = {"aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF"}
+BOUNDARY_EPS = 0.001
+
 
 def solve_ration(feeds, targets, constraints, mode="relaxed"):
     """
@@ -291,6 +294,29 @@ def _solve_relaxed(feeds, targets, constraints):
             warnings.append({"code": code, "value": val, "min": t["min"], "max": t.get("max"), "issue": "below_min"})
         elif t.get("max") is not None and val > t["max"] + 1e-4:
             warnings.append({"code": code, "value": val, "min": t.get("min"), "max": t["max"], "issue": "above_max"})
+        elif code in FIBRE_CODES:
+            # A valid optimum that sits on a fibre boundary is fragile: a
+            # small feed-analysis change can push it outside the target.
+            min_value = t.get("min")
+            max_value = t.get("max")
+            if min_value is not None and abs(val - min_value) <= BOUNDARY_EPS:
+                warnings.append({
+                    "code": code,
+                    "value": val,
+                    "min": min_value,
+                    "max": max_value,
+                    "issue": "at_boundary",
+                    "boundary": "min",
+                })
+            elif max_value is not None and abs(val - max_value) <= BOUNDARY_EPS:
+                warnings.append({
+                    "code": code,
+                    "value": val,
+                    "min": min_value,
+                    "max": max_value,
+                    "issue": "at_boundary",
+                    "boundary": "max",
+                })
 
     result["status"] = "relaxed"
     result["warnings"] = warnings

@@ -35,7 +35,9 @@ The relaxed solution meets the absolute fibre floors:
 | ADF/aNDF | 56.9237 | 60–65 | **below** |
 | uNDF/aNDF | 36.5001 | 29–36.5 | at the upper boundary |
 
-Only the derived ratio **ADF/aNDF** is flagged. The hand ration misses four
+The response carries three warnings: **ADF/aNDF below_min**, **ADF
+at_boundary (min)**, **uNDF/aNDF at_boundary (max)**. Boundary warnings are
+limited to the fibre class so the list stays a safety signal. The hand ration misses four
 targets (uNDF, ADF, ADF/aNDF, uNDF/aNDF); the solver adjusts quantities to
 meet the first three and the uNDF/aNDF ceiling, but cannot reach ADF/aNDF
 ≥ 60 on this feed library. The relaxed €9.373 is therefore not a "relaxed

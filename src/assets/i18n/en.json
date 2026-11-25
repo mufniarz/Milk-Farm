@@ -135,7 +135,8 @@
     "MIN_FORAGE_RATIO": "Minimum forage ratio",
     "MAX_FORAGE_RATIO": "Maximum forage ratio",
     "DELETE_CONFIRM": "Are you sure you want to delete this recipe?",
-    "UNREACHABLE_HINT": "These targets cannot be met with the current feeds. Use relaxed mode for the closest ration, or override the targets."
+    "UNREACHABLE_HINT": "These targets cannot be met with the current feeds. Use relaxed mode for the closest ration, or override the targets.",
+    "AT_BOUNDARY": "at the boundary (fragile)"
   },
   "COMMON": {
     "LOADING": "Loading...",

@@ -58,7 +58,8 @@ export interface OptimizationWarning {
   value: number;
   min: number | null;
   max: number | null;
-  issue: 'below_min' | 'above_max';
+  issue: 'below_min' | 'above_max' | 'at_boundary';
+  boundary?: 'min' | 'max';
 }
 
 export interface OptimizationResultFeed {

@@ -171,8 +171,11 @@ def test_relaxed_reference_keeps_absolute_fibre_floors():
     assert analysis["aNDF"] >= 28.0 - 0.1
     assert analysis["ADF"] >= 18.0 - 0.1
     assert analysis["uNDF"] >= 9.0 - 0.1
-    codes = {warning["code"] for warning in result.get("warnings", [])}
-    assert "ADF_aNDF" in codes
-    assert "aNDF" not in codes
-    assert "ADF" not in codes
-    assert "uNDF" not in codes
+    warnings = {
+        warning["code"]: warning for warning in result.get("warnings", [])
+    }
+    assert warnings["ADF_aNDF"]["issue"] == "below_min"
+    assert warnings["ADF"]["issue"] == "at_boundary"
+    assert warnings["uNDF_aNDF"]["issue"] == "at_boundary"
+    assert "aNDF" not in warnings
+    assert "uNDF" not in warnings

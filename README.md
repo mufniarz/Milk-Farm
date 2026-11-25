@@ -326,6 +326,14 @@ project configured; no staging project exists).
   TTL are not part of this deploy.
 
 
+## Comparison export decision
+
+The Stage 2 comparison is a separate XLSX `Confronto` sheet (not CSV) with
+`workbook`, `relaxed-solver` and `strict-solver` rows and separate
+`warnings`/`unreachableTargets` columns; `€`/number formats must pass an
+`it-IT` LibreOffice/Excel check. See
+[`docs/COMPARISON_EXPORT.md`](docs/COMPARISON_EXPORT.md).
+
 ## Follow-up deadlines
 
 - **Browser smoke** — done; CSV-in-Excel, stale-heartbeat banner and 360 px
