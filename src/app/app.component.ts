@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -29,7 +29,12 @@ import { AuthService } from './core/services/auth.service';
   template: `
     @if (authService.isAuthenticated()) {
       <mat-sidenav-container class="app-container">
-        <mat-sidenav #sidenav mode="side" [opened]="true" class="app-sidenav">
+        <mat-sidenav
+          #sidenav
+          [mode]="isMobile() ? 'over' : 'side'"
+          [opened]="!isMobile()"
+          class="app-sidenav"
+        >
           <div class="sidenav-header">
             <div class="logo-container">
               <mat-icon class="logo-icon">agriculture</mat-icon>
@@ -239,6 +244,18 @@ import { AuthService } from './core/services/auth.service';
       display: none;
     }
 
+    @media (max-width: 800px) {
+      .menu-toggle {
+        display: inline-flex;
+      }
+      .main-content {
+        padding: 16px;
+      }
+      .app-sidenav {
+        width: 260px;
+      }
+    }
+
     .toolbar-spacer {
       flex: 1;
     }
@@ -272,10 +289,16 @@ import { AuthService } from './core/services/auth.service';
 export class AppComponent {
   private translate = inject(TranslateService);
   authService = inject(AuthService);
+  readonly isMobile = signal(false);
 
   constructor() {
     this.translate.addLangs(['it', 'en']);
     this.translate.use('it');
+    const media = window.matchMedia('(max-width: 800px)');
+    this.isMobile.set(media.matches);
+    media.addEventListener('change', (event) =>
+      this.isMobile.set(event.matches),
+    );
   }
 
   switchLanguage(lang: string): void {

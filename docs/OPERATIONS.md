@@ -16,6 +16,18 @@ delayed." A missing document is treated as stale.
 
 This heartbeat is the minimum signal. It does not replace an alert.
 
+## Alert IAM and channel
+
+The script needs `roles/monitoring.alertPolicyEditor` and
+`roles/monitoring.notificationChannelEditor` (or the specific
+`monitoring.alertPolicies.create` / `monitoring.notificationChannels.create`
+permissions), plus `roles/logging.viewer` if the operator needs to inspect the
+underlying log entries. Grant them to the deployment account, then run the
+script with an operator email.
+
+The out-of-band alert is a precondition for the first invoice, not for the
+free design-partner pilot.
+
 ## Log-based alert (required console step)
 
 Create a Cloud Monitoring log-based alert with:

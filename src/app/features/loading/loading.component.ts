@@ -491,6 +491,12 @@ import {
       .actions {
         justify-content: flex-start;
       }
+      .feeder-add {
+        flex-wrap: wrap;
+      }
+      .feeder-add button {
+        flex: 0 0 auto;
+      }
     }
   `,
 })

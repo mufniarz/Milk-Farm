@@ -294,8 +294,10 @@ project configured; no staging project exists).
   doc). A milk record write/read and a feeding read also returned 200. The
   test farm, feed, membership and user were deleted.
 - **Core callables smoke:** `export_recipe` returned a valid `.xlsx`
-  (filename, MIME, `PK` magic) and `optimize_ration` returned `status:
-  optimal`, `totalDM: 10.0`, `totalCost: 2.5`.
+  (filename, MIME, `PK` magic). `optimize_ration` at reference scale honours
+  `totalDM: 23.1`: full targets `relaxed` at €9.373, protein/starch targets
+  `optimal` at €6.031. The exact €9.885 is the workbook hand ration, not the
+  cost minimum; see [`docs/SOLVER_SMOKE.md`](docs/SOLVER_SMOKE.md).
 - **Registration order:** a rules-emulator test now proves the owner
   membership is denied before the farm exists and succeeds after the farm is
   created with `ownerUid = uid`, matching `register()`/`loginWithGoogle()`.
@@ -303,9 +305,13 @@ project configured; no staging project exists).
   `error: null`; the loading banner is independent of queue emptiness. The
   log-based alert is scripted but **not created** (no operator email/channel
   and no Monitoring permission for the available credentials).
-- **Not browser-tested:** the Angular loading/IOFC/accuracy screens and the
-  actual queued-failure UI were exercised through the API/SDK, not a browser
-  session.
+- **Browser smoke:** signed in with a throwaway owner, confirmed a load and
+  verified the trigger posting, opened IOFC, refreshed the snapshot and saw
+  the cards (€150/€45/€105/€10.50), and opened the accuracy row. The smoke
+  found and fixed missing IOFC i18n keys, a save-before-data-loaded path, and
+  a 360 px shell overflow; see [`docs/BROWSER_SMOKE.md`](docs/BROWSER_SMOKE.md).
+  CSV download in Excel and the stale-heartbeat banner remain not
+  browser-tested.
 - **No staging:** the mitigation is production-only: full local gate before
   every deploy, the authenticated smoke after every deploy, and a manual
   rollback of the previous functions/rules version. Creating
@@ -317,10 +323,11 @@ project configured; no staging project exists).
 
 ## Follow-up deadlines
 
-- **Browser smoke** (loading, IOFC, accuracy, heartbeat banner) before the
-  pilot farm uses the app.
+- **Browser smoke** — done; CSV-in-Excel, stale-heartbeat banner and 360 px
+  confirm-button visibility remain unexercised.
 - **Log-based scheduler alert** (`scripts/setup-monitoring-alert.sh`) before
-  the pilot; the in-app heartbeat is not an out-of-band signal.
+  the first paying customer; the in-app heartbeat is not an out-of-band
+  signal.
 - **Four-decimal solver/fixture tightening** before Stage 2's comparison
   export adds another fixture surface.
 - **90-day resolved-failure TTL**, excluding `manual-adjustment` and

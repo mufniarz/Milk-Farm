@@ -311,6 +311,8 @@
     "SNAPSHOT_REFRESH": "È disponibile un carico confermato: aggiorna lo snapshot del numero di capi.",
     "SNAPSHOT_REFRESH_ACTION": "Aggiorna snapshot",
     "SNAPSHOT_REFRESHED": "Snapshot aggiornato.",
-    "SNAPSHOT_REFRESH_FAILED": "Aggiornamento snapshot non riuscito."
+    "SNAPSHOT_REFRESH_FAILED": "Aggiornamento snapshot non riuscito.",
+    "INCOMPLETE_SNAPSHOT": "Registrazione senza snapshot completo del costo razione o dei capi: usa \"Aggiorna snapshot\" o riseleziona la data.",
+    "SAVE_DEFAULT": "Salva predefinito"
   }
 }

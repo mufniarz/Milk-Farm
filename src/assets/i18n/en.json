@@ -311,6 +311,8 @@
     "SNAPSHOT_REFRESH": "A confirmed feeding is now available: refresh the head-count snapshot.",
     "SNAPSHOT_REFRESH_ACTION": "Refresh snapshot",
     "SNAPSHOT_REFRESHED": "Snapshot refreshed.",
-    "SNAPSHOT_REFRESH_FAILED": "Snapshot refresh failed."
+    "SNAPSHOT_REFRESH_FAILED": "Snapshot refresh failed.",
+    "INCOMPLETE_SNAPSHOT": "This record has no complete cost/head-count snapshot: use Refresh snapshot or reselect the date.",
+    "SAVE_DEFAULT": "Save default"
   }
 }

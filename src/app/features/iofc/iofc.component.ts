@@ -98,7 +98,7 @@ import { localDateKey } from '../../core/utils/loading-math';
             mat-flat-button
             color="primary"
             (click)="save()"
-            [disabled]="saving || !selectedGroupId"
+            [disabled]="saving || !selectedGroupId || result === null"
           >
             {{ 'IOFC.SAVE' | translate }}
           </button>
@@ -562,6 +562,14 @@ export class IofcComponent implements OnInit {
   async save(): Promise<void> {
     const group = this.group;
     if (!group?.id) return;
+    if (this.result === null) {
+      this.snackBar.open(
+        this.translate.instant('IOFC.NO_COST'),
+        undefined,
+        { duration: 4000 },
+      );
+      return;
+    }
     this.saving = true;
     try {
       await this.milkService.saveRecord({

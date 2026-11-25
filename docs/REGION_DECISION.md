@@ -37,8 +37,9 @@ does not fix latency and does not survive a co-op procurement review.
 
 ## Gate
 
-**No paying contract is signed and no invoice is issued until the migration
-to `europe-west1` is complete and the DPA references the EU region.** The
+**No paying contract is signed, no invoice is issued, and no out-of-band
+alert gap is accepted until the migration to `europe-west1` is complete and
+the DPA references the EU region.** The
 design-partner cohort (up to three farms, free, with signed consent that data
 is in `nam5` during the trial) is the only exception. This is a sales/ops
 gate, not an intention.
