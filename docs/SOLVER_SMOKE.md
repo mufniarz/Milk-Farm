@@ -37,7 +37,14 @@ The relaxed solution meets the absolute fibre floors:
 
 The response carries three warnings: **ADF/aNDF below_min**, **ADF
 at_boundary (min)**, **uNDF/aNDF at_boundary (max)**. Boundary warnings are
-limited to the fibre class so the list stays a safety signal. The hand ration misses four
+limited to the fibre class so the list stays a safety signal.
+
+`at_boundary` means "within **0.001** of a limit, whether inside, exactly on
+it, or just outside by float noise." It is deliberately different from the
+**0.03** parity tolerance: 0.03 is how close the computed analysis must be to
+the workbook to pass parity; 0.001 is how close to a boundary counts as
+fragile. A value at 36.502 is `above_max` for the fragility signal but still
+passes the 0.03 parity gate. The hand ration misses four
 targets (uNDF, ADF, ADF/aNDF, uNDF/aNDF); the solver adjusts quantities to
 meet the first three and the uNDF/aNDF ceiling, but cannot reach ADF/aNDF
 ≥ 60 on this feed library. The relaxed €9.373 is therefore not a "relaxed

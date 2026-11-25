@@ -8,14 +8,27 @@ diagnostics columns and `€` values is better served by a typed sheet than by a
 delimiter format that has a pending `it-IT` visual check.
 
 - Sheet: `Confronto`.
-- Rows/columns:
-  - `source`: `workbook` | `relaxed-solver` | `strict-solver`;
-  - `status`, `totalDM`, `totalCost`;
-  - `warnings` and `unreachableTargets` as **separate columns**, not a merged
-    notes cell;
-  - one row per source, not one row per feed.
-- Number/currency formats: `€ #,##0.000` (Italian locale); verify the `€`
-  glyph and formats in LibreOffice with `it-IT` before shipping.
+- Rows: one per source — `workbook`, `relaxed-solver`, `strict-solver`.
+- Columns, in order:
+  1. `source`;
+  2. `status` (`workbook`, `optimal`, `relaxed`, `infeasible`);
+  3. `totalAsFed`;
+  4. `totalDM`;
+  5. `totalCost`;
+  6-22. the 17 nutrient analysis columns (`umidita`, `proteina`, `ee`,
+     `amido`, `zuccheri`, `ceneri`, `aNDF`, `uNDF`, `NFC`, `ADF`, `ADL`,
+     `pectine`, `ADF_aNDF`, `uNDF_aNDF`, `emicellulosa`, `foraggiPct`,
+     `concentratiPct`);
+  23. `warnings`;
+  24. `unreachableTargets`.
+- **Infeasible strict row:** `status = infeasible`; `totalAsFed`, `totalDM`,
+  `totalCost` and all nutrient cells are `—`, never 0; `warnings` and
+  `unreachableTargets` are populated. The `status` column is what
+  disambiguates a missing value from an infeasible result.
+- **Cell format:** `€ #,##0.000` for cost with the Italian locale
+  (`€ 9.373,000`); `0.000` for `totalAsFed`/`totalDM`; `0.00` for nutrients;
+  text for `status`, `warnings`, `unreachableTargets`. The `it-IT` XLSX check
+  asserts exactly that rendering.
 - The workbook row is labelled "workbook hand ration" so the consultant can
   explain why there are three prices for the same recipe.
 
@@ -36,6 +49,8 @@ export must make that distinction before a consultant presents it.
 Do not ship the comparison export until:
 
 1. the `it-IT` XLSX visual check passes (LibreOffice/Excel);
+   this is a different check from the accuracy CSV check: XLSX validates
+   number formats and `€` cells; CSV validates delimiter/decimal/BOM;
 2. the strict response includes both `unreachableTargets` and `warnings`
    (done);
 3. the boundary warnings are present (`ADF`, `uNDF/aNDF` — done).

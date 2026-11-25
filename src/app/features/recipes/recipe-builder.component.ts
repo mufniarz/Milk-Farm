@@ -36,6 +36,7 @@ import {
   OptimizationConstraints,
   OptimizationWarning,
 } from '../../core/services/optimization.service';
+import { warningIssueKey, warningLimit } from '../../core/utils/recipe-warning';
 import {
   RationCalculatorService,
   RationResult,
@@ -327,20 +328,8 @@ interface RecipeFeedEntry {
                       <li>
                         <strong>{{ warning.code }}</strong>
                         {{ warning.value | number: '1.2-2' }} —
-                        {{
-                          (warning.issue === 'below_min'
-                            ? 'RECIPES.BELOW_MIN'
-                            : warning.issue === 'above_max'
-                              ? 'RECIPES.ABOVE_MAX'
-                              : 'RECIPES.AT_BOUNDARY'
-                          ) | translate
-                        }}
-                        {{
-                          warning.boundary === 'min' ||
-                          warning.issue === 'below_min'
-                            ? warning.min
-                            : warning.max
-                        }}
+                        {{ warningLabel(warning) | translate }}
+                        {{ warningLimitValue(warning) }}
                       </li>
                     }
                   </ul>
@@ -1034,6 +1023,14 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     const result = this.calculator.calculateRation(feeds, quantities);
     this.rationResult.set(result);
     this.updateRadarChart();
+  }
+
+  warningLabel(warning: OptimizationWarning): string {
+    return warningIssueKey(warning.issue);
+  }
+
+  warningLimitValue(warning: OptimizationWarning): number | null {
+    return warningLimit(warning);
   }
 
   async optimize(): Promise<void> {
