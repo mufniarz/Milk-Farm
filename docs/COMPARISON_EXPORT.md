@@ -52,9 +52,10 @@ code|value|min|max|issue|boundary
 ```
 
 - `issue`: `below_min`, `above_max`, or `at_boundary`.
-- `boundary`: `min`/`max` for `at_boundary`; **empty** for below/above, with
-  a trailing pipe (`code|value|min|max|issue|`) so the parser is positional,
-  not a missing field. It is not a distance and not redundant:
+- `boundary`: `min`/`max` for `at_boundary`; **empty string** (not
+  `undefined`/`null`) for below/above, with a trailing pipe
+  (`code|value|min|max|issue|`) so the parser is positional.
+- Sort: by `code`, ascending; one tuple per line inside the cell. It is not a distance and not redundant:
   `at_boundary` alone does not say which side. Do not add a distance field
   unless the sheet needs sorting by closeness.
 - Multiple warnings: one per line. The range is inline so the consultant does
@@ -76,6 +77,7 @@ not in Angular i18n; an English export is a refactor, not a config switch.
 | computed_at | Calcolato il |
 | scenario_cost_saved | Costo salvato |
 | saved_at | Salvato il |
+| diverged | Variato |
 | totalAsFed | Totale tal quale |
 | totalDM | SS totali |
 | totalCost | Costo |
@@ -147,14 +149,23 @@ A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
   status columns, not only deltas. A target with both bounds null removes the
   constraint and evaluates `met`.
 
+`applyScenario` returns **`status: computed | infeasible`**, not the solver's
+`optimal`/`relaxed`; empty changes reproduce the same values and `computed`
+status. The `Stato` column in `Scenari` uses these values.
+
 ### Columns
 
 - `scenario`, `base_source` (header `Base di confronto`), `status`,
-  `diagnostics_from`, `computed_at`; `Fonte` is a `Confronto`-only column
+  `diagnostics_from`, `computed_at`, `diverged`; `Fonte` is a
+  `Confronto`-only column
   (workbook/relaxed/strict) and is not present in `Scenari`;
 - `scenario_cost_saved`, `saved_at` — the stored snapshot's cost and save
   time, so a recompute that differs from what the farm saw is readable;
-- `base_cost`, `scenario_cost`, `delta_cost`;
+  `NA()` when the snapshot is absent. A `diverged` boolean is true when any
+  recomputed value differs from the stored snapshot beyond tolerance, so the
+  reader knows to check the scenario screen rather than only cost;
+- `base_cost`, `scenario_cost`, `delta_cost`; `scenario_cost_saved`,
+  `saved_at`;
 - `base_DM`, `scenario_DM`, `delta_DM`;
 - for each nutrient selected in the export: `base_<nutrient>`,
   `scenario_<nutrient>`, `delta_<nutrient>`;
@@ -173,21 +184,23 @@ A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
 effective targets** (base + `targetOverrides`). This is what makes an
 override scenario visible when its value deltas are zero.
 
-The export **recomputes** each scenario from its saved `changes` and the
-current base; `computed_at` records the recomputation. `scenario_cost_saved`
-and `saved_at` come from the stored `resultSnapshot`, so a price/availability
-change since saving is visible as a divergence rather than a silent rewrite.
+The export **recomputes server-side** from saved `changes` + current base
+(one TS scenario recompute callable feeding the Python workbook formatter;
+not client-side, so a stale browser cannot export stale numbers).
+`computed_at` records the recomputation. `scenario_cost_saved`, `saved_at`
+and `diverged` come from comparing against the stored `resultSnapshot`.
 `Sensibilità` uses the same recomputed values.
 
-**Classification lives in one place for scenarios:** `applyScenario` produces
-the values, compliance statuses and warnings, including `at_boundary` and its
-side, with the TS `BOUNDARY_EPS`; the exporter serialises them and does not
-reclassify. The solver rows use Python's `classify_warning`/`BOUNDARY_EPS` on
-the solver surface; the two surfaces are separate and each has one
-implementation. Do not re-derive scenario `at_boundary` in Python.
+**Classification parity:** `applyScenario` produces the scenario values,
+compliance and warnings; the solver uses Python's `classify_target`. Both
+implement the same 0.001 rule, and a shared fixture
+(`src/assets/boundary-cases.json`) is asserted by both a Karma spec and a
+pytest, so a change to one threshold fails the other. Do not change one
+without the other.
 
 Deltas are **scenario − base**; a cheaper scenario has a negative
-`delta_cost`. A header note states this.
+`delta_cost`. A header note states this. `computed_at`/`saved_at` are ISO
+8601 UTC (`…Z`), not browser-local time.
 
 An infeasible scenario is `NA()` in every numeric cell, with
 `status: infeasible` and `diagnostics_from: self`; never 0 or `—` text.
@@ -203,6 +216,7 @@ An infeasible scenario is `NA()` in every numeric cell, with
 | computed_at | Calcolato il |
 | scenario_cost_saved | Costo salvato |
 | saved_at | Salvato il |
+| diverged | Variato |
 | base_cost / scenario_cost / delta_cost | Costo base / Costo scenario / Delta costo |
 | base_DM / scenario_DM / delta_DM | SS base / SS scenario / Delta SS |
 | base_<nutrient> / scenario_<nutrient> / delta_<nutrient> | nutrient label + Base/Scenario/Delta |
@@ -248,6 +262,9 @@ The first build must assert:
 - base recipe `updatedAt`/data unchanged by applying a scenario;
 - save/replay round-trip returns the same `resultSnapshot`;
 - export accepts only one `(baseSource, baseRecipeId)` pair;
+- save rejects a `targetOverrides` key not in the farm's current overrides and
+  an `inclusions`/`feedPrices` key not in the base's line list;
+- the server recompute, not the client payload, writes the audit snapshot;
 - sensitivity: top-3 ordering, ties, ±5/±10% **price**, per-scenario ranking,
   base unchanged, infeasible scenario `NA()`.
 

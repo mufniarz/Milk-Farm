@@ -49,7 +49,7 @@ export function applyScenario(
     if (!target.isActive) continue;
     const value = result.nutrients[target.nutrientCode];
     if (value === undefined) continue;
-    const evaluated = evaluateTarget(target, value);
+    const evaluated = classifyScenarioTarget(target, value);
     compliance[target.nutrientCode] = evaluated.status;
     if (evaluated.warning) warnings.push(evaluated.warning);
   }
@@ -85,13 +85,13 @@ function effectiveTargets(
   });
 }
 
-function evaluateTarget(
+export function classifyScenarioTarget(
   target: ScenarioBaseTarget,
   value: number,
 ): { status: ScenarioCompliance; warning?: ScenarioWarning } {
   const min = target.minValue;
   const max = target.maxValue;
-  if (min !== null && value < min) {
+  if (min !== null && value < min - 1e-4) {
     return {
       status: 'below_min',
       warning: {
@@ -103,7 +103,7 @@ function evaluateTarget(
       },
     };
   }
-  if (max !== null && value > max) {
+  if (max !== null && value > max + 1e-4) {
     return {
       status: 'above_max',
       warning: {

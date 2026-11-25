@@ -1,0 +1,12 @@
+[
+  { "code": "ADF", "value": 18.0, "min": 18, "max": 22, "issue": "at_boundary", "boundary": "min" },
+  { "code": "ADF", "value": 18.0005, "min": 18, "max": 22, "issue": "at_boundary", "boundary": "min" },
+  { "code": "ADF", "value": 18.0015, "min": 18, "max": 22, "issue": "met", "boundary": "" },
+  { "code": "ADF", "value": 18.002, "min": 18, "max": 22, "issue": "met", "boundary": "" },
+  { "code": "ADF", "value": 17.99995, "min": 18, "max": 22, "issue": "at_boundary", "boundary": "min" },
+  { "code": "ADF", "value": 17.999, "min": 18, "max": 22, "issue": "below_min", "boundary": "" },
+  { "code": "ADF", "value": 21.9995, "min": 18, "max": 22, "issue": "at_boundary", "boundary": "max" },
+  { "code": "ADF", "value": 22.00005, "min": 18, "max": 22, "issue": "at_boundary", "boundary": "max" },
+  { "code": "ADF", "value": 22.0002, "min": 18, "max": 22, "issue": "above_max", "boundary": "" },
+  { "code": "proteina", "value": 14.0005, "min": 14, "max": 18, "issue": "met", "boundary": "" }
+]

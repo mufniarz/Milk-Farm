@@ -230,6 +230,50 @@ def _build_result(feeds, quantities):
     }
 
 
+def classify_target(code, value, min_value, max_value):
+    """Classify a nutrient value against a target; None means met.
+
+    Shared by the solver's relaxed warnings. The TS scenario classifier uses
+    the same 0.001 boundary rule; the parity fixture pins both.
+    """
+    if min_value is not None and value < min_value - 1e-4:
+        return {
+            "code": code,
+            "value": value,
+            "min": min_value,
+            "max": max_value,
+            "issue": "below_min",
+        }
+    if max_value is not None and value > max_value + 1e-4:
+        return {
+            "code": code,
+            "value": value,
+            "min": min_value,
+            "max": max_value,
+            "issue": "above_max",
+        }
+    if code in FIBRE_CODES:
+        if min_value is not None and abs(value - min_value) <= BOUNDARY_EPS:
+            return {
+                "code": code,
+                "value": value,
+                "min": min_value,
+                "max": max_value,
+                "issue": "at_boundary",
+                "boundary": "min",
+            }
+        if max_value is not None and abs(value - max_value) <= BOUNDARY_EPS:
+            return {
+                "code": code,
+                "value": value,
+                "min": min_value,
+                "max": max_value,
+                "issue": "at_boundary",
+                "boundary": "max",
+            }
+    return None
+
+
 def _solve_relaxed(feeds, targets, constraints):
     """
     Goal-programming fallback: when no ration satisfies every nutrient target,
@@ -290,33 +334,9 @@ def _solve_relaxed(feeds, targets, constraints):
         val = analysis.get(code)
         if val is None:
             continue
-        if t.get("min") is not None and val < t["min"] - 1e-4:
-            warnings.append({"code": code, "value": val, "min": t["min"], "max": t.get("max"), "issue": "below_min"})
-        elif t.get("max") is not None and val > t["max"] + 1e-4:
-            warnings.append({"code": code, "value": val, "min": t.get("min"), "max": t["max"], "issue": "above_max"})
-        elif code in FIBRE_CODES:
-            # A valid optimum that sits on a fibre boundary is fragile: a
-            # small feed-analysis change can push it outside the target.
-            min_value = t.get("min")
-            max_value = t.get("max")
-            if min_value is not None and abs(val - min_value) <= BOUNDARY_EPS:
-                warnings.append({
-                    "code": code,
-                    "value": val,
-                    "min": min_value,
-                    "max": max_value,
-                    "issue": "at_boundary",
-                    "boundary": "min",
-                })
-            elif max_value is not None and abs(val - max_value) <= BOUNDARY_EPS:
-                warnings.append({
-                    "code": code,
-                    "value": val,
-                    "min": min_value,
-                    "max": max_value,
-                    "issue": "at_boundary",
-                    "boundary": "max",
-                })
+        warning = classify_target(code, val, t.get("min"), t.get("max"))
+        if warning is not None:
+            warnings.append(warning)
 
     result["status"] = "relaxed"
     result["warnings"] = warnings
