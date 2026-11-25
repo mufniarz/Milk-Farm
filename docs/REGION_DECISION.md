@@ -35,8 +35,16 @@ does not fix latency and does not survive a co-op procurement review.
 5. Keep the old project read-only for rollback for 30 days; delete only after
    the pilot confirms.
 
-## Open
+## Gate
 
-- Owner and deadline for the migration: **before the first paying farm**.
-- If the client explicitly accepts US storage, record SCCs/TIA and the
-  consent in the DPA; do not leave the decision implicit.
+**No paying contract is signed and no invoice is issued until the migration
+to `europe-west1` is complete and the DPA references the EU region.** The
+design-partner cohort (up to three farms, free, with signed consent that data
+is in `nam5` during the trial) is the only exception. This is a sales/ops
+gate, not an intention.
+
+## Rollback
+
+Keep `nam5` read-only for 30 days after the EU cutover; export/import back is
+possible until the old project is deleted. A migration with no rollback is a
+migration that stalls at the first error.

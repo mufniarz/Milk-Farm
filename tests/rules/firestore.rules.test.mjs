@@ -438,3 +438,34 @@ test('the retry-scan heartbeat is authenticated-read and client-write-denied', a
     getDoc(doc(anonymous, 'system', 'feedingRetryScan')),
   );
 });
+
+
+test('registration creates the farm before the owner membership', async () => {
+  const owner = dbFor('owner');
+  // Membership first is denied: the farm must exist with ownerUid = uid.
+  await assertFails(
+    setDoc(doc(owner, 'farmMembers', 'f3_owner'), {
+      farmId: 'f3',
+      uid: 'owner',
+      role: 'owner',
+      status: 'active',
+      invitedBy: null,
+    }),
+  );
+  await assertSucceeds(
+    setDoc(doc(owner, 'farms', 'f3'), {
+      id: 'f3',
+      name: 'Farm 3',
+      ownerUid: 'owner',
+    }),
+  );
+  await assertSucceeds(
+    setDoc(doc(owner, 'farmMembers', 'f3_owner'), {
+      farmId: 'f3',
+      uid: 'owner',
+      role: 'owner',
+      status: 'active',
+      invitedBy: null,
+    }),
+  );
+});

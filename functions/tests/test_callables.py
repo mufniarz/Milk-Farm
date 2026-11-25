@@ -1756,7 +1756,7 @@ def test_manual_adjustment_requires_every_item_to_be_covered():
 
 
 def test_scan_heartbeat_is_written():
-    main._write_scan_heartbeat(DB, "ok", 3)
+    main._write_scan_heartbeat(DB, "ok", 3, 2)
     data = (
         DB.collection("system")
         .document("feedingRetryScan")
@@ -1765,4 +1765,5 @@ def test_scan_heartbeat_is_written():
     )
     assert data["lastRunStatus"] == "ok"
     assert data["docsScanned"] == 3
+    assert data["openFailures"] == 2
     assert data["lastRunAt"] is not None

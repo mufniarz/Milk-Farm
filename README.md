@@ -293,6 +293,16 @@ project configured; no staging project exists).
   posted 100 kg (on-hand 1000 → 900, one consumption ledger entry, no failure
   doc). A milk record write/read and a feeding read also returned 200. The
   test farm, feed, membership and user were deleted.
+- **Core callables smoke:** `export_recipe` returned a valid `.xlsx`
+  (filename, MIME, `PK` magic) and `optimize_ration` returned `status:
+  optimal`, `totalDM: 10.0`, `totalCost: 2.5`.
+- **Registration order:** a rules-emulator test now proves the owner
+  membership is denied before the farm exists and succeeds after the farm is
+  created with `ownerUid = uid`, matching `register()`/`loginWithGoogle()`.
+- **Heartbeat:** production shows `lastRunStatus: ok`, `openFailures: 0`,
+  `error: null`; the loading banner is independent of queue emptiness. The
+  log-based alert is scripted but **not created** (no operator email/channel
+  and no Monitoring permission for the available credentials).
 - **Not browser-tested:** the Angular loading/IOFC/accuracy screens and the
   actual queued-failure UI were exercised through the API/SDK, not a browser
   session.
@@ -300,6 +310,6 @@ project configured; no staging project exists).
   every deploy, the authenticated smoke after every deploy, and a manual
   rollback of the previous functions/rules version. Creating
   `nicola-milk-farm-staging` is the recommended follow-up. Queue health and
-  the required log-based alert are in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+  the alert helper are in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 - **Deferred:** the four-decimal solver/fixture fix and the 90-day resolved
   TTL are not part of this deploy.

@@ -6,6 +6,7 @@ export interface RetryScanHeartbeat {
   lastRunAt?: Date | { toDate(): Date };
   lastRunStatus?: 'ok' | 'error';
   docsScanned?: number;
+  openFailures?: number;
   error?: string;
 }
 

@@ -30,6 +30,18 @@ Route it to the operator's email or a Slack webhook. The alert fires when the
 scheduled function throws, including the `FAILED_PRECONDITION` index failure
 that silently disabled the scan in the first production deploy.
 
+The helper `scripts/setup-monitoring-alert.sh` creates an email channel and
+the log-based policy; run it once with an operator account that has
+Monitoring Admin:
+
+```
+OPS_EMAIL=ops@example.com ./scripts/setup-monitoring-alert.sh
+```
+
+It has not been run in this session: the available service account lacks
+Monitoring permissions and the operator email/channel is not configured.
+Until it is run, the in-app heartbeat banner is the only signal.
+
 ## Deploy gate
 
 1. `npm run verify` (includes `scripts/check-firestore-indexes.cjs`; the

@@ -25,6 +25,7 @@ import {
   RetryScanHeartbeat,
   SystemHealthService,
 } from '../../core/services/system-health.service';
+import { isScanStale } from '../../core/utils/scan-health';
 import {
   OverdrawnFeed,
   computeCalledKg,
@@ -67,10 +68,7 @@ import {
       <h1 class="page-title">{{ 'LOADING.TITLE' | translate }}</h1>
       <p class="page-subtitle">{{ 'LOADING.SUBTITLE' | translate }}</p>
 
-      @if (
-        failures.length > 0 &&
-        (scanStale || heartbeat?.lastRunStatus === 'error')
-      ) {
+      @if (scanUnavailable) {
         <div class="alert danger">
           {{ 'LOADING.SCAN_STALE' | translate }}
         </div>
@@ -514,6 +512,7 @@ export class LoadingComponent implements OnInit, OnDestroy {
   feedings: Feeding[] = [];
   failures: FeedingFailure[] = [];
   heartbeat?: RetryScanHeartbeat;
+  heartbeatLoaded = false;
 
   selectedGroupId = '';
   selectedFeederId = '';
@@ -547,9 +546,10 @@ export class LoadingComponent implements OnInit, OnDestroy {
       this.failureService
         .getOpenFailures()
         .subscribe((failures) => (this.failures = failures));
-      this.systemHealth
-        .getRetryScanHeartbeat()
-        .subscribe((heartbeat) => (this.heartbeat = heartbeat));
+      this.systemHealth.getRetryScanHeartbeat().subscribe((heartbeat) => {
+        this.heartbeat = heartbeat;
+        this.heartbeatLoaded = true;
+      });
     }
   }
 
@@ -567,11 +567,14 @@ export class LoadingComponent implements OnInit, OnDestroy {
   }
 
   get scanStale(): boolean {
-    const lastRun = this.heartbeat?.lastRunAt;
-    if (!lastRun) return true;
-    const date =
-      lastRun instanceof Date ? lastRun : lastRun.toDate();
-    return Date.now() - date.getTime() > 15 * 60 * 1000;
+    return isScanStale(this.heartbeat?.lastRunAt);
+  }
+
+  get scanUnavailable(): boolean {
+    return (
+      this.heartbeatLoaded &&
+      (this.scanStale || this.heartbeat?.lastRunStatus === 'error')
+    );
   }
 
   get needsReviewCount(): number {

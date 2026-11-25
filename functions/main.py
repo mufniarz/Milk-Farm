@@ -1515,14 +1515,14 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
         raise
 
 
-def _write_scan_heartbeat(db, status, scanned, error=None):
+def _write_scan_heartbeat(db, status, scanned, open_failures=0, error=None):
     payload = {
         "lastRunAt": firestore.SERVER_TIMESTAMP,
         "lastRunStatus": status,
         "docsScanned": scanned,
+        "openFailures": open_failures,
+        "error": None if error is None else str(error)[:500],
     }
-    if error is not None:
-        payload["error"] = str(error)[:500]
     db.collection("system").document("feedingRetryScan").set(
         payload, merge=True
     )
@@ -1540,6 +1540,7 @@ def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client()
     instance_id = f"scheduled-{uuid.uuid4()}"
     scanned = 0
+    open_failures = 0
     try:
         # Equality queries use the (status, deadAt) composite prefix. An `in`
         # query would additionally require a collection-group single-field index;
@@ -1552,6 +1553,7 @@ def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
                 .stream()
             )
             scanned += len(docs)
+            open_failures += len(docs)
             for doc in docs:
                 data = doc.to_dict() or {}
                 farm_id = data.get("farmId")
@@ -1574,10 +1576,12 @@ def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
             farm_id = data.get("farmId")
             if farm_id:
                 _abandon_dead_failure(db, farm_id, doc.id)
-        _write_scan_heartbeat(db, "ok", scanned)
+        _write_scan_heartbeat(db, "ok", scanned, open_failures)
     except Exception as error:
         try:
-            _write_scan_heartbeat(db, "error", scanned, error)
+            _write_scan_heartbeat(
+                db, "error", scanned, open_failures, error
+            )
         except Exception:
             pass
         raise
