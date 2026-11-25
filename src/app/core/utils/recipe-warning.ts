@@ -28,3 +28,23 @@ export function warningLimit(warning: RecipeWarningLike): number | null {
   }
   return warning.max;
 }
+
+
+export interface TargetReferenceLike {
+  source?: 'reference' | 'override';
+  referenceMinValue?: number | null;
+  referenceMaxValue?: number | null;
+}
+
+/** For an override boundary, the original reference floor to show alongside it. */
+export function warningReferenceLimit(
+  warning: RecipeWarningLike,
+  target: TargetReferenceLike | undefined,
+): number | null {
+  if (warning.issue !== 'at_boundary' || target?.source !== 'override') {
+    return null;
+  }
+  return warning.boundary === 'min'
+    ? (target.referenceMinValue ?? null)
+    : (target.referenceMaxValue ?? null);
+}

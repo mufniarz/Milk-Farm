@@ -36,7 +36,11 @@ import {
   OptimizationConstraints,
   OptimizationWarning,
 } from '../../core/services/optimization.service';
-import { warningIssueKey, warningLimit } from '../../core/utils/recipe-warning';
+import {
+  warningIssueKey,
+  warningLimit,
+  warningReferenceLimit,
+} from '../../core/utils/recipe-warning';
 import {
   RationCalculatorService,
   RationResult,
@@ -330,6 +334,12 @@ interface RecipeFeedEntry {
                         {{ warning.value | number: '1.2-2' }} —
                         {{ warningLabel(warning) | translate }}
                         {{ warningLimitValue(warning) }}
+                        @if (warningReferenceValue(warning); as reference) {
+                          <span class="reference-floor">
+                            ({{ 'RECIPES.REFERENCE_SHORT' | translate }}
+                            {{ reference }})
+                          </span>
+                        }
                       </li>
                     }
                   </ul>
@@ -1037,6 +1047,13 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
 
   warningLimitValue(warning: OptimizationWarning): number | null {
     return warningLimit(warning);
+  }
+
+  warningReferenceValue(warning: OptimizationWarning): number | null {
+    const target = this.targets.find(
+      (entry) => entry.nutrientCode === warning.code,
+    );
+    return warningReferenceLimit(warning, target);
   }
 
   async optimize(): Promise<void> {
