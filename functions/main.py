@@ -1515,6 +1515,19 @@ def on_feeding_confirmed(event: firestore_fn.Event) -> None:
         raise
 
 
+def _write_scan_heartbeat(db, status, scanned, error=None):
+    payload = {
+        "lastRunAt": firestore.SERVER_TIMESTAMP,
+        "lastRunStatus": status,
+        "docsScanned": scanned,
+    }
+    if error is not None:
+        payload["error"] = str(error)[:500]
+    db.collection("system").document("feedingRetryScan").set(
+        payload, merge=True
+    )
+
+
 @scheduler_fn.on_schedule(
     schedule="*/5 * * * *",
     timezone=scheduler_fn.Timezone("Europe/Rome"),
@@ -1526,37 +1539,48 @@ def scheduled_feeding_retry(event: scheduler_fn.ScheduledEvent) -> None:
     """Retry pending trigger failures; stale claims are reclaimed after 10m."""
     db = firestore.client()
     instance_id = f"scheduled-{uuid.uuid4()}"
-    # Equality queries use the (status, deadAt) composite prefix. An `in`
-    # query would additionally require a collection-group single-field index;
-    # the two scans avoid that dependency.
-    for scan_status in ("pending", "retrying"):
-        docs = list(
+    scanned = 0
+    try:
+        # Equality queries use the (status, deadAt) composite prefix. An `in`
+        # query would additionally require a collection-group single-field index;
+        # the two scans avoid that dependency.
+        for scan_status in ("pending", "retrying"):
+            docs = list(
+                db.collection_group("feedingTriggerFailures")
+                .where("status", "==", scan_status)
+                .limit(20)
+                .stream()
+            )
+            scanned += len(docs)
+            for doc in docs:
+                data = doc.to_dict() or {}
+                farm_id = data.get("farmId")
+                if farm_id:
+                    _retry_one_failure(db, farm_id, doc.id, instance_id)
+
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            days=_ABANDON_AFTER_DAYS
+        )
+        dead_docs = list(
             db.collection_group("feedingTriggerFailures")
-            .where("status", "==", scan_status)
-            .limit(20)
+            .where("status", "==", "dead")
+            .where("deadAt", "<", cutoff)
+            .limit(50)
             .stream()
         )
-        for doc in docs:
+        scanned += len(dead_docs)
+        for doc in dead_docs:
             data = doc.to_dict() or {}
             farm_id = data.get("farmId")
             if farm_id:
-                _retry_one_failure(db, farm_id, doc.id, instance_id)
-
-    cutoff = datetime.now(timezone.utc) - timedelta(
-        days=_ABANDON_AFTER_DAYS
-    )
-    dead_docs = list(
-        db.collection_group("feedingTriggerFailures")
-        .where("status", "==", "dead")
-        .where("deadAt", "<", cutoff)
-        .limit(50)
-        .stream()
-    )
-    for doc in dead_docs:
-        data = doc.to_dict() or {}
-        farm_id = data.get("farmId")
-        if farm_id:
-            _abandon_dead_failure(db, farm_id, doc.id)
+                _abandon_dead_failure(db, farm_id, doc.id)
+        _write_scan_heartbeat(db, "ok", scanned)
+    except Exception as error:
+        try:
+            _write_scan_heartbeat(db, "error", scanned, error)
+        except Exception:
+            pass
+        raise
 
 
 @https_fn.on_call(

@@ -82,7 +82,7 @@ XDG_CONFIG_HOME=./.firebase-config FIREBASE_CLI_DISABLE_UPDATE_CHECK=true \
 directly under Node's type stripping; keep the extension. `scripts/backfill-members.mts`
 uses the same runner.
 
-`pytest` without the emulator skips the 29 callable/trigger tests. `npm run test:functions`
+`pytest` without the emulator skips the 30 callable/trigger tests. `npm run test:functions`
 runs the full suite through the emulator with `REQUIRE_EMULATOR=1`, so a missing
 emulator fails instead of silently skipping. The parity chain
 (workbook -> fixtures -> computed) is described in
@@ -258,7 +258,10 @@ project configured; no staging project exists).
   every farm has an owner and every user an active membership.
 - **Region:** Firestore `(default)` is in **`nam5` (US multi-region)**;
   Cloud Functions are in `europe-west1`. This is a data-residency mismatch
-  for an Italian farm and a GDPR/DPA decision, not a code detail.
+  for an Italian farm and a GDPR/DPA decision, not a code detail. The
+  decision is recorded in [`docs/REGION_DECISION.md`](docs/REGION_DECISION.md):
+  migrate to `europe-west1` before the first paying farm; the current project
+  is design-partner only until then.
 - **Indexes:** the first deploy removed `feedingTriggerFailures.status` as an
   "unnecessary" single-field index. That broke the scheduler in production:
   the collection-group equality/IN query requires a `COLLECTION_GROUP_ASC`
@@ -277,8 +280,14 @@ project configured; no staging project exists).
   Scheduler was enabled.
 - **Rules and hosting:** the compatibility rules are released and
   `https://nicola-milk-farm.web.app` returns 200. The backfill condition was
-  met, so the strict membership rules are live; no compatibility window
-  remains.
+  met, so the legacy `users.farmId` fallback was removed and the strict
+  membership rules are live; the rules test now asserts a legacy-only user is
+  denied. No compatibility window remains.
+- **Queue health:** `scheduled_feeding_retry` now writes
+  `system/feedingRetryScan`; production shows `lastRunStatus: ok` with
+  `docsScanned: 0`. The loading sheet warns when the scan is stale or errored.
+  The required log-based alert is documented in
+  [`docs/OPERATIONS.md`](docs/OPERATIONS.md); it is a console step, not code.
 - **Authenticated smoke:** a custom-token test user with an owner membership
   read the farm (200), created and confirmed a feeding (200), and the trigger
   posted 100 kg (on-hand 1000 → 900, one consumption ledger entry, no failure
@@ -290,6 +299,7 @@ project configured; no staging project exists).
 - **No staging:** the mitigation is production-only: full local gate before
   every deploy, the authenticated smoke after every deploy, and a manual
   rollback of the previous functions/rules version. Creating
-  `nicola-milk-farm-staging` is the recommended follow-up.
+  `nicola-milk-farm-staging` is the recommended follow-up. Queue health and
+  the required log-based alert are in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 - **Deferred:** the four-decimal solver/fixture fix and the 90-day resolved
   TTL are not part of this deploy.

@@ -171,11 +171,11 @@ test('member can read the farm and its feed', async () => {
   await assertSucceeds(getDoc(doc(db, 'farms', 'f1', 'groups', 'g1')));
 });
 
-test('legacy user with only users.farmId can read during the window', async () => {
+test('a legacy-only user is denied after the strict-rules cutover', async () => {
   const db = dbFor('legacy');
-  await assertSucceeds(getDoc(doc(db, 'farms', 'f1')));
-  await assertSucceeds(getDoc(doc(db, 'feeds', 'feed1')));
-  await assertSucceeds(getDoc(doc(db, 'recipes', 'r1')));
+  await assertFails(getDoc(doc(db, 'farms', 'f1')));
+  await assertFails(getDoc(doc(db, 'feeds', 'feed1')));
+  await assertFails(getDoc(doc(db, 'recipes', 'r1')));
 });
 
 test('outsider cannot read the farm or its feed', async () => {
@@ -418,5 +418,23 @@ test('trigger failures are operator-readable and client-write-denied', async () 
     getDoc(
       doc(feeder, 'farms', 'f1', 'feedingTriggerFailures', 'feeding1'),
     ),
+  );
+});
+
+
+test('the retry-scan heartbeat is authenticated-read and client-write-denied', async () => {
+  const member = dbFor('member');
+  await assertSucceeds(
+    getDoc(doc(member, 'system', 'feedingRetryScan')),
+  );
+  await assertFails(
+    setDoc(doc(member, 'system', 'feedingRetryScan'), {
+      lastRunStatus: 'ok',
+    }),
+  );
+
+  const anonymous = testEnv.unauthenticatedContext().firestore();
+  await assertFails(
+    getDoc(doc(anonymous, 'system', 'feedingRetryScan')),
   );
 });

@@ -22,6 +22,10 @@ import { FeederService } from '../../core/services/feeder.service';
 import { FeedingFailureService } from '../../core/services/feeding-failure.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
 import {
+  RetryScanHeartbeat,
+  SystemHealthService,
+} from '../../core/services/system-health.service';
+import {
   OverdrawnFeed,
   computeCalledKg,
   computeDeviationPct,
@@ -62,6 +66,15 @@ import {
     <div class="loading-page">
       <h1 class="page-title">{{ 'LOADING.TITLE' | translate }}</h1>
       <p class="page-subtitle">{{ 'LOADING.SUBTITLE' | translate }}</p>
+
+      @if (
+        failures.length > 0 &&
+        (scanStale || heartbeat?.lastRunStatus === 'error')
+      ) {
+        <div class="alert danger">
+          {{ 'LOADING.SCAN_STALE' | translate }}
+        </div>
+      }
 
       @if (failures.length > 0) {
         <div class="alert caution">
@@ -490,6 +503,7 @@ export class LoadingComponent implements OnInit, OnDestroy {
   private inventoryService = inject(InventoryService);
   private feederService = inject(FeederService);
   private failureService = inject(FeedingFailureService);
+  private systemHealth = inject(SystemHealthService);
   private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
@@ -499,6 +513,7 @@ export class LoadingComponent implements OnInit, OnDestroy {
   inventoryItems: InventoryItem[] = [];
   feedings: Feeding[] = [];
   failures: FeedingFailure[] = [];
+  heartbeat?: RetryScanHeartbeat;
 
   selectedGroupId = '';
   selectedFeederId = '';
@@ -532,6 +547,9 @@ export class LoadingComponent implements OnInit, OnDestroy {
       this.failureService
         .getOpenFailures()
         .subscribe((failures) => (this.failures = failures));
+      this.systemHealth
+        .getRetryScanHeartbeat()
+        .subscribe((heartbeat) => (this.heartbeat = heartbeat));
     }
   }
 
@@ -546,6 +564,14 @@ export class LoadingComponent implements OnInit, OnDestroy {
   get canRetry(): boolean {
     const role = this.farmContext.activeRole();
     return role === 'owner' || role === 'farmAdmin';
+  }
+
+  get scanStale(): boolean {
+    const lastRun = this.heartbeat?.lastRunAt;
+    if (!lastRun) return true;
+    const date =
+      lastRun instanceof Date ? lastRun : lastRun.toDate();
+    return Date.now() - date.getTime() > 15 * 60 * 1000;
   }
 
   get needsReviewCount(): number {

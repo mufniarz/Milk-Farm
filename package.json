@@ -11,7 +11,7 @@
     "backfill:members": "node --no-warnings --experimental-strip-types scripts/backfill-members.mts",
     "check:calculator": "node --no-warnings --experimental-strip-types scripts/check-calculator.mts",
     "check:i18n": "node scripts/check-i18n.cjs",
-    "verify": "node scripts/parse-excel.cjs && git diff --exit-code && npm run check:calculator && npm run check:i18n && npm run build",
+    "verify": "node scripts/check-firestore-indexes.cjs && node scripts/parse-excel.cjs --check && node --no-warnings --experimental-strip-types scripts/check-calculator.mts && npm run check:i18n && ng build",
     "test:rules": "node --test tests/rules/firestore.rules.test.mjs",
     "test:functions": "XDG_CONFIG_HOME=./.firebase-config CI=true npx firebase emulators:exec --only firestore --project demo-milk-farm \"cd functions && REQUIRE_EMULATOR=1 ./venv/bin/python -m pytest tests -q\""
   },

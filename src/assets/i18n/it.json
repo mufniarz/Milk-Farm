@@ -252,7 +252,8 @@
     "ACKNOWLEDGE": "Nessuna scrittura necessaria",
     "ACKNOWLEDGED": "Carico chiuso senza azione.",
     "WRITE_OFF": "Scarica in perdita",
-    "NEEDS_REVIEW": "da verificare"
+    "NEEDS_REVIEW": "da verificare",
+    "SCAN_STALE": "Il controllo automatico dei carichi non è in esecuzione: la registrazione dell'inventario potrebbe essere in ritardo."
   },
   "ACCURACY": {
     "TITLE": "Precisione di caricamento",

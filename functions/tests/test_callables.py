@@ -78,7 +78,7 @@ def _delete_collection(collection_ref):
 
 @pytest.fixture(autouse=True)
 def clean_emulator():
-    for name in ("farms", "farmMembers", "feeds", "recipes"):
+    for name in ("farms", "farmMembers", "feeds", "recipes", "system"):
         _delete_collection(DB.collection(name))
     yield
 
@@ -1753,3 +1753,16 @@ def test_manual_adjustment_requires_every_item_to_be_covered():
         )
     )
     assert result["ok"] is True
+
+
+def test_scan_heartbeat_is_written():
+    main._write_scan_heartbeat(DB, "ok", 3)
+    data = (
+        DB.collection("system")
+        .document("feedingRetryScan")
+        .get()
+        .to_dict()
+    )
+    assert data["lastRunStatus"] == "ok"
+    assert data["docsScanned"] == 3
+    assert data["lastRunAt"] is not None

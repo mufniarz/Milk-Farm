@@ -252,7 +252,8 @@
     "ACKNOWLEDGE": "No ledger entry needed",
     "ACKNOWLEDGED": "Feeding closed without action.",
     "WRITE_OFF": "Write off",
-    "NEEDS_REVIEW": "to review"
+    "NEEDS_REVIEW": "to review",
+    "SCAN_STALE": "The automatic retry scan is not running: inventory posting may be delayed."
   },
   "ACCURACY": {
     "TITLE": "Feeder accuracy",

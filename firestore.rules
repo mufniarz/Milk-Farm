@@ -20,17 +20,10 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/farmMembers/$(farmId + '_' + request.auth.uid)).data.role in roles;
     }
 
-    // Compatibility window while the farmMembers backfill rolls out.
-    // Remove this helper and every canAccessFarm() call once the backfill has
-    // been verified and strict rules are deployed.
-    function isLegacyFarmUser(farmId) {
-      return isAuthenticated()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.farmId == farmId;
-    }
-
-    function canAccessFarm(farmId) {
-      return isMember(farmId) || isLegacyFarmUser(farmId);
+    // ─── System health (heartbeat; server-written, authenticated read) ──
+    match /system/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
     }
 
     // ─── Nutrients (shared, read-only) ──────────────────────────────────
@@ -73,8 +66,7 @@ service cloud.firestore {
     match /farms/{farmId} {
       allow read: if isAuthenticated()
         && (resource.data.ownerUid == request.auth.uid
-            || isMember(farmId)
-            || isLegacyFarmUser(farmId));
+            || isMember(farmId));
       allow create: if isAuthenticated()
         && request.resource.data.ownerUid == request.auth.uid;
       allow update: if isAuthenticated()
@@ -185,34 +177,34 @@ service cloud.firestore {
     // ─── Feeds (per-farm) ───────────────────────────────────────────────
     match /feeds/{feedId} {
       allow read: if isAuthenticated()
-        && canAccessFarm(resource.data.farmId);
+        && isMember(resource.data.farmId);
       allow create: if isAuthenticated()
-        && canAccessFarm(request.resource.data.farmId);
+        && isMember(request.resource.data.farmId);
       allow delete: if isAuthenticated()
-        && canAccessFarm(resource.data.farmId);
+        && isMember(resource.data.farmId);
       // farmId is immutable: an update may never move a feed to another farm.
       allow update: if isAuthenticated()
-        && canAccessFarm(resource.data.farmId)
+        && isMember(resource.data.farmId)
         && request.resource.data.farmId == resource.data.farmId;
     }
 
     // ─── Recipes (per-farm) ─────────────────────────────────────────────
     match /recipes/{recipeId} {
       allow read: if isAuthenticated()
-        && canAccessFarm(resource.data.farmId);
+        && isMember(resource.data.farmId);
       allow create: if isAuthenticated()
-        && canAccessFarm(request.resource.data.farmId);
+        && isMember(request.resource.data.farmId);
       allow delete: if isAuthenticated()
-        && canAccessFarm(resource.data.farmId);
+        && isMember(resource.data.farmId);
       allow update: if isAuthenticated()
-        && canAccessFarm(resource.data.farmId)
+        && isMember(resource.data.farmId)
         && request.resource.data.farmId == resource.data.farmId;
 
       match /feeds/{feedEntryId} {
         allow read: if isAuthenticated()
-          && canAccessFarm(get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId);
+          && isMember(get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId);
         allow write: if isAuthenticated()
-          && canAccessFarm(get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId);
+          && isMember(get(/databases/$(database)/documents/recipes/$(recipeId)).data.farmId);
       }
     }
 
