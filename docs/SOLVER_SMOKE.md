@@ -66,3 +66,17 @@ warning.
 `functions/tests/test_solver.py` covers the strict rejection (with both
 `unreachableTargets` and `warnings`), multiple unreachable targets, and the
 relaxed absolute-fibre assertions.
+
+
+## Override warning vs solve warning
+
+The targets screen and the builder are two different surfaces:
+
+- the **override** warning uses `target-safety` on the draft target and the
+  reference floor (below-floor check);
+- the **solve** warning uses the solver's `at_boundary` result within 0.001
+  of the active target.
+
+They share the fibre-code list but not one helper, because one checks a draft
+override and the other checks a solved ration. A change to one threshold does
+not automatically change the other; both are deliberate.
