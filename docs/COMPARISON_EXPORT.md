@@ -52,10 +52,11 @@ code|value|min|max|issue|boundary
 ```
 
 - `issue`: `below_min`, `above_max`, or `at_boundary`.
-- `boundary`: `min`/`max` for `at_boundary`; **empty** for below/above.
-  It is not a distance and not redundant: `at_boundary` alone does not say
-  which side. Do not add a distance field unless the sheet needs sorting by
-  closeness.
+- `boundary`: `min`/`max` for `at_boundary`; **empty** for below/above, with
+  a trailing pipe (`code|value|min|max|issue|`) so the parser is positional,
+  not a missing field. It is not a distance and not redundant:
+  `at_boundary` alone does not say which side. Do not add a distance field
+  unless the sheet needs sorting by closeness.
 - Multiple warnings: one per line. The range is inline so the consultant does
   not need a second document. UI labels (`at the reference floor`, …) are
   UI-only; the export stays filterable.
@@ -84,7 +85,8 @@ not in Angular i18n; an English export is a refactor, not a config switch.
 - Cost: `€ #,##0.000` → `€ 9.373,000` under `it-IT`; the format code uses
   en-US separators and Excel renders it per locale. Do not rewrite it to
   `€ #.##0,000`.
-- Totals: `0.000`; nutrients: `0.00`.
+- Totals: `0.000` for `totalAsFed` **and** `totalDM`; cost `€ #,##0.000`;
+  nutrients `0.00`.
 - Infeasible numeric cells: `NA()` / `#N/A`, not `—` text. Excel and
   LibreOffice exclude `#N/A` from sums/pivots; a text dash pollutes them.
   The human-readable “—” belongs in the UI, not the sheet.
@@ -100,17 +102,76 @@ on `Confronto`:
 
 Sequence: build on 0.01 with the footnote; land the four-decimal fix before
 the export is used in a client conversation; regenerate the fixture. After the
-fix, the row shows 23.10246 and the footnote is removed or changed to “matches
-workbook.”
+fix, the row shows 23.10246 and the footnote is **removed** (a footnote
+explaining a zero difference is noise).
 
 ## `Scenari` format
 
-- Rows: one per saved scenario, plus a `base` row.
-- Columns: `scenario`, `base_cost`, `scenario_cost`, `delta_cost`,
-  `base_DM`, `scenario_DM`, `delta_DM`, and the nutrient rows/deltas selected
-  for the comparison.
-- Deltas are scenario − base; positive cost delta means more expensive.
-- The same Italian headers and `€`/number formats apply.
+### Shape
+
+**One row per scenario**, metrics as columns — the same orientation as
+`Confronto`. It scales to 20 scenarios and filters like a table; the
+transposed "metrics as rows" shape is rejected because it becomes unreadable
+past a handful of scenarios.
+
+The export takes an explicit `scenarioIds` list (or a date-range selection)
+with a **maximum of 20**; it never silently caps. The sheet header names the
+selected range and count.
+
+### Base
+
+`Scenari` compares against **the saved recipe the scenarios were created
+from**, not the workbook. A `base_source` column records `saved-recipe` or
+`workbook`; the base identity is the recipe id/name. A scenario created from
+the workbook is labelled `workbook`.
+
+### `changes` schema
+
+A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
+
+- **feedPrices** — recompute with modified prices; cost changes, nutrient
+  values do not.
+- **inclusions** — modify recipe line quantities; both nutrients and cost
+  change.
+- **targetOverrides** — the ration is unchanged, so value deltas are **0**;
+  only compliance status changes. This is why `Scenari` carries status
+  columns, not only deltas.
+
+### Columns
+
+- `scenario`, `base_source`, `status`, `diagnostics_from`;
+- `base_cost`, `scenario_cost`, `delta_cost`;
+- `base_DM`, `scenario_DM`, `delta_DM`;
+- for each nutrient selected in the export: `base_<nutrient>`,
+  `scenario_<nutrient>`, `delta_<nutrient>`;
+- for the fibre class: `base_status_<nutrient>`, `scenario_status_<nutrient>`
+  with `met` / `below_min` / `above_max` / `at_boundary`.
+
+Deltas are **scenario − base**; a cheaper scenario has a negative
+`delta_cost`. A header note states this.
+
+An infeasible scenario is `NA()` in every numeric cell, with
+`status: infeasible` and `diagnostics_from: self`; never 0 or `—` text.
+
+### Italian headers
+
+| Column | Header |
+|---|---|
+| scenario | Scenario |
+| base_source | Base |
+| status | Stato |
+| diagnostics_from | Diagnostica da |
+| base_cost / scenario_cost / delta_cost | Costo base / Costo scenario / Delta costo |
+| base_DM / scenario_DM / delta_DM | SS base / SS scenario / Delta SS |
+| base_<nutrient> / scenario_<nutrient> / delta_<nutrient> | nutrient label + Base/Scenario/Delta |
+| base_status_<nutrient> / scenario_status_<nutrient> | nutrient label + Stato base/Stato scenario |
+
+### Sensitivity
+
+Sensitivity is **per scenario** and lives in a third sheet, `Sensibilità`:
+one block per scenario, top 3 ingredients by cost contribution, ±5% and ±10%
+price shocks, cost/IOFC deltas per shock. The pure function is
+`topThreeByCostContribution`; it is unit-tested independently.
 
 ## Build acceptance tests
 
@@ -124,7 +185,17 @@ The first build must assert:
 5. strict row `diagnostics_from = relaxed-fallback`;
 6. strict row numeric cells are `NA()` (`#N/A`), not 0 or text `—`;
 7. Italian headers render;
-8. `Scenari` base + scenario + delta arithmetic (once scenarios exist).
+8. `Scenari` base + scenario + delta arithmetic, including the override
+   case (zero value deltas, changed compliance status).
+
+### Stage 2 scenario/sensitivity test scope
+
+- price change: cost changes, nutrient values unchanged;
+- inclusion change: nutrients and cost change;
+- target override: values unchanged, compliance status changes;
+- base recipe `updatedAt`/data unchanged by applying a scenario;
+- save/replay round-trip returns the same `resultSnapshot`;
+- sensitivity: top-3 ordering, ties, ±5/±10%, base unchanged.
 
 ## Gate
 
