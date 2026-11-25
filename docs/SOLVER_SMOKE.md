@@ -1,26 +1,51 @@
 # Production solver smoke — reference scale
 
-Called `optimize_ration` in production with the full lactating reference feed
-library and `constraints.totalDM = 23.1`:
+## Contract
+
+The callable supports two modes:
+
+- `mode: 'relaxed'` (default) — minimise cost, soften unreachable targets and
+  return them in `warnings`.
+- `mode: 'strict'` — no softening; return `infeasible` if the targets cannot
+  all be met.
+
+The workbook's €9.885 ration is the **hand ration**. It is reproduced by the
+reference-quantity parity test. The solver is a cost minimiser, so its result
+is expected to be **≤ €9.885**, not equal to it.
+
+## Production result (full lactating reference)
 
 | Scenario | Status | Total DM | Total cost |
 |---|---|---|---|
-| Full reference targets | `relaxed` | 23.1 | €9.373 |
-| Protein/starch targets only | `optimal` | 23.1 | €6.031 |
+| Full targets, `strict` | `infeasible` | — | — |
+| Full targets, `relaxed` | `relaxed` | **23.1** | **€9.373** |
+| Protein/starch targets, `relaxed` | `optimal` | **23.1** | **€6.031** |
 
-The 1 kg-DM failure mode is not present: both calls honour the 23.1 kg DM
-constraint. The full target set contains an ADF/aNDF target that the feed
-library cannot satisfy (existing solver test), so the solver returns
-`relaxed` with warnings; the protein/starch-only case is `optimal` at a lower
-cost because the LP minimises cost.
+The 1 kg-DM failure mode is gone: every successful call honours 23.1 kg DM.
 
-The reference workbook ration (the manually fed 48.3 kg as-fed / 23.10246 kg
-DM) reproduces **€9.885** in the parity test (`_build_result` with the
-reference quantities), but the solver is not expected to return that exact
-cost: €9.885 is a feasible hand ration, not the cost minimum. The parity test
-therefore asserts `totalCost <= 9.885` for the solver and `≈ 9.885` for the
-reference quantities.
+## Safety of the relaxed ration
 
-If the product contract is "return the workbook ration" rather than "minimise
-cost subject to targets," that is a different requirement and would need a
-separate non-optimising path; the current callable is a cost minimiser.
+The relaxed solution meets the absolute fibre floors:
+
+| Nutrient | Result | Target | Status |
+|---|---|---|---|
+| aNDF | 31.6213 | 28–34 | met |
+| ADF | 18.0 | 18–22 | met (boundary) |
+| uNDF | 11.5418 | 9–12 | met |
+| ADF/aNDF | 56.9237 | 60–65 | **below** |
+| uNDF/aNDF | 36.5001 | 29–36.5 | at the upper boundary |
+
+Only the derived ratio **ADF/aNDF** is flagged. The hand ration misses four
+targets (uNDF, ADF, ADF/aNDF, uNDF/aNDF); the solver adjusts quantities to
+meet the first three and the uNDF/aNDF ceiling, but cannot reach ADF/aNDF
+≥ 60 on this feed library. The relaxed €9.373 is therefore not a "relaxed
+fibre class" ration: the absolute fibre floors hold.
+
+The €6.031 protein/starch-only result is a sensitivity data point, not a
+recommended ration: disabling fibre targets collapses cost and would be
+unsafe. The override UI should warn when a fibre target is disabled.
+
+## Reproduce
+
+`functions/tests/test_solver.py` covers the strict rejection and the
+relaxed absolute-fibre assertions.

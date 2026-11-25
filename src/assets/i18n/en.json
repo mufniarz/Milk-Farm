@@ -313,6 +313,8 @@
     "SNAPSHOT_REFRESHED": "Snapshot refreshed.",
     "SNAPSHOT_REFRESH_FAILED": "Snapshot refresh failed.",
     "INCOMPLETE_SNAPSHOT": "This record has no complete cost/head-count snapshot: use Refresh snapshot or reselect the date.",
-    "SAVE_DEFAULT": "Save default"
+    "SAVE_DEFAULT": "Save default",
+    "DEFAULT_SAVED": "Default price saved.",
+    "DEFAULT_FAILED": "Could not save the default price."
   }
 }

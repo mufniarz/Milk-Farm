@@ -33,11 +33,11 @@ numbers.
 | Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 30 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting, failure queue (claim/lock/resolve, three-dead bulk retry, dead audit, already-posted/written-off/missing/draft reasons, manual handled requires every item adjusted, manual write-off, acknowledge-no-action, adjustment-without-mark needs-review, 90-day write-off, cross-farm denial), farm milk price, scan heartbeat |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 32 passed — 3 calculator parity + 6 loading math + 2 once-daily guard + 3 scan-health + 11 accuracy + 7 IOFC (3 math + 4 wiring) |
+| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 33 passed — 3 calculator parity + 6 loading math + 2 once-daily guard + 3 scan-health + 11 accuracy + 8 IOFC (3 math + 4 wiring + 1 save guard) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 18 passed — tenant boundary, strict cutover (legacy-only denied), registration order (farm before owner membership), owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, operator-only feedings, milk-record roles, failure-queue read-only, heartbeat read/write |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 48 passed with `REQUIRE_EMULATOR=1` (18 solver/parity + 30 callable/trigger/failure/retroactive) |
+| Full suite incl. callables | `npm run test:functions` | 50 passed with `REQUIRE_EMULATOR=1` (20 solver/parity + 30 callable/trigger/failure/retroactive) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -288,6 +288,16 @@ Implemented as a separate, auditable action:
   loads" reconciles `inventorySkippedFeedIds`, while the queue retries the
   consumed lines. They do not block or double-count each other.
 
+## J2. Solver contract
+
+`optimize_ration` supports `mode: 'relaxed'` (default: minimise, soften and
+flag unreachable targets) and `mode: 'strict'` (return `infeasible` rather
+than soften). The full reference target set is infeasible in strict mode; in
+relaxed mode the 23.1 kg DM solution meets aNDF/ADF/uNDF floors and misses
+only ADF/aNDF. The €9.885 workbook ration is the hand ration reproduced by
+the parity test, not the cost minimum. Details and the fibre safety table are
+in [`docs/SOLVER_SMOKE.md`](SOLVER_SMOKE.md).
+
 ## K. Trigger failure queue
 
 Implemented; it is still a pre-deploy gate because the trigger and loading
@@ -390,6 +400,10 @@ sheet ship together.
   `indexes`). The `(status, deadAt)` composite serves the abandonment query.
   Removing the single-field index broke the scheduler in production until the
   override was added; the scan is exercised in production.
+- **i18n gate:** `check-i18n.cjs` now scans `src` for `| translate` and
+  `translate.instant/get/stream` keys and fails when a used key is missing
+  from either file. It found `IOFC.DEFAULT_SAVED`/`DEFAULT_FAILED` in addition
+  to the two browser-smoke keys.
 - **Region:** Firestore is `nam5` (US multi-region) while functions are
   `europe-west1`; the data-residency/GDPR decision is recorded in
   [`docs/REGION_DECISION.md`](REGION_DECISION.md): migrate to `europe-west1`

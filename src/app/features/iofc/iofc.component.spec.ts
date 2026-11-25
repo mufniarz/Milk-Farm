@@ -205,6 +205,22 @@ describe('IofcComponent wiring', () => {
     expect(component.snapshotRefreshAvailable).toBeTrue();
   });
 
+  it('does not save a milk record without a cost result', async () => {
+    const milk = TestBed.inject(MilkService);
+    const save = spyOn(milk, 'saveRecord');
+    component.groups = [group(100)];
+    component.selectedGroupId = 'g1';
+    component.feedCostPerHead = null;
+    component.milkKg = 300;
+
+    await component.save();
+    expect(save).not.toHaveBeenCalled();
+
+    component.feedCostPerHead = 4.5;
+    await component.save();
+    expect(save).toHaveBeenCalled();
+  });
+
   it('uses the group head count and the per-head recipe cost', async () => {
     component.groups = [group(100)];
     component.selectedGroupId = 'g1';

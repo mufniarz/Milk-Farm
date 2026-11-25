@@ -101,3 +101,59 @@ def test_missing_total_dm_is_rejected():
 
     assert result["status"] == "error"
     assert "totalDM" in result["message"]
+
+
+def _solver_targets():
+    return [
+        {
+            "code": target["nutrientCode"],
+            "min": target["minValue"],
+            "max": target["maxValue"],
+        }
+        for target in FIXTURE["targets"]
+        if target.get("isActive")
+    ]
+
+
+def test_strict_mode_rejects_relaxed_reference():
+    """Strict mode must not silently soften unreachable targets."""
+    result = solve_ration(
+        FIXTURE["feeds"],
+        _solver_targets(),
+        {
+            "totalDM": 23.1,
+            "minMoisturePct": 50.0,
+            "maxMoisturePct": 55.0,
+            "minForageRatio": 0.40,
+            "maxForageRatio": 0.45,
+        },
+        mode="strict",
+    )
+    assert result["status"] == "infeasible"
+    assert "strict" in result["message"].lower()
+
+
+def test_relaxed_reference_keeps_absolute_fibre_floors():
+    """The relaxed solution may miss derived ratios, not the absolute floors."""
+    result = solve_ration(
+        FIXTURE["feeds"],
+        _solver_targets(),
+        {
+            "totalDM": 23.1,
+            "minMoisturePct": 50.0,
+            "maxMoisturePct": 55.0,
+            "minForageRatio": 0.40,
+            "maxForageRatio": 0.45,
+        },
+        mode="relaxed",
+    )
+    assert result["status"] == "relaxed"
+    analysis = result["nutrientAnalysis"]
+    assert analysis["aNDF"] >= 28.0 - 0.1
+    assert analysis["ADF"] >= 18.0 - 0.1
+    assert analysis["uNDF"] >= 9.0 - 0.1
+    codes = {warning["code"] for warning in result.get("warnings", [])}
+    assert "ADF_aNDF" in codes
+    assert "aNDF" not in codes
+    assert "ADF" not in codes
+    assert "uNDF" not in codes

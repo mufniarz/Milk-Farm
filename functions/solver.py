@@ -7,7 +7,7 @@ main.py wraps solve_ration() in the Cloud Function entry point.
 from pulp import LpProblem, LpMinimize, LpVariable, lpSum, PULP_CBC_CMD, constants
 
 
-def solve_ration(feeds, targets, constraints):
+def solve_ration(feeds, targets, constraints, mode="relaxed"):
     """
     Solve a minimum-cost TMR formulation using linear programming.
 
@@ -66,6 +66,14 @@ def solve_ration(feeds, targets, constraints):
         result["message"] = "Optimal solution found"
         return result
 
+    if mode == "strict":
+        return {
+            "status": "infeasible",
+            "message": (
+                "Targets cannot be met in strict mode. "
+                "Relax the targets or use relaxed mode."
+            ),
+        }
     return _solve_relaxed(feeds, targets, constraints)
 
 

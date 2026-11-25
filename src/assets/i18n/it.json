@@ -313,6 +313,8 @@
     "SNAPSHOT_REFRESHED": "Snapshot aggiornato.",
     "SNAPSHOT_REFRESH_FAILED": "Aggiornamento snapshot non riuscito.",
     "INCOMPLETE_SNAPSHOT": "Registrazione senza snapshot completo del costo razione o dei capi: usa \"Aggiorna snapshot\" o riseleziona la data.",
-    "SAVE_DEFAULT": "Salva predefinito"
+    "SAVE_DEFAULT": "Salva predefinito",
+    "DEFAULT_SAVED": "Prezzo predefinito salvato.",
+    "DEFAULT_FAILED": "Salvataggio del predefinito non riuscito."
   }
 }

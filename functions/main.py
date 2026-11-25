@@ -74,10 +74,17 @@ def optimize_ration(req: https_fn.CallableRequest):
         )
 
     data = req.data
+    mode = data.get("mode", "relaxed")
+    if mode not in ("relaxed", "strict"):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="mode must be 'relaxed' or 'strict'.",
+        )
     return solve_ration(
         data.get("feeds", []),
         data.get("targets", []),
         data.get("constraints", {}),
+        mode=mode,
     )
 
 

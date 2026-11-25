@@ -310,8 +310,9 @@ project configured; no staging project exists).
   the cards (€150/€45/€105/€10.50), and opened the accuracy row. The smoke
   found and fixed missing IOFC i18n keys, a save-before-data-loaded path, and
   a 360 px shell overflow; see [`docs/BROWSER_SMOKE.md`](docs/BROWSER_SMOKE.md).
-  CSV download in Excel and the stale-heartbeat banner remain not
-  browser-tested.
+  The i18n check now scans used keys and found two more missing default-price
+  keys. CSV in Excel, the stale-heartbeat banner and the 360 px confirm button
+  remain not browser-tested.
 - **No staging:** the mitigation is production-only: full local gate before
   every deploy, the authenticated smoke after every deploy, and a manual
   rollback of the previous functions/rules version. Creating
@@ -326,8 +327,8 @@ project configured; no staging project exists).
 - **Browser smoke** — done; CSV-in-Excel, stale-heartbeat banner and 360 px
   confirm-button visibility remain unexercised.
 - **Log-based scheduler alert** (`scripts/setup-monitoring-alert.sh`) before
-  the first paying customer; the in-app heartbeat is not an out-of-band
-  signal.
+  the first paying customer; the gate is **delivered notification**, not just
+  a created policy. The in-app heartbeat is not an out-of-band signal.
 - **Four-decimal solver/fixture tightening** before Stage 2's comparison
   export adds another fixture surface.
 - **90-day resolved-failure TTL**, excluding `manual-adjustment` and

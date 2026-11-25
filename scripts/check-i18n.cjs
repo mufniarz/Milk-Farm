@@ -38,8 +38,48 @@ const en = load("en");
 const missingInEn = [...it.keys()].filter((key) => !en.has(key)).sort();
 const missingInIt = [...en.keys()].filter((key) => !it.has(key)).sort();
 
-if (missingInEn.length === 0 && missingInIt.length === 0) {
-  console.log(`i18n OK: ${it.size} keys in both it.json and en.json`);
+// Static usage scan: the parity check alone missed raw keys that were used in
+// components but absent from both files (IOFC.SAVE_DEFAULT, ...). Match only
+// the literal-key patterns the app uses, not every dotted identifier.
+const sourceRoot = path.join(process.cwd(), "src");
+const usage = new Set();
+const keyPattern = /[A-Z][A-Z0-9_]*(?:\.[A-Z0-9_]+)+/;
+
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walk(file);
+      continue;
+    }
+    if (!/\.(ts|html)$/.test(entry.name)) continue;
+    const text = fs.readFileSync(file, "utf8");
+    for (const match of text.matchAll(
+      /['"]([A-Z][A-Z0-9_]*(?:\.[A-Z0-9_]+)+)['"]\s*\|\s*translate/g,
+    )) {
+      usage.add(match[1]);
+    }
+    for (const match of text.matchAll(
+      /translate\.(?:instant|get|stream)\(\s*['"]([A-Z][A-Z0-9_]*(?:\.[A-Z0-9_]+)+)['"]/g,
+    )) {
+      usage.add(match[1]);
+    }
+  }
+}
+walk(sourceRoot);
+
+const missingUsage = [...usage].filter(
+  (key) => !it.has(key) || !en.has(key),
+).sort();
+
+if (
+  missingInEn.length === 0 &&
+  missingInIt.length === 0 &&
+  missingUsage.length === 0
+) {
+  console.log(
+    `i18n OK: ${it.size} keys in both it.json and en.json (${usage.size} used keys checked)`,
+  );
   process.exit(0);
 }
 
@@ -50,5 +90,9 @@ if (missingInEn.length) {
 if (missingInIt.length) {
   console.error(`Keys present in en.json but missing from it.json:`);
   for (const key of missingInIt) console.error(`  - ${key}`);
+}
+if (missingUsage.length) {
+  console.error(`Keys used in src but missing from a translation file:`);
+  for (const key of missingUsage) console.error(`  - ${key}`);
 }
 process.exit(1);
