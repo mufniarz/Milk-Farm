@@ -35,9 +35,11 @@ The relaxed solution meets the absolute fibre floors:
 | ADF/aNDF | 56.9237 | 60–65 | **below** |
 | uNDF/aNDF | 36.5001 | 29–36.5 | at the upper boundary |
 
-The response carries three warnings: **ADF/aNDF below_min**, **ADF
-at_boundary (min)**, **uNDF/aNDF at_boundary (max)**. Boundary warnings are
-limited to the fibre class so the list stays a safety signal.
+The response carries three **warnings**: **ADF/aNDF below_min**, **ADF
+at_boundary (min)**, **uNDF/aNDF at_boundary (max)**. `unreachableTargets`
+carries only the violations — in this case **ADF/aNDF**; boundary hugs are
+warnings, not unreachable. Boundary warnings are limited to the fibre class
+so the list stays a safety signal.
 
 `at_boundary` means "within **0.001** of a limit, whether inside, exactly on
 it, or just outside by float noise." It is deliberately different from the

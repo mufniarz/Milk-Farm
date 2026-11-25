@@ -77,7 +77,7 @@ def solve_ration(feeds, targets, constraints, mode="relaxed"):
                 "Targets cannot be met in strict mode. "
                 "Relax the targets or use relaxed mode."
             ),
-            "unreachableTargets": relaxed.get("warnings", []),
+            "unreachableTargets": relaxed.get("unreachableTargets", []),
             "warnings": relaxed.get("warnings", []),
         }
     return _solve_relaxed(feeds, targets, constraints)
@@ -320,5 +320,11 @@ def _solve_relaxed(feeds, targets, constraints):
 
     result["status"] = "relaxed"
     result["warnings"] = warnings
+    # Violations only; boundary hugs are warnings but not unreachable targets.
+    result["unreachableTargets"] = [
+        warning
+        for warning in warnings
+        if warning["issue"] in ("below_min", "above_max")
+    ]
     result["message"] = "Closest feasible ration found. Some nutrient targets are not fully met."
     return result

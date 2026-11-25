@@ -10,10 +10,15 @@ export interface RecipeWarningLike {
 }
 
 /** i18n key for the warning label. */
-export function warningIssueKey(issue: WarningIssue): string {
+export function warningIssueKey(
+  issue: WarningIssue,
+  isOverride = false,
+): string {
   if (issue === 'below_min') return 'RECIPES.BELOW_MIN';
   if (issue === 'above_max') return 'RECIPES.ABOVE_MAX';
-  return 'RECIPES.AT_BOUNDARY';
+  return isOverride
+    ? 'RECIPES.AT_BOUNDARY_OVERRIDE'
+    : 'RECIPES.AT_BOUNDARY';
 }
 
 /** The limit shown next to the warning: the min for below/boundary-min, else max. */

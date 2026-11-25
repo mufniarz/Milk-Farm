@@ -5,6 +5,9 @@ describe('recipe warning rendering', () => {
     expect(warningIssueKey('below_min')).toBe('RECIPES.BELOW_MIN');
     expect(warningIssueKey('above_max')).toBe('RECIPES.ABOVE_MAX');
     expect(warningIssueKey('at_boundary')).toBe('RECIPES.AT_BOUNDARY');
+    expect(warningIssueKey('at_boundary', true)).toBe(
+      'RECIPES.AT_BOUNDARY_OVERRIDE',
+    );
   });
 
   it('shows the min for below_min and boundary-min', () => {

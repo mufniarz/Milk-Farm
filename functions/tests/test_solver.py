@@ -134,7 +134,12 @@ def test_strict_mode_rejects_relaxed_reference():
     assert "ADF_aNDF" in {
         target["code"] for target in result["unreachableTargets"]
     }
-    assert result["warnings"] == result["unreachableTargets"]
+    assert {
+        target["code"] for target in result["unreachableTargets"]
+    } == {"ADF_aNDF"}
+    assert {
+        warning["issue"] for warning in result["warnings"]
+    } == {"below_min", "at_boundary"}
 
 
 def test_strict_mode_reports_multiple_unreachable_targets():
@@ -179,3 +184,6 @@ def test_relaxed_reference_keeps_absolute_fibre_floors():
     assert warnings["uNDF_aNDF"]["issue"] == "at_boundary"
     assert "aNDF" not in warnings
     assert "uNDF" not in warnings
+    assert {
+        target["code"] for target in result["unreachableTargets"]
+    } == {"ADF_aNDF"}

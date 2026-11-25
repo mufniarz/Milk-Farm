@@ -9,6 +9,17 @@ delimiter format that has a pending `it-IT` visual check.
 
 - Sheet: `Confronto`.
 - Rows: one per source — `workbook`, `relaxed-solver`, `strict-solver`.
+- **Workbook row:** `status: hand-ration`; `warnings` and
+  `unreachableTargets` are both computed against the workbook ideals, so it
+  lists the four misses (uNDF, ADF, ADF/aNDF, uNDF/aNDF). It is not a solver
+  output, but the diagnostic columns mean the same thing as for the solver
+  rows.
+- **Relaxed row:** `warnings` is the full three-entry list (ADF/aNDF
+  below_min, ADF at_boundary, uNDF/aNDF at_boundary); `unreachableTargets` is
+  the violation subset only — `ADF/aNDF`. Boundary hugs are warnings, not
+  "unreachable."
+- **Strict row:** `unreachableTargets` is the same violation subset;
+  `warnings` is the full list; status `infeasible`.
 - Columns, in order:
   1. `source`;
   2. `status` (`workbook`, `optimal`, `relaxed`, `infeasible`);
@@ -22,13 +33,17 @@ delimiter format that has a pending `it-IT` visual check.
   23. `warnings`;
   24. `unreachableTargets`.
 - **Infeasible strict row:** `status = infeasible`; `totalAsFed`, `totalDM`,
-  `totalCost` and all nutrient cells are `—`, never 0; `warnings` and
-  `unreachableTargets` are populated. The `status` column is what
+  `totalCost` and all nutrient cells are `—`, never 0 (including
+  `totalAsFed`); `warnings` and `unreachableTargets` are populated. The `status` column is what
   disambiguates a missing value from an infeasible result.
 - **Cell format:** `€ #,##0.000` for cost with the Italian locale
   (`€ 9.373,000`); `0.000` for `totalAsFed`/`totalDM`; `0.00` for nutrients;
-  text for `status`, `warnings`, `unreachableTargets`. The `it-IT` XLSX check
-  asserts exactly that rendering.
+  text for `status`, `warnings`, `unreachableTargets`. The format code uses
+  en-US separators (`,` thousands, `.` decimal); Excel renders it per the
+  user's locale. Do not "fix" it to `€ #.##0,000`.
+- **Diagnostics are structured:** `warnings`/`unreachableTargets` cells carry
+  `code|value|issue` tuples (and boundary for at_boundary), not the UI labels.
+  Labels are UI-only via `warningIssueKey`; the export stays filterable.
 - The workbook row is labelled "workbook hand ration" so the consultant can
   explain why there are three prices for the same recipe.
 
@@ -48,9 +63,12 @@ export must make that distinction before a consultant presents it.
 
 Do not ship the comparison export until:
 
-1. the `it-IT` XLSX visual check passes (LibreOffice/Excel);
-   this is a different check from the accuracy CSV check: XLSX validates
-   number formats and `€` cells; CSV validates delimiter/decimal/BOM;
+1. the `it-IT` XLSX visual check passes (LibreOffice/Excel) **before the
+   export is used in a client conversation**; this is a different check from
+   the accuracy CSV check: XLSX validates number formats and `€` cells; CSV
+   validates delimiter/decimal/BOM;
 2. the strict response includes both `unreachableTargets` and `warnings`
    (done);
-3. the boundary warnings are present (`ADF`, `uNDF/aNDF` — done).
+3. the boundary warnings are present (`ADF`, `uNDF/aNDF` — done);
+4. the four-decimal solver/fixture decision is recorded for this new fixture
+   surface (currently the 0.01 basis; schedule the tightening).

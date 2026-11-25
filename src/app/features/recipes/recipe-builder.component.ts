@@ -1026,7 +1026,13 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   }
 
   warningLabel(warning: OptimizationWarning): string {
-    return warningIssueKey(warning.issue);
+    const target = this.targets.find(
+      (entry) => entry.nutrientCode === warning.code,
+    );
+    return warningIssueKey(
+      warning.issue,
+      target?.source === 'override',
+    );
   }
 
   warningLimitValue(warning: OptimizationWarning): number | null {
@@ -1109,7 +1115,7 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
           result.message || this.translate.instant('RECIPES.INFEASIBLE'),
         );
         this.optimizationWarnings.set(
-          result.unreachableTargets ?? result.warnings ?? [],
+          result.warnings ?? result.unreachableTargets ?? [],
         );
       }
     } catch (e: any) {
