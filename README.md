@@ -313,3 +313,17 @@ project configured; no staging project exists).
   the alert helper are in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 - **Deferred:** the four-decimal solver/fixture fix and the 90-day resolved
   TTL are not part of this deploy.
+
+
+## Follow-up deadlines
+
+- **Browser smoke** (loading, IOFC, accuracy, heartbeat banner) before the
+  pilot farm uses the app.
+- **Log-based scheduler alert** (`scripts/setup-monitoring-alert.sh`) before
+  the pilot; the in-app heartbeat is not an out-of-band signal.
+- **Four-decimal solver/fixture tightening** before Stage 2's comparison
+  export adds another fixture surface.
+- **90-day resolved-failure TTL**, excluding `manual-adjustment` and
+  `written-off`, before the first paying farm.
+- **EU Firestore migration** before the first paying contract; see
+  [`docs/REGION_DECISION.md`](docs/REGION_DECISION.md).

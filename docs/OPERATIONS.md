@@ -42,6 +42,16 @@ It has not been run in this session: the available service account lacks
 Monitoring permissions and the operator email/channel is not configured.
 Until it is run, the in-app heartbeat banner is the only signal.
 
+## Scope of `system`
+
+`system/feedingRetryScan` is a global singleton. It contains only scan
+health, never farm data. The `system` collection is global-only; per-farm
+state must stay under `farms/{farmId}`.
+
+`scripts/check-firestore-indexes.cjs` is a repository guard: it proves the
+repo carries the required indexes, not that the deployed project does. The
+heartbeat is the production check; keep both.
+
 ## Deploy gate
 
 1. `npm run verify` (includes `scripts/check-firestore-indexes.cjs`; the
