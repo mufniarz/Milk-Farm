@@ -631,12 +631,12 @@ calculator:
 
 ## M. Stage 2 plan (order and acceptance)
 
-1. **Scenarios** — pure feature first: a `Scenario` with `changes`
-   (feed price/availability/include, target overrides) and `resultSnapshot`;
-   save/replay via a service; the calculation runs through the existing pure
-   calculator, not a second solver. Acceptance: pure tests for applying each
-   change, an unchanged base when no change is applied, and a stored snapshot
-   that matches the recomputed result. No UI until the math is covered.
+1. **Scenarios** — pure feature implemented: `applyScenario(changes, base)`
+   returns a `ScenarioSnapshot` with values, effective `targets`, compliance,
+   `warnings` (all targets), and `computedAt`; 4 Karma specs cover price,
+   inclusion, target override and base immutability/determinism. Save/replay
+   service and UI remain next. The calculation uses the pure calculator, not
+   a second solver.
 2. **Sensitivity** — pure function: top 3 ingredients by total cost
    contribution, ±5% and ±10% changes, recompute cost/IOFC per shock; tests
    assert ordering, ties, and that the base is unchanged. No solver call.

@@ -73,11 +73,12 @@ not in Angular i18n; an English export is a refactor, not a config switch.
 | source | Fonte |
 | status | Stato |
 | diagnostics_from | Diagnostica da |
+| computed_at | Calcolato il |
 | totalAsFed | Totale tal quale |
 | totalDM | SS totali |
 | totalCost | Costo |
 | nutrients | nutrient label |
-| warnings | Avvisi |
+| warnings / Avvisi | Avvisi |
 | unreachableTargets | Obiettivi non raggiungibili |
 
 ### Cell formats
@@ -118,6 +119,10 @@ The export takes an explicit `scenarioIds` list (or a date-range selection)
 with a **maximum of 20**; it never silently caps. The sheet header names the
 selected range and count.
 
+**One base per export.** All selected scenarios must share the same
+`baseSource` and `baseRecipeId`; the export refuses a mixed selection with a
+clear message. Mixed bases would make `delta_cost` incomparable across rows.
+
 ### Base
 
 `Scenari` compares against **the saved recipe the scenarios were created
@@ -139,13 +144,32 @@ A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
 
 ### Columns
 
-- `scenario`, `base_source`, `status`, `diagnostics_from`;
+- `scenario`, `base_source` (header `Base di confronto`), `status`,
+  `diagnostics_from`, `computed_at`;
 - `base_cost`, `scenario_cost`, `delta_cost`;
 - `base_DM`, `scenario_DM`, `delta_DM`;
 - for each nutrient selected in the export: `base_<nutrient>`,
   `scenario_<nutrient>`, `delta_<nutrient>`;
-- for the fibre class: `base_status_<nutrient>`, `scenario_status_<nutrient>`
-  with `met` / `below_min` / `above_max` / `at_boundary`.
+- `warnings` (`Avvisi`) — the same `code|value|min|max|issue|boundary`
+  tuples as `Confronto`, computed against the **scenario's effective
+  targets**, covering all 17 nutrients, not only fibre;
+- for the fibre class as a convenience: `base_status_<nutrient>`,
+  `scenario_status_<nutrient>` with
+  `met` / `below_min` / `above_max` / `at_boundary`. The `Avvisi` column is
+  the self-contained answer for every nutrient; the status pair is a quick
+  safety read.
+
+`base_status_<nutrient>` is the **base value against the base's targets**;
+`scenario_status_<nutrient>` is the **scenario value against the scenario's
+effective targets** (base + `targetOverrides`). This is what makes an
+override scenario visible when its value deltas are zero.
+
+The export **recomputes** each scenario from its saved `changes` and the
+current base, rather than reading the stored `resultSnapshot`; `computed_at`
+records that recomputation. A stored snapshot is the audit record, not the
+export source. `Sensibilità` uses the same recomputed values. The scenario
+snapshot still carries `warnings`, `targets` (effective) and `computedAt`, so
+a saved scenario can be audited without recomputing.
 
 Deltas are **scenario − base**; a cheaper scenario has a negative
 `delta_cost`. A header note states this.
@@ -158,20 +182,26 @@ An infeasible scenario is `NA()` in every numeric cell, with
 | Column | Header |
 |---|---|
 | scenario | Scenario |
-| base_source | Base |
+| base_source | Base di confronto |
 | status | Stato |
 | diagnostics_from | Diagnostica da |
+| computed_at | Calcolato il |
 | base_cost / scenario_cost / delta_cost | Costo base / Costo scenario / Delta costo |
 | base_DM / scenario_DM / delta_DM | SS base / SS scenario / Delta SS |
 | base_<nutrient> / scenario_<nutrient> / delta_<nutrient> | nutrient label + Base/Scenario/Delta |
+| warnings | Avvisi |
 | base_status_<nutrient> / scenario_status_<nutrient> | nutrient label + Stato base/Stato scenario |
 
 ### Sensitivity
 
 Sensitivity is **per scenario** and lives in a third sheet, `Sensibilità`:
-one block per scenario, top 3 ingredients by cost contribution, ±5% and ±10%
-price shocks, cost/IOFC deltas per shock. The pure function is
-`topThreeByCostContribution`; it is unit-tested independently.
+one row per scenario, **12 delta-cost columns** (top 3 ingredients × ±5%/±10%
+price shocks), plus the scenario/base identification. Rows-per-shock is
+rejected for readability. It is ranked **per scenario**, because an inclusion
+change can alter the top 3. Only saved scenarios are exported; the builder's
+unsaved state is not. The pure function is
+`topThreeByCostContribution`; price shocks are ±5%/±10%, not inclusion
+shocks. It is unit-tested independently.
 
 ## Build acceptance tests
 
