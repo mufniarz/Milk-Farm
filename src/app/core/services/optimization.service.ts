@@ -10,6 +10,7 @@ export interface OptimizationRequest {
   feeds: OptimizationFeed[];
   targets: OptimizationTarget[];
   constraints?: OptimizationConstraints;
+  mode?: 'relaxed' | 'strict';
 }
 
 export interface OptimizationFeed {
@@ -83,6 +84,7 @@ export class OptimizationService {
     feeds: Feed[],
     targets: NutrientTarget[],
     constraints?: OptimizationConstraints,
+    mode: 'relaxed' | 'strict' = 'relaxed',
   ): Promise<OptimizationResult> {
     const callable = httpsCallable<OptimizationRequest, OptimizationResult>(
       this.functions,

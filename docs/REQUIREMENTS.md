@@ -37,7 +37,7 @@ numbers.
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 18 passed — tenant boundary, strict cutover (legacy-only denied), registration order (farm before owner membership), owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, operator-only feedings, milk-record roles, failure-queue read-only, heartbeat read/write |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
-| Full suite incl. callables | `npm run test:functions` | 50 passed with `REQUIRE_EMULATOR=1` (20 solver/parity + 30 callable/trigger/failure/retroactive) |
+| Full suite incl. callables | `npm run test:functions` | 51 passed with `REQUIRE_EMULATOR=1` (21 solver/parity + 30 callable/trigger/failure/retroactive) |
 
 No deploy of rules, functions or hosting was performed; the verification above is local/emulator only. Karma now runs locally with the no-sandbox launcher and CI re-runs it on push (the earlier "next morning" note is superseded).
 
@@ -292,7 +292,8 @@ Implemented as a separate, auditable action:
 
 `optimize_ration` supports `mode: 'relaxed'` (default: minimise, soften and
 flag unreachable targets) and `mode: 'strict'` (return `infeasible` rather
-than soften, with `unreachableTargets`). The full reference target set is infeasible in strict mode; in
+than soften, with both `unreachableTargets` and the relaxed diagnostic
+`warnings`). The full reference target set is infeasible in strict mode; in
 relaxed mode the 23.1 kg DM solution meets aNDF/ADF/uNDF floors and misses
 only ADF/aNDF. The €9.885 workbook ration is the hand ration reproduced by
 the parity test, not the cost minimum. Details and the fibre safety table are

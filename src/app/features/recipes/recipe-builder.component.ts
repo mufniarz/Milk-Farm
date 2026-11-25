@@ -1064,6 +1064,7 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
         feeds,
         this.targets,
         constraints,
+        'relaxed',
       );
 
       if (result.status === 'optimal' && result.feeds) {

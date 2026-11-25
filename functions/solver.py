@@ -75,6 +75,7 @@ def solve_ration(feeds, targets, constraints, mode="relaxed"):
                 "Relax the targets or use relaxed mode."
             ),
             "unreachableTargets": relaxed.get("warnings", []),
+            "warnings": relaxed.get("warnings", []),
         }
     return _solve_relaxed(feeds, targets, constraints)
 

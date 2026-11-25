@@ -1,0 +1,2 @@
+﻿date;herdGroupId;feederId;feedId;feedName;calledKgAsFed;loadedKgAsFed;deviationPct;refusedKgAsFed;status;isCorrection;hasOverdrawn;hasSkipped;hasRefusalError
+2026-11-26;g-export;feeder-export;f1;Silage;100;100;0;0;posted;false;false;false;false

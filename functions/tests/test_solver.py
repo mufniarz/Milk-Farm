@@ -134,6 +134,22 @@ def test_strict_mode_rejects_relaxed_reference():
     assert "ADF_aNDF" in {
         target["code"] for target in result["unreachableTargets"]
     }
+    assert result["warnings"] == result["unreachableTargets"]
+
+
+def test_strict_mode_reports_multiple_unreachable_targets():
+    result = solve_ration(
+        FIXTURE["feeds"],
+        [
+            {"code": "aNDF", "min": 70.0, "max": 75.0},
+            {"code": "ADF", "min": 60.0, "max": 65.0},
+        ],
+        {"totalDM": 23.1},
+        mode="strict",
+    )
+    assert result["status"] == "infeasible"
+    codes = {target["code"] for target in result["unreachableTargets"]}
+    assert {"aNDF", "ADF"}.issubset(codes)
 
 
 def test_relaxed_reference_keeps_absolute_fibre_floors():

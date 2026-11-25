@@ -18,9 +18,15 @@ afterward.
 - Heartbeat error banner: with an error heartbeat and an **empty** queue,
   `/loading` showed "Il controllo automatico dei carichi non è in esecuzione".
 - CSV export: downloaded from `/accuracy`; 250 bytes, UTF-8 BOM present,
-  header `date;herdGroupId;...;hasRefusalError`, row uses `;` and no decimal
-  separator was needed for that row. The file was not opened in Excel/
-  LibreOffice; the byte-level format is verified.
+  header `date;herdGroupId;...;hasRefusalError`, row uses `;`. Parsed with
+  Python's `csv` module (14 columns, numeric fields parse). It was not opened
+  in Excel/LibreOffice; no such app is installed here. A fixture is at
+  [`accuracy-smoke.csv`](screenshots/accuracy-smoke.csv) for a five-minute
+  `it-IT` visual check.
+- 360 px active confirm: after selecting the group/feeder and loading 100 kg,
+  the button is visible, enabled, and fully inside the 360 px viewport
+  (`x=171, width=148`), reachable by scroll. Screenshot:
+  [loading-360-confirm](screenshots/loading-360-confirm.png).
 - No console errors or page errors.
 
 Screenshots: [loading](screenshots/loading-confirmed.png),
@@ -51,5 +57,4 @@ Screenshots: [loading](screenshots/loading-confirmed.png),
   check). The CSV path is unit-tested; the browser download was not opened.
 - The heartbeat stale banner was verified visually with an error heartbeat and
   an empty queue; the screenshot is [stale-banner](screenshots/stale-banner.png).
-- The loading confirm button at 360 px after selecting a group (the form is
-  below the fold in the screenshot).
+- Excel/LibreOffice visual parse of the CSV (fixture provided; no app here).

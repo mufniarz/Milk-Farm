@@ -17,7 +17,7 @@ is expected to be **≤ €9.885**, not equal to it.
 
 | Scenario | Status | Total DM | Total cost |
 |---|---|---|---|
-| Full targets, `strict` | `infeasible` (ADF/aNDF in `unreachableTargets`) | — | — |
+| Full targets, `strict` | `infeasible` (ADF/aNDF in `unreachableTargets` and `warnings`) | — | — |
 | Full targets, `relaxed` | `relaxed` | **23.1** | **€9.373** |
 | Protein/starch targets, `relaxed` | `optimal` | **23.1** | **€6.031** |
 
@@ -54,5 +54,6 @@ warning.
 
 ## Reproduce
 
-`functions/tests/test_solver.py` covers the strict rejection and the
+`functions/tests/test_solver.py` covers the strict rejection (with both
+`unreachableTargets` and `warnings`), multiple unreachable targets, and the
 relaxed absolute-fibre assertions.

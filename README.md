@@ -312,8 +312,9 @@ project configured; no staging project exists).
   queue-health subscription race (role resolved after `ngOnInit`, so the
   heartbeat/failure list never loaded), and a 360 px shell overflow; see
   [`docs/BROWSER_SMOKE.md`](docs/BROWSER_SMOKE.md). The stale banner was
-  remade visible on an empty queue, and the CSV download was byte-checked
-  (BOM + `;` header), though not opened in Excel. The i18n check now scans
+  remade visible on an empty queue. The CSV was byte- and `csv`-parsed
+  (BOM, `;`, numeric fields) and a fixture is provided, though not opened in
+  Excel; the 360 px active confirm button was screenshotted and fits. The i18n check now scans
   used keys and found two more missing default-price keys. Dynamic keys built
   by concatenation are not scanned; user-visible keys must be literal.
 - **No staging:** the mitigation is production-only: full local gate before
