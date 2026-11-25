@@ -301,9 +301,10 @@ in [`docs/SOLVER_SMOKE.md`](SOLVER_SMOKE.md). The targets screen warns when a
 fibre target is set below the reference floor; the reason remains required
 for the override. The Stage 2 comparison is a separate XLSX `Confronto` sheet
 with workbook/relaxed/strict rows and separate warnings columns; see
-[`docs/COMPARISON_EXPORT.md`](COMPARISON_EXPORT.md): workbook diagnostics use
-the sheet's animal-group ideals and the same classifier, tuples include
-min/max, and the workbook DM footnote covers 23.095 vs 23.10246.
+[`docs/COMPARISON_EXPORT.md`](COMPARISON_EXPORT.md): `Confronto` is the
+solver comparison (with `diagnostics_from`), `Scenari` is the scenario sheet;
+workbook diagnostics use the sheet's ideals and the same classifier, tuples
+include min/max, and the workbook DM footnote covers 23.095 vs 23.10246.
 
 ## K. Trigger failure queue
 
@@ -626,3 +627,21 @@ calculator:
    reference ration and checks it against `golden-data.ts` (17 codes within
    0.03 pp; totals within 0.01 kg / 0.001 €). `scripts/check-calculator.mts`
    runs the same numbers without Karma for the local and CI smoke gate.
+
+
+## M. Stage 2 plan (order and acceptance)
+
+1. **Scenarios** — pure feature first: a `Scenario` with `changes`
+   (feed price/availability/include, target overrides) and `resultSnapshot`;
+   save/replay via a service; the calculation runs through the existing pure
+   calculator, not a second solver. Acceptance: pure tests for applying each
+   change, an unchanged base when no change is applied, and a stored snapshot
+   that matches the recomputed result. No UI until the math is covered.
+2. **Sensitivity** — pure function: top 3 ingredients by total cost
+   contribution, ±5% and ±10% changes, recompute cost/IOFC per shock; tests
+   assert ordering, ties, and that the base is unchanged. No solver call.
+3. **Comparison export** — after the contract and the four-decimal decision:
+   `Confronto` (solver rows, `diagnostics_from`) and `Scenari` (base +
+   scenarios + deltas) in one workbook; acceptance list is in
+   [`docs/COMPARISON_EXPORT.md`](COMPARISON_EXPORT.md). The `it-IT` XLSX check
+   is a pre-ship gate.
