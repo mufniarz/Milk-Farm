@@ -6,11 +6,11 @@ export interface ScenarioTargetOverride {
 }
 
 export interface ScenarioChanges {
-  /** feedId -> new €/kg as fed. */
+  /** feedId -> new €/kg as fed. Unknown feed ids are ignored. */
   feedPrices?: Record<string, number>;
-  /** feedId -> new kg as fed per head. */
+  /** feedId -> replacement kg as fed per head (not additive). Zero removes the line. */
   inclusions?: Record<string, number>;
-  /** nutrientCode -> new min/max. */
+  /** nutrientCode -> new min/max; both null removes the constraint. */
   targetOverrides?: Record<string, ScenarioTargetOverride>;
 }
 

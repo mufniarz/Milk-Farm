@@ -97,6 +97,59 @@ describe('applyScenario', () => {
     ).toBeTrue();
   });
 
+  it('empty changes reproduce the base', () => {
+    const baseSnapshot = applyScenario(base, {}, now);
+    const empty = applyScenario(base, {}, now);
+    expect(empty).toEqual(baseSnapshot);
+    expect(empty.status).toBe('computed');
+    expect(empty.compliance['proteina']).toBe('met');
+  });
+
+  it('composes price, inclusion and target changes', () => {
+    const combined = applyScenario(
+      base,
+      {
+        feedPrices: { silage: 0.2 },
+        inclusions: { soy: 3 },
+        targetOverrides: { aNDF: { min: 40, max: 45 } },
+      },
+      now,
+    );
+    const baseSnapshot = applyScenario(base, {}, now);
+    expect(combined.totalCost).toBeGreaterThan(baseSnapshot.totalCost);
+    expect(combined.nutrients['proteina']).toBeGreaterThan(
+      baseSnapshot.nutrients['proteina'],
+    );
+    expect(combined.compliance['aNDF']).toBe('below_min');
+    expect(
+      combined.warnings.some((warning) => warning.code === 'aNDF'),
+    ).toBeTrue();
+  });
+
+  it('ignores unknown feed ids and treats inclusions as replacement', () => {
+    const unchanged = applyScenario(
+      base,
+      { feedPrices: { unknown: 99 }, inclusions: { unknown: 5 } },
+      now,
+    );
+    expect(unchanged).toEqual(applyScenario(base, {}, now));
+
+    const removed = applyScenario(base, { inclusions: { soy: 0 } }, now);
+    expect(removed.totalAsFed).toBe(10);
+  });
+
+  it('a target with both bounds null is unconstrained', () => {
+    const result = applyScenario(
+      base,
+      { targetOverrides: { aNDF: { min: null, max: null } } },
+      now,
+    );
+    expect(result.compliance['aNDF']).toBe('met');
+    expect(
+      result.warnings.some((warning) => warning.code === 'aNDF'),
+    ).toBeFalse();
+  });
+
   it('does not mutate the base and is deterministic for a fixed clock', () => {
     const snapshot = JSON.stringify(base);
     const first = applyScenario(base, {}, now);

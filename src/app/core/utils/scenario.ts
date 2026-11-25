@@ -54,6 +54,8 @@ export function applyScenario(
     if (evaluated.warning) warnings.push(evaluated.warning);
   }
 
+  warnings.sort((a, b) => a.code.localeCompare(b.code));
+
   return {
     status: 'computed',
     totalAsFed: result.totalAsFed,

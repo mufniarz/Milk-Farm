@@ -74,6 +74,8 @@ not in Angular i18n; an English export is a refactor, not a config switch.
 | status | Stato |
 | diagnostics_from | Diagnostica da |
 | computed_at | Calcolato il |
+| scenario_cost_saved | Costo salvato |
+| saved_at | Salvato il |
 | totalAsFed | Totale tal quale |
 | totalDM | SS totali |
 | totalCost | Costo |
@@ -119,9 +121,11 @@ The export takes an explicit `scenarioIds` list (or a date-range selection)
 with a **maximum of 20**; it never silently caps. The sheet header names the
 selected range and count.
 
-**One base per export.** All selected scenarios must share the same
-`baseSource` and `baseRecipeId`; the export refuses a mixed selection with a
-clear message. Mixed bases would make `delta_cost` incomparable across rows.
+**One base per export.** All selected scenarios must share the **pair**
+`(baseSource, baseRecipeId)`; the export refuses a mixed selection with a
+clear message. Checking only `baseSource` is insufficient: two different
+saved recipes both have `saved-recipe`. Mixed bases would make `delta_cost`
+incomparable across rows.
 
 ### Base
 
@@ -139,13 +143,17 @@ A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
 - **inclusions** — modify recipe line quantities; both nutrients and cost
   change.
 - **targetOverrides** — the ration is unchanged, so value deltas are **0**;
-  only compliance status changes. This is why `Scenari` carries status
-  columns, not only deltas.
+  only compliance status changes. This is why `Scenari` carries `Avvisi` and
+  status columns, not only deltas. A target with both bounds null removes the
+  constraint and evaluates `met`.
 
 ### Columns
 
 - `scenario`, `base_source` (header `Base di confronto`), `status`,
-  `diagnostics_from`, `computed_at`;
+  `diagnostics_from`, `computed_at`; `Fonte` is a `Confronto`-only column
+  (workbook/relaxed/strict) and is not present in `Scenari`;
+- `scenario_cost_saved`, `saved_at` — the stored snapshot's cost and save
+  time, so a recompute that differs from what the farm saw is readable;
 - `base_cost`, `scenario_cost`, `delta_cost`;
 - `base_DM`, `scenario_DM`, `delta_DM`;
 - for each nutrient selected in the export: `base_<nutrient>`,
@@ -157,7 +165,8 @@ A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
   `scenario_status_<nutrient>` with
   `met` / `below_min` / `above_max` / `at_boundary`. The `Avvisi` column is
   the self-contained answer for every nutrient; the status pair is a quick
-  safety read.
+  safety read. Status values come from `applyScenario`; the export does not
+  reclassify.
 
 `base_status_<nutrient>` is the **base value against the base's targets**;
 `scenario_status_<nutrient>` is the **scenario value against the scenario's
@@ -165,11 +174,17 @@ effective targets** (base + `targetOverrides`). This is what makes an
 override scenario visible when its value deltas are zero.
 
 The export **recomputes** each scenario from its saved `changes` and the
-current base, rather than reading the stored `resultSnapshot`; `computed_at`
-records that recomputation. A stored snapshot is the audit record, not the
-export source. `Sensibilità` uses the same recomputed values. The scenario
-snapshot still carries `warnings`, `targets` (effective) and `computedAt`, so
-a saved scenario can be audited without recomputing.
+current base; `computed_at` records the recomputation. `scenario_cost_saved`
+and `saved_at` come from the stored `resultSnapshot`, so a price/availability
+change since saving is visible as a divergence rather than a silent rewrite.
+`Sensibilità` uses the same recomputed values.
+
+**Classification lives in one place for scenarios:** `applyScenario` produces
+the values, compliance statuses and warnings, including `at_boundary` and its
+side, with the TS `BOUNDARY_EPS`; the exporter serialises them and does not
+reclassify. The solver rows use Python's `classify_warning`/`BOUNDARY_EPS` on
+the solver surface; the two surfaces are separate and each has one
+implementation. Do not re-derive scenario `at_boundary` in Python.
 
 Deltas are **scenario − base**; a cheaper scenario has a negative
 `delta_cost`. A header note states this.
@@ -186,6 +201,8 @@ An infeasible scenario is `NA()` in every numeric cell, with
 | status | Stato |
 | diagnostics_from | Diagnostica da |
 | computed_at | Calcolato il |
+| scenario_cost_saved | Costo salvato |
+| saved_at | Salvato il |
 | base_cost / scenario_cost / delta_cost | Costo base / Costo scenario / Delta costo |
 | base_DM / scenario_DM / delta_DM | SS base / SS scenario / Delta SS |
 | base_<nutrient> / scenario_<nutrient> / delta_<nutrient> | nutrient label + Base/Scenario/Delta |
@@ -221,11 +238,22 @@ The first build must assert:
 ### Stage 2 scenario/sensitivity test scope
 
 - price change: cost changes, nutrient values unchanged;
-- inclusion change: nutrients and cost change;
-- target override: values unchanged, compliance status changes;
+- inclusion change: nutrients and cost change; `inclusions` is replacement,
+  zero removes the line;
+- target override: values unchanged, compliance status changes; both-null
+  removes the constraint;
+- empty `changes` reproduces the base;
+- combined changes compose (price + inclusion + override);
+- unknown feed ids in `feedPrices`/`inclusions` are ignored;
 - base recipe `updatedAt`/data unchanged by applying a scenario;
 - save/replay round-trip returns the same `resultSnapshot`;
-- sensitivity: top-3 ordering, ties, ±5/±10%, base unchanged.
+- export accepts only one `(baseSource, baseRecipeId)` pair;
+- sensitivity: top-3 ordering, ties, ±5/±10% **price**, per-scenario ranking,
+  base unchanged, infeasible scenario `NA()`.
+
+`applyScenario` keeps `now` as its only impure input (it writes `computedAt`);
+no other time read or effective-date logic is inside it. Warnings are sorted
+by code for deterministic snapshots.
 
 ## Gate
 
