@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -535,6 +535,29 @@ export class LoadingComponent implements OnInit, OnDestroy {
 
   readonly today = localDateKey();
 
+  private subscribedToHealth = false;
+
+  constructor() {
+    effect(() => {
+      const role = this.farmContext.activeRole();
+      if (
+        this.subscribedToHealth ||
+        !role ||
+        role === 'feeder'
+      ) {
+        return;
+      }
+      this.subscribedToHealth = true;
+      this.failureService
+        .getOpenFailures()
+        .subscribe((failures) => (this.failures = failures));
+      this.systemHealth.getRetryScanHeartbeat().subscribe((heartbeat) => {
+        this.heartbeat = heartbeat;
+        this.heartbeatLoaded = true;
+      });
+    });
+  }
+
   ngOnInit(): void {
     this.groupService
       .getGroups()
@@ -548,15 +571,6 @@ export class LoadingComponent implements OnInit, OnDestroy {
     this.feedingService
       .getFeedings()
       .subscribe((feedings) => (this.feedings = feedings));
-    if (this.canRetry) {
-      this.failureService
-        .getOpenFailures()
-        .subscribe((failures) => (this.failures = failures));
-      this.systemHealth.getRetryScanHeartbeat().subscribe((heartbeat) => {
-        this.heartbeat = heartbeat;
-        this.heartbeatLoaded = true;
-      });
-    }
   }
 
   get alreadyConfirmedToday(): boolean {

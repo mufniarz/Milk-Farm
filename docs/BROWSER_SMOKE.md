@@ -15,6 +15,12 @@ afterward.
   re-lock the feeding snapshot. Cards rendered €150.00 revenue, €45.00 feed,
   €105.00 IOFC/day, €10.50 IOFC/cow, 30 kg milk/cow, €0.150 feed/kg.
 - `/accuracy`: rendered the per-feeder row for the confirmed load.
+- Heartbeat error banner: with an error heartbeat and an **empty** queue,
+  `/loading` showed "Il controllo automatico dei carichi non è in esecuzione".
+- CSV export: downloaded from `/accuracy`; 250 bytes, UTF-8 BOM present,
+  header `date;herdGroupId;...;hasRefusalError`, row uses `;` and no decimal
+  separator was needed for that row. The file was not opened in Excel/
+  LibreOffice; the byte-level format is verified.
 - No console errors or page errors.
 
 Screenshots: [loading](screenshots/loading-confirmed.png),
@@ -28,8 +34,14 @@ Screenshots: [loading](screenshots/loading-confirmed.png),
 2. **Incomplete milk record could be saved** while the recipe/feeding data
    was still loading: the page saved `feedCostPerHeadSnapshot: null` and
    `hasFeedingSnapshot: false`. Save is now disabled until `result` is
-   non-null, with a guard in `save()`.
-3. **The shell was not responsive at 360 px**: the permanent 260 px sidenav
+   non-null, with a guard in `save()` and a Karma spec.
+3. **Queue-health subscriptions never started on a fresh page**: the loading
+   component checked `canRetry` once in `ngOnInit`; if the farm role resolved
+   after that, the failures list and heartbeat were never subscribed. This is
+   why the first stale-banner browser attempt showed nothing. They are now
+   started from an `effect` on `activeRole`, and the stale banner was remade
+   visible on an empty queue.
+4. **The shell was not responsive at 360 px**: the permanent 260 px sidenav
    clipped the page. The sidenav is now `over` on ≤800 px with a menu button,
    and the new-feeder row wraps instead of clipping the "Aggiungi" button.
 
@@ -37,7 +49,7 @@ Screenshots: [loading](screenshots/loading-confirmed.png),
 
 - CSV download opened in Italian Excel/LibreOffice (delimiter/BOM visual
   check). The CSV path is unit-tested; the browser download was not opened.
-- The heartbeat stale banner was verified by pure specs, not by forcing a
-  stale heartbeat in the browser.
+- The heartbeat stale banner was verified visually with an error heartbeat and
+  an empty queue; the screenshot is [stale-banner](screenshots/stale-banner.png).
 - The loading confirm button at 360 px after selecting a group (the form is
   below the fold in the screenshot).

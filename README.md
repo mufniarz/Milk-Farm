@@ -308,11 +308,13 @@ project configured; no staging project exists).
 - **Browser smoke:** signed in with a throwaway owner, confirmed a load and
   verified the trigger posting, opened IOFC, refreshed the snapshot and saw
   the cards (€150/€45/€105/€10.50), and opened the accuracy row. The smoke
-  found and fixed missing IOFC i18n keys, a save-before-data-loaded path, and
-  a 360 px shell overflow; see [`docs/BROWSER_SMOKE.md`](docs/BROWSER_SMOKE.md).
-  The i18n check now scans used keys and found two more missing default-price
-  keys. CSV in Excel, the stale-heartbeat banner and the 360 px confirm button
-  remain not browser-tested.
+  found and fixed missing IOFC i18n keys, a save-before-data-loaded path, a
+  queue-health subscription race (role resolved after `ngOnInit`, so the
+  heartbeat/failure list never loaded), and a 360 px shell overflow; see
+  [`docs/BROWSER_SMOKE.md`](docs/BROWSER_SMOKE.md). The stale banner was
+  remade visible on an empty queue, and the CSV download was byte-checked
+  (BOM + `;` header), though not opened in Excel. The i18n check now scans
+  used keys and found two more missing default-price keys.
 - **No staging:** the mitigation is production-only: full local gate before
   every deploy, the authenticated smoke after every deploy, and a manual
   rollback of the previous functions/rules version. Creating
