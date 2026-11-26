@@ -15,13 +15,21 @@
 > `check:calculator` must pass at current tolerances; old goldens must fail
 > and the failure must be explained as precision shift.
 > **Commit 2 — re-pin only:** update goldens and record old/new/delta.
-> `ε = 1e-6` (solver feasibility). New pin outside old ±ε blocks and escalates.
+> `SOLVER_EPS = 1e-6` (feasibility) is **not** the re-pin check.
+> `REPIN_REVIEW_TOLERANCE = 0.001`, anchored to the parity value (workbook
+> fixture), not the old pin. A new pin within 0.001 of parity is expected;
+> outside blocks and escalates.
 > Engineering signs; product signs only if a signed column, shape or decision
 > changes.
 >
 > **Constants:** `COST_PARITY_EUR=0.001`, `SS_PARITY_KG=0.001`,
-> `AT_BOUNDARY_BAND=0.001` **percentage points of the nutrient**, solver
-> `ε=1e-6`. They are separate constants.
+> `AT_BOUNDARY_BAND=0.001` **percentage points, fibre-class DM targets
+> only**, solver `SOLVER_EPS=1e-6`, `REPIN_REVIEW_TOLERANCE=0.001`.
+>
+> **Boundary model (current code):** satisfied-side band of 0.001 inside the
+> target; an additional 1e-4 guard allows just-outside float noise to remain
+> `at_boundary` (e.g. 36.5001). This is asymmetric and is **not signed**;
+> choose symmetric-band or half-open before Scenari consumes it.
 >
 > **Fallback B rework scope:** `NA()`→string changes Scenari NA checks;
 > Sensibilità 16→15 changes header/tests; propagation allowed changes
