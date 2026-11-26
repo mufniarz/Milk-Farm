@@ -266,8 +266,18 @@ are `NA()`. Rows-per-shock is rejected for readability.
   `NA()`.
 - Only saved scenarios; the builder's unsaved state is not exported. The pure
   function is `topThreeByCostContribution`; price shocks are price-only, not
-  inclusion. An infeasible scenario keeps its row with `Stato = infeasible`
-  and 12 `NA()` deltas.
+  inclusion.
+- **Infeasible input** returns `{ deltas: [null × 12], ranking: [] }`; it does
+  not throw and does not block the rest of the workbook.
+- One or two feeds: `feed_top1` populated, missing slots and their four
+  deltas `NA()`.
+- `deltaCost = newCost − scenarioCost`; a +5% shock is positive.
+- Ranking is per scenario (its `lines`), descending, ties by `feedId`.
+- `diverged` uses strict `>`; exactly at the threshold is `false`. When
+  `diverged = false`, `computed_at` is informational; values equal the saved
+  snapshot.
+- Four-decimal sequence: fix → regenerate `boundary-cases.json` → regenerate
+  `scenario-parity-cases.json` → both parities pass → deploy.
 
 ## `export_comparison` signature
 
@@ -286,6 +296,22 @@ XLSX with `Confronto`, `Scenari` and `Sensibilità`.
   `(baseSource, baseRecipeId)` and that none is soft-deleted; mismatch →
   `mixed_base`, deleted → `scenario_deleted`.
 - Returns a signed Storage URL, same pattern as `export_recipe`.
+
+## Persistence test scope (next round)
+
+The persistence round's +N is these seven tests:
+
+1. save rejects an override key not in the farm's current overrides
+   (`invalid_override`);
+2. save rejects an inclusion/price key not in the base's line list
+   (`unknown_feed`);
+3. save returns `{scenarioId, snapshot, serverTime}` and writes `savedAt` from
+   server time, not the payload;
+4. save ignores a client-supplied snapshot; the server snapshot is canonical;
+5. delete sets `deletedAt`, hides the row, and the export rejects it;
+6. delete is denied for feeder and allowed for owner/admin;
+7. export rejects mixed-base and deleted selections with `mixed_base` /
+   `scenario_deleted`.
 
 ## Build acceptance tests
 
@@ -331,13 +357,20 @@ The first build must assert:
 - `/scenarios` row: name, base, `savedAt`, `Stato`, `scenario_cost`,
   `diverged`, checkbox, action menu (load into builder, delete);
 - `scenario` name: required, trimmed, non-empty, ≤ 100 chars, no `/`;
+  default `<base name> — <date/time>`;
 - **always-new save**: `save_scenario` never edits an existing scenario; a
   changed what-if is saved as a new one (the audit stays simple);
 - **soft delete**: `delete_scenario` (owner/admin) sets `deletedAt`;
-  `/scenarios` hides deleted rows; exports reject selected deleted rows;
-- builder flow: “Save scenario” in the toolbar, name dialog, snapshot of the
-  current builder state **including unsaved recipe changes**; no recipe-save
-  prerequisite;
+  `/scenarios` hides deleted rows; exports reject selected deleted rows with
+  `scenario_deleted` and the detail “Deleted scenarios cannot be re-exported;
+  the previously exported workbook is the record”; the export selector
+  refreshes on open, hides deleted rows, and offers a one-click removal for a
+  stale selection;
+- builder flow: “Save scenario” in the toolbar, name dialog defaulted to
+  `<base name> — <date/time>`; snapshot of the current builder state
+  **including unsaved recipe changes**; no recipe-save prerequisite;
+  “Load into builder” shows “Saving creates a new scenario; the loaded one is
+  preserved,” and asks before discarding unsaved changes;
 - the server snapshot is canonical; `save_scenario` returns it and the client
   replaces its preview, showing a toast if the preview differed;
 - changes scope: `inclusions`/`feedPrices` only for feeds in the base’s line

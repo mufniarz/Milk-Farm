@@ -633,7 +633,8 @@ calculator:
 
 1. **Scenarios** — persistence lifecycle: always-new `save_scenario`, soft
    `delete_scenario` (owner/admin), builder save dialog with unsaved state,
-   `/scenarios` list (latest 50), client UUID; then service/UI. The pure
+   `/scenarios` list (up to 200), client UUID; then service/UI. Acceptance:
+   the seven persistence tests in `COMPARISON_EXPORT.md`. The pure
    feature is implemented: `applyScenario(changes, base)`
    returns a `ScenarioSnapshot` with values, effective `targets`, compliance,
    `warnings` (all targets), and `computedAt`; 4 Karma specs cover price,
