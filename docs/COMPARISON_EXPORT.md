@@ -26,6 +26,9 @@
 > `AT_BOUNDARY_BAND=0.001` **percentage points, fibre-class DM targets
 > only**, solver `SOLVER_EPS=1e-6`, `REPIN_REVIEW_TOLERANCE=0.001`.
 >
+> **Boundary max-side coverage:** `36.4989 → met`, `36.4999`/`36.5001 →
+> at_boundary`, `36.5011 → above_max`.
+>
 > **Boundary model (current code):** satisfied-side band of 0.001 inside the
 > target; an additional 1e-4 guard allows just-outside float noise to remain
 > `at_boundary` (e.g. 36.5001). This is asymmetric and is **not signed**;
@@ -33,15 +36,26 @@
 > covered by Fallback B as shipped; symmetric/half-open remain alternatives
 > with rework risk. `met` = satisfied and outside the band.
 >
+> **Expected outcome: Fallback B on 2026-12-04** unless product signs
+> Fallback A first.
+>
+> **Production gate:** the 1e-4 guard must be derived from a measured
+> classifier residual before production; tests currently lock it at ≥1e-4,
+> not at its true value.
+>
 > **Fallback B includes the current band model as shipped** (asymmetric
 > 0.001 satisfied-side + 1e-4 violation-side guard). 2026-12-04 therefore
 > unblocks Scenari; a later band-model change requires re-verifying Scenari
 > classification tests.
 >
-> **Re-pin formula:** strict cost `|new - 9.885| < COST_PARITY_EUR`; strict
-> DM `|new - 23.10246| < SS_PARITY_KG`; relaxed cost/protein have no parity
-> anchor — `|new - old| < REPIN_REVIEW_TOLERANCE` is only an expected-change
-> sanity check, recorded old/new/delta.
+> **Pinned rows:** workbook row = `9.885` / `23.10246` (not re-pinned;
+> source of truth). Relaxed row = `9.0062` / `23.095` / `15.8016`. Strict row
+> is all-NA and has no numeric pin.
+>
+> **Re-pin rule:** workbook row is never re-pinned. Relaxed cost/DM/protein
+> have no parity anchor; **no tolerance gate** — record old/new/delta for
+> engineering review. Four-decimal does not change the workbook row's
+> contract values.
 >
 > **Fallback B rework scope:** `NA()`→string changes Scenari NA checks;
 > Sensibilità 16→15 changes header/tests; propagation allowed changes

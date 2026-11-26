@@ -110,5 +110,21 @@
     "max": 36.5,
     "issue": "at_boundary",
     "boundary": "max"
+  },
+  {
+    "code": "ADF",
+    "value": 36.4989,
+    "min": 29,
+    "max": 36.5,
+    "issue": "met",
+    "boundary": ""
+  },
+  {
+    "code": "ADF",
+    "value": 36.5011,
+    "min": 29,
+    "max": 36.5,
+    "issue": "above_max",
+    "boundary": ""
   }
 ]
