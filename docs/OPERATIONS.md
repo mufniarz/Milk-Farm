@@ -91,7 +91,10 @@ the only environment and the smoke script is the gate.
 
 `functions/retention.py` (`should_expire_failure`) defines the 90-day rule:
 resolved/dead failures expire, except `manual-adjustment` and `written-off`.
-The scheduled cleanup function and Firestore TTL policy are not wired yet.
+Scheduled cleanup is deployed in staging (`scheduled_failure_cleanup`) and
+verified on 2026-11-27: expired resolved and expired dead documents were
+deleted; `manual-adjustment`, `written-off` and young documents remained.
+Smoke documents were removed.
 
 
 ## Accepted production blocker — alert delivery (2026-11-27)
