@@ -52,23 +52,30 @@
 > source of truth). Relaxed row = `9.0062` / `23.095` / `15.8016`. Strict row
 > is all-NA and has no numeric pin.
 >
-> **General re-pin rule:** any solver row with numeric values is re-pinned.
-> Strict row with numeric values → anchor `9.885`/`23.10246` (workbook).
+> **General re-pin rule:** the only operative re-pin is relaxed rows
+> (record/review). A numeric strict row is covered by the existing workbook
+> parity assertion (`check:calculator`), not by a separate re-pin; after the
+> four-decimal fix re-tighten that assertion from 0.01 to 0.001.
 > Relaxed row → no parity anchor; record old/new/delta and review.
 > All-NA strict row → no re-pin. Workbook row → never re-pinned.
 > `16.23` is the workbook protein from `reference_rations.json`.
 >
-> **Relaxed review criteria:** cost/DM delta expected ≤0.01; protein ≤0.1;
-> direction must match the DM shift; cost and protein must move together —
-> if only one moves, investigate before merging. `REPIN_REVIEW_TOLERANCE` is
-> defined for reference only and is not enforced.
+> **Relaxed review criteria:** DM must move to the new constraint; cost/DM
+> delta expected ≤0.01 and protein ≤0.1 (0.00746 DM shift × 1.3 safety; protein
+> 12× observed shift). Direction is informational for cost/protein. If DM
+> moved but neither cost nor protein moved, investigate whether the solver
+> re-solved; cost/protein may diverge validly. No enforced tolerance constant.
 >
-> **Guard range locked by tests:** `[1e-4, 5e-4)`; production derivation must
-> land inside it or update fixtures.
+> **Guard:** code currently uses **1e-4**, the bottom of the tested
+> `[1e-4, 5e-4)` range, so boundary tests are float-edge sensitive. Production
+> derivation must land inside the range or update fixtures.
 >
 > **Under Fallback B:** NA/Sensibilità/propagation/band ship as current.
-> **Still blocking regardless:** CI determinism of 15.8016 and callable
-> mixed/deleted ordering test.
+> **Still blocking regardless:** callable mixed/deleted ordering test and CI
+> determinism. **CI blocker identified:** `main` is 93 commits ahead of
+> `origin/main`; no CI run exists for these commits. Push/PR is required to
+> produce the `15.8016` CI evidence. Scenari requires Fallback B **and** both
+> engineering items.
 >
 > **Fallback B rework scope:** `NA()`→string changes Scenari NA checks;
 > Sensibilità 16→15 changes header/tests; propagation allowed changes
