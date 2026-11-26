@@ -498,3 +498,18 @@ euros with three decimals. The correct Italian render of 9.885 is
 1,000). The format code `€ #,##0.000` is correct.
 
 Screenshot: `docs/screenshots/export-prod-confronto-it.png`.
+
+
+## Scenario export smoke (2026-11-27, staging)
+
+With a seeded recipe and one saved scenario (`feedPrices` change):
+
+- response 200, 3 sheets: `Confronto`, `Scenari`, `Sensibilità`;
+- `Scenari`: base €4.000, scenario €5.000, delta +€1.000, status computed;
+- `Sensibilità`: 16 columns (Scenario + 15), top feed `smoke-feed`,
+  ±5/±10% deltas 0.25/−0.25/0.50/−0.50;
+- `Confronto` hand-ration/relaxed/strict rows from the seeded recipe.
+
+The smoke recipe, feed and scenario were deleted afterward. This verifies the
+production callable path for `Scenari`/`Sensibilità`, not only the sheet
+builders.
