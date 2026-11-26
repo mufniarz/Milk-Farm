@@ -129,12 +129,19 @@ with a clear message. Saved-recipe scenarios use `baseHash: null`; builder
 snapshots use the server hash, so two different builder moments are not
 silently combined. Checking only `baseSource` is insufficient.
 
+**`baseHash` normalization:** drop lines with `kgAsFed <= 0`; round to 3
+decimals; render integral values without `.0`; sort by `feedId` ascending;
+serialize as compact JSON; SHA-256. The
+`scenario-base-hash-cases.json` fixture is asserted by TS and Python, so the
+two produce the same hash for the same builder state.
+
 ### Base
 
 `Scenari` compares against **the saved recipe the scenarios were created
-from**, not the workbook. A `base_source` column records `saved-recipe` or
-`workbook`; the base identity is the recipe id/name. A scenario created from
-the workbook is labelled `workbook`.
+from**, not the workbook. `baseSource` is `saved-recipe` or `builder`; a
+scenario captured from the builder carries `baseRecipeId: null` and its
+server `baseHash`. `workbook` was removed as a scenario base: it is not
+implemented and would be a trap for callers.
 
 ### `changes` schema
 

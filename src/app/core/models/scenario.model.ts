@@ -1,4 +1,4 @@
-export type ScenarioBaseSource = 'saved-recipe' | 'workbook';
+export type ScenarioBaseSource = 'saved-recipe' | 'builder';
 
 export interface ScenarioTargetOverride {
   min: number | null;

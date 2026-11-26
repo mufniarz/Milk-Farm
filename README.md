@@ -337,7 +337,8 @@ The Stage 2 comparison is a separate XLSX `Confronto` sheet (not CSV) with
 ### Parity fixtures are gates
 
 `src/assets/boundary-cases.json`,
-`src/assets/scenario-parity-cases.json`, and the workbook target chain
+`src/assets/scenario-parity-cases.json`,
+`src/assets/scenario-base-hash-cases.json`, and the workbook target chain
 (`functions/tests/targets.json` → `initial-data.ts` → `target_ranges.json`,
 checked by `scripts/check-target-parity.cjs`) are required gates: changing a
 nutrient, the ration calculator, `BOUNDARY_EPS`, or `applyScenario` must

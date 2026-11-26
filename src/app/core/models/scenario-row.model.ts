@@ -3,7 +3,7 @@ import { ScenarioChanges, ScenarioSnapshot } from './scenario.model';
 export interface ScenarioRow {
   id: string;
   name: string;
-  baseSource: 'saved-recipe' | 'workbook' | 'builder';
+  baseSource: 'saved-recipe' | 'builder';
   baseRecipeId: string | null;
   baseHash?: string | null;
   changes: ScenarioChanges;

@@ -2272,17 +2272,32 @@ def _scenario_base_from_builder(db, farm_id, data):
     }
 
 
-def _base_hash(base):
+def _canonical_kg(value):
+    rounded = round(float(value), 3)
+    return int(rounded) if rounded.is_integer() else rounded
+
+
+def _hash_scenario_lines(lines):
     normalized = sorted(
         (
-            {"feedId": feed["id"], "kgAsFed": round(feed["kgAsFed"], 6)}
-            for feed in base["feeds"]
+            {
+                "feedId": line["feedId"],
+                "kgAsFed": _canonical_kg(line["kgAsFed"]),
+            }
+            for line in lines
+            if float(line["kgAsFed"]) > 0
         ),
         key=lambda line: line["feedId"],
     )
     return hashlib.sha256(
-        json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(normalized, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def _base_hash(base):
+    return _hash_scenario_lines(
+        [{"feedId": feed["id"], "kgAsFed": feed["kgAsFed"]} for feed in base["feeds"]]
+    )
 
 
 def _validate_scenario_changes(base, changes, override_codes):

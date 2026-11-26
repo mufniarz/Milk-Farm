@@ -1,0 +1,32 @@
+[
+  {
+    "name": "sorted and rounded",
+    "lines": [
+      {
+        "feedId": "b",
+        "kgAsFed": 2.00049
+      },
+      {
+        "feedId": "a",
+        "kgAsFed": 10.00049
+      }
+    ],
+    "canonical": "[{\"feedId\":\"a\",\"kgAsFed\":10},{\"feedId\":\"b\",\"kgAsFed\":2}]",
+    "hash": "9d1dc1bfe87e77cba770bb76b016c0b560e83676ab36333a236013b7de6c4020"
+  },
+  {
+    "name": "drops zero lines",
+    "lines": [
+      {
+        "feedId": "b",
+        "kgAsFed": 0
+      },
+      {
+        "feedId": "a",
+        "kgAsFed": 3
+      }
+    ],
+    "canonical": "[{\"feedId\":\"a\",\"kgAsFed\":3}]",
+    "hash": "1af610e8ff558e007d6020722e938dc0362809ce36ba52c01d65849799fbbcea"
+  }
+]
