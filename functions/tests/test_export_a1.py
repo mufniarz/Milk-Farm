@@ -38,4 +38,4 @@ def test_export_rejects_scenarios_before_workbook():
         handler = handler.__wrapped__
     with pytest.raises(https_fn.HttpsError) as exc:
         handler(SimpleNamespace(auth=SimpleNamespace(uid="u"), data={"scenarioIds": ["s1"]}))
-    assert "not_implemented" in (exc.value.message or "")
+    assert "farmId" in (exc.value.message or "")

@@ -2614,6 +2614,55 @@ def _format_warnings(warnings):
     )
 
 
+def _scenario_export_rows(db, farm_id, base, scenario_ids):
+    from export_validation import validate_scenario_selection
+    from scenario import apply_scenario
+
+    docs = []
+    for scenario_id in scenario_ids:
+        entry = (
+            db.collection("farms").document(farm_id)
+            .collection("scenarios").document(scenario_id).get()
+        )
+        if not entry.exists:
+            raise ValueError("scenario_deleted")
+        data = entry.to_dict() or {}
+        data["_id"] = entry.id
+        docs.append(data)
+    validate_scenario_selection(docs)
+    base_snapshot = apply_scenario(base, {})
+    rows = []
+    for data in docs:
+        snapshot = apply_scenario(base, data.get("changes") or {})
+        rows.append(
+            {
+                "scenario": data.get("name", data["_id"]),
+                "base_cost": base_snapshot["totalCost"],
+                "scenario_cost": snapshot["totalCost"],
+                "delta_cost": snapshot["totalCost"] - base_snapshot["totalCost"],
+                "status": snapshot["status"],
+            }
+        )
+    return rows
+
+
+def _add_scenari_sheet(workbook, rows):
+    sheet = workbook.create_sheet("Scenari")
+    headers = [("scenario", "Scenario"), ("base_cost", "Costo base"),
+               ("scenario_cost", "Costo scenario"), ("delta_cost", "Delta costo"),
+               ("status", "Stato")]
+    for column, (_, header) in enumerate(headers, start=1):
+        sheet.cell(row=1, column=column, value=header).font = Font(bold=True)
+    for row_index, row in enumerate(rows, start=2):
+        for column, (key, _) in enumerate(headers, start=1):
+            value = row.get(key)
+            if key in ("base_cost", "scenario_cost", "delta_cost"):
+                cell = sheet.cell(row=row_index, column=column, value=value)
+                cell.number_format = '€ #,##0.000'
+            else:
+                sheet.cell(row=row_index, column=column, value=value)
+
+
 def _build_confronto_workbook(rows):
     wb = Workbook()
     ws = wb.active
@@ -2651,23 +2700,34 @@ def export_comparison(req: https_fn.CallableRequest):
             message="Sign in required.",
         )
     data = req.data or {}
-    if data.get("scenarioIds"):
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
-            message="not_implemented: scenario export lands in B",
-        )
     if data.get("baseSource") == "builder":
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
             message="unsupported_base_for_confronto",
         )
-    if data.get("baseRecipeId"):
+    farm_id = _require_string(data, "farmId") if data.get("scenarioIds") else None
+    db = _require_farm_role(farm_id, req.auth.uid, _SCENARIO_ROLES) if farm_id else None
+    scenario_rows = []
+    if data.get("scenarioIds"):
+        base_id = _require_string(data, "baseRecipeId")
+        base = _scenario_base(db, farm_id, base_id)
+        rows = _saved_recipe_confronto_rows(db, farm_id, base_id)
+        scenario_rows = _scenario_export_rows(db, farm_id, base, data["scenarioIds"])
+    elif data.get("baseRecipeId"):
         farm_id = _require_string(data, "farmId")
         db = _require_farm_role(farm_id, req.auth.uid, _SCENARIO_ROLES)
         rows = _saved_recipe_confronto_rows(db, farm_id, data["baseRecipeId"])
     else:
         rows = _reference_confronto_rows()
     content = _build_confronto_workbook(rows)
+    if scenario_rows:
+        from io import BytesIO
+        from openpyxl import load_workbook
+        workbook = load_workbook(BytesIO(content))
+        _add_scenari_sheet(workbook, scenario_rows)
+        buffer = BytesIO()
+        workbook.save(buffer)
+        content = buffer.getvalue()
     bucket = storage.bucket()
     blob = bucket.blob(f"exports/confronto-{uuid.uuid4()}.xlsx")
     blob.upload_from_string(
