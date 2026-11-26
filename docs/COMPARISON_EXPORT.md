@@ -145,7 +145,10 @@ implemented and would be a trap for callers.
 
 ### `changes` schema
 
-A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`:
+A scenario is `{ feedPrices?, inclusions?, targetOverrides? }`. Until the
+scenario change editor lands, the builder button is labelled **“Save current
+ration”** and saves `changes: {}`; its `Scenari` row has zero deltas by
+design (a saved base, not a what-if).
 
 - **feedPrices** — recompute with modified prices; cost changes, nutrient
   values do not.

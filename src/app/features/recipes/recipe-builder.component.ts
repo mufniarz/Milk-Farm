@@ -54,6 +54,7 @@ import {
 import { TargetService } from '../../core/services/target.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
 import { ScenarioService } from '../../core/services/scenario.service';
+import { buildBuilderScenarioPayload } from '../../core/utils/scenario-payload';
 import { TARGET_RANGES } from '../../core/data/initial-data';
 import { ChartData, ChartType } from 'chart.js';
 
@@ -1161,28 +1162,27 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   async saveScenario(): Promise<void> {
     const farmId = this.farmContext.activeFarmId();
     if (!farmId || this.selectedFeeds().length === 0) return;
-    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
-    const name = prompt(
-      this.translate.instant('RECIPES.SCENARIO_NAME'),
-      `${this.recipeName || 'Ration'} — ${stamp}`,
-    );
-    if (!name) return;
     const baseLines = this.selectedFeeds()
       .filter((entry) => entry.feed.id)
       .map((entry) => ({
         feedId: entry.feed.id as string,
         kgAsFed: entry.kgAsFed,
       }));
+    const payload = buildBuilderScenarioPayload({
+      farmId,
+      recipeName: this.recipeName,
+      animalGroupId: this.animalGroupId,
+      baseLines,
+      now: new Date(),
+      scenarioId: crypto.randomUUID(),
+    });
+    const name = prompt(
+      this.translate.instant('RECIPES.SCENARIO_NAME'),
+      payload.name,
+    );
+    if (!name) return;
     try {
-      await this.scenarioService.save({
-        farmId,
-        scenarioId: crypto.randomUUID(),
-        name,
-        baseSource: 'builder',
-        baseLines,
-        animalGroupId: this.animalGroupId,
-        changes: {},
-      });
+      await this.scenarioService.save({ ...payload, name });
       this.snackBar.open(
         this.translate.instant('RECIPES.SCENARIO_SAVED'),
         undefined,
