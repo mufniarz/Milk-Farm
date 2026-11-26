@@ -965,7 +965,6 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   }
 
   constructor() {
-    setTimeout(() => void this.loadScenarioFromQuery(), 800);
     // Overrides can only be read once the active farm is known.
     effect(() => {
       if (this.farmContext.activeFarmId()) {
@@ -986,7 +985,9 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
         this.feedEntries.set(
           feeds.map((f) => ({ feed: f, kgAsFed: 0, selected: false })),
         );
-        if (id) {
+        if (this.route.snapshot.queryParamMap.get('scenario')) {
+          void this.loadScenarioFromQuery();
+        } else if (id) {
           this.loadRecipe(id);
         } else {
           void this.loadTargets();
