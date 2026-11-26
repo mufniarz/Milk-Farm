@@ -1,10 +1,20 @@
-> **STATUS: two contract decisions are PENDING SIGN-OFF.**
+> **STATUS: four contract decisions are PENDING SIGN-OFF.**
 > `NA()` semantics (error vs string, including the all-NA strict row) and
 > Sensibilità width (15 data + `Scenario` = 16 total) are not signed.
-> Scenari code is blocked until a product owner is assigned and both are
-> recorded here. **Fallback:** if unsigned by **2026-12-04**, Scenari is
-> built against the last signed contract (string `n/a`, 16-column
-> Sensibilità, no cross-sheet propagation) with rework risk recorded. The proposed 25-column shape below is not a contract change.
+> Scenari code is blocked until a product owner is assigned and all four are
+> recorded here. **Fallback (2026-12-04): Fallback B — current shipped
+> behavior**, per decision:
+> 1. `NA()` = Excel error `=NA()`, all-NA strict row;
+> 2. Sensibilità = 15 data columns + `Scenario` = **16 total**;
+> 3. cross-sheet = **no** propagation (Scenari computes independently);
+> 4. `at_boundary` = warnings-only, never in `unreachableTargets`.
+>
+> **Four-decimal re-pin procedure (engineering):** fix moisture precision →
+> regenerate `boundary-cases.json` and `scenario-parity-cases.json` → both
+> parity tests and `check:calculator` pass → record old/new pinned values and
+> delta → re-pin within solver tolerance ε (CBC default) → deploy.
+> Engineering sign-off for re-pin; product sign-off only if a target
+> changes. The proposed 25-column shape below is not a contract change.
 
 # Comparison export — format and semantics
 

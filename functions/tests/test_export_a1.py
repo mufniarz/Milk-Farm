@@ -59,6 +59,7 @@ def test_infeasible_cells_are_na():
         assert len(parts) == 6
         assert parts[4] in {"below_min", "above_max"}
         assert parts[5] == ""
+    assert sheet.cell(row=2, column=24).value in (None, "")
     warning_lines = sheet.cell(row=3, column=24).value.splitlines()
     assert warning_lines
     assert any(line.split("|")[4] == "at_boundary" for line in warning_lines)
@@ -67,6 +68,11 @@ def test_infeasible_cells_are_na():
         assert parts[4] in {"below_min", "above_max", "at_boundary"}
         if parts[4] == "at_boundary":
             assert parts[5] in {"min", "max"}
+            value, minimum, maximum = float(parts[1]), float(parts[2]), float(parts[3])
+            if value == maximum:
+                assert parts[5] == "max"
+            elif value == minimum:
+                assert parts[5] == "min"
         else:
             assert parts[5] == ""
     assert sheet.cell(row=2, column=3).value == "workbook"
