@@ -531,8 +531,9 @@ the pending `NA()`/Sensibilità decisions.
   `Avvisi`, `Obiettivi non raggiungibili`.
 - `diagnostics_from`: `workbook`, `self`, `relaxed-fallback`.
 - `unreachableTargets`: newline-separated `code|value|min|max|issue|boundary`;
-  `issue` ∈ {`below_min`,`above_max`,`at_boundary`}; `boundary` ∈
-  {``,`min`,`max`}.
+  `issue` is only `below_min`/`above_max`; `boundary` is always empty.
+  `at_boundary` is a warning-only category and never appears in
+  `unreachableTargets`; `boundary` exists only for warnings.
 - Strict row: `totalAsFed`, `totalDM`, `totalCost` and 17 nutrients are
   `=NA()` (20 cells); relaxed row has none.
 - `NA()` is an Excel error value that propagates; display is
