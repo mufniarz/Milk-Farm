@@ -2719,6 +2719,10 @@ def _scenario_export_rows(db, farm_id, base, scenario_ids):
                 if base_value is not None and scenario_value is not None
                 else None
             )
+        row["warnings"] = _format_warnings(snapshot.get("warnings", []))
+        for code in ("aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF"):
+            row[f"base_status_{code}"] = base_snapshot.get("compliance", {}).get(code)
+            row[f"scenario_status_{code}"] = snapshot.get("compliance", {}).get(code)
         row.update(_sensitivity_columns(snapshot))
         rows.append(row)
     return rows
@@ -2737,6 +2741,10 @@ def _add_scenari_sheet(workbook, rows):
         (f"{prefix}_{code}", f"{label} {code}")
         for code in _NUTRIENT_CODES
         for prefix, label in (("base", "Base"), ("scenario", "Scenario"), ("delta", "Delta"))
+    ] + [("warnings", "Avvisi")] + [
+        (f"{prefix}_status_{code}", f"{label} stato {code}")
+        for code in ("aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF")
+        for prefix, label in (("base", "Base"), ("scenario", "Scenario"))
     ]
     for column, (_, header) in enumerate(headers, start=1):
         sheet.cell(row=1, column=column, value=header).font = Font(bold=True)
