@@ -2701,7 +2701,11 @@ def _scenario_export_rows(db, farm_id, base, scenario_ids):
             "scenario_DM": snapshot["totalDM"],
             "delta_DM": snapshot["totalDM"] - base_snapshot["totalDM"],
             "scenario_cost_saved": saved_cost,
-            "saved_at": data.get("savedAt"),
+            "saved_at": (
+                data["savedAt"].astimezone(timezone.utc).isoformat()
+                if isinstance(data.get("savedAt"), datetime)
+                else data.get("savedAt")
+            ),
             "diverged": (
                 saved_cost is None
                 or abs(snapshot["totalCost"] - saved_cost)

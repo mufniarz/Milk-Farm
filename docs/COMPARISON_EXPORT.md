@@ -619,3 +619,17 @@ the pending `NA()`/Sensibilità decisions.
 - `NA()` is an Excel error value that propagates; display is
   renderer-localized (`#N/A` in LibreOffice it-IT, potentially `#N/D` in
   Excel it-IT).
+
+
+## Scenari staging spot-check (2026-11-27)
+
+Full three-sheet export for a seeded saved recipe + scenario:
+
+- `Scenari` **73 columns**, row populated: `Base umidita = 50`, nutrient
+  delta = 0 for the price-only scenario, `Avvisi` six-field tuples including
+  `uNDF|9.0|9|12|at_boundary|min`, fibre statuses `above_max`/`below_min`.
+- No unexpected Excel errors; 30 `=NA()` cells total (strict Confronto plus
+  missing scenario nutrients), no `#DIV/0!`, `#REF!` or other errors.
+- Found and fixed: `saved_at` Firestore datetime was passed to openpyxl and
+  crashed with "Excel does not support timezones"; now serialized to UTC ISO.
+- Smoke recipe/feed/scenario removed afterward.
