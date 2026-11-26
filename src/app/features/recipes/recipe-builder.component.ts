@@ -53,6 +53,7 @@ import {
 } from '../../core/models/nutrient.model';
 import { TargetService } from '../../core/services/target.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
+import { ScenarioService } from '../../core/services/scenario.service';
 import { TARGET_RANGES } from '../../core/data/initial-data';
 import { ChartData, ChartType } from 'chart.js';
 
@@ -511,6 +512,17 @@ interface RecipeFeedEntry {
 
             <!-- Save Button -->
             <button
+              mat-stroked-button
+              color="primary"
+              class="save-btn"
+              (click)="saveScenario()"
+              [disabled]="saving() || selectedFeeds().length === 0"
+              id="save-scenario-btn"
+            >
+              <mat-icon>bookmark_add</mat-icon>
+              {{ 'RECIPES.SAVE_SCENARIO' | translate }}
+            </button>
+            <button
               mat-flat-button
               color="primary"
               class="save-btn"
@@ -813,6 +825,7 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   private calculator = inject(RationCalculatorService);
   private targetService = inject(TargetService);
   private farmContext = inject(FarmContextService);
+  private scenarioService = inject(ScenarioService);
   private snackBar = inject(MatSnackBar);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -1142,6 +1155,45 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
       );
     } finally {
       this.optimizing.set(false);
+    }
+  }
+
+  async saveScenario(): Promise<void> {
+    const farmId = this.farmContext.activeFarmId();
+    if (!farmId || this.selectedFeeds().length === 0) return;
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const name = prompt(
+      this.translate.instant('RECIPES.SCENARIO_NAME'),
+      `${this.recipeName || 'Ration'} — ${stamp}`,
+    );
+    if (!name) return;
+    const baseLines = this.selectedFeeds()
+      .filter((entry) => entry.feed.id)
+      .map((entry) => ({
+        feedId: entry.feed.id as string,
+        kgAsFed: entry.kgAsFed,
+      }));
+    try {
+      await this.scenarioService.save({
+        farmId,
+        scenarioId: crypto.randomUUID(),
+        name,
+        baseSource: 'builder',
+        baseLines,
+        animalGroupId: this.animalGroupId,
+        changes: {},
+      });
+      this.snackBar.open(
+        this.translate.instant('RECIPES.SCENARIO_SAVED'),
+        undefined,
+        { duration: 4000 },
+      );
+    } catch {
+      this.snackBar.open(
+        this.translate.instant('RECIPES.SCENARIO_FAILED'),
+        undefined,
+        { duration: 5000 },
+      );
     }
   }
 

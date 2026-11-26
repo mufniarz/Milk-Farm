@@ -17,8 +17,10 @@ export interface SaveScenarioInput {
   farmId: string;
   scenarioId: string;
   name: string;
-  baseRecipeId: string | null;
-  baseHash?: string | null;
+  baseSource: 'saved-recipe' | 'builder';
+  baseRecipeId?: string;
+  baseLines?: { feedId: string; kgAsFed: number }[];
+  animalGroupId?: string;
   changes: ScenarioChanges;
 }
 

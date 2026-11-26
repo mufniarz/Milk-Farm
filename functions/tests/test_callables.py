@@ -1882,6 +1882,14 @@ def test_delete_scenario_soft_deletes_for_owner():
     assert doc["deletedAt"] is not None
 
 
+def test_save_scenario_ignores_animal_group_for_saved_recipe():
+    _seed_scenario_base()
+    req = _save_request(animalGroupId='dry')
+    result = _handler(main.save_scenario)(req)
+    codes = {target['nutrientCode'] for target in result['snapshot']['targets']}
+    assert 'umidita' in codes  # lactating reference, not dry
+
+
 def test_save_scenario_accepts_validated_builder_base():
     _seed_scenario_base()
     req = _save_request(

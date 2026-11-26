@@ -139,7 +139,11 @@
     "UNREACHABLE_HINT": "These targets cannot be met with the current feeds. Use relaxed mode for the closest ration, or override the targets.",
     "AT_BOUNDARY": "at the reference floor (fragile)",
     "AT_BOUNDARY_OVERRIDE": "at your target (fragile)",
-    "REFERENCE_SHORT": "ref."
+    "REFERENCE_SHORT": "ref.",
+    "SAVE_SCENARIO": "Save scenario",
+    "SCENARIO_NAME": "Scenario name",
+    "SCENARIO_SAVED": "Scenario saved.",
+    "SCENARIO_FAILED": "Could not save the scenario."
   },
   "COMMON": {
     "LOADING": "Loading...",
