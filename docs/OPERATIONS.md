@@ -92,3 +92,11 @@ the only environment and the smoke script is the gate.
 `functions/retention.py` (`should_expire_failure`) defines the 90-day rule:
 resolved/dead failures expire, except `manual-adjustment` and `written-off`.
 The scheduled cleanup function and Firestore TTL policy are not wired yet.
+
+
+## Accepted production blocker — alert delivery (2026-11-27)
+
+**Status: accepted blocker, no owner.** No operator email or Monitoring IAM
+owner has been named. Production deploy is blocked until both exist and one
+synthetic alert is delivered. To close: name operator email + IAM owner, create
+the log alert, deliver a test notification.
