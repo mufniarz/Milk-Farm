@@ -27,6 +27,10 @@ const hasIndex = (collectionGroup, fields) =>
   });
 
 const required = [
+  ['scenarios', [
+    { fieldPath: 'deletedAt', order: 'ASCENDING', arrayConfig: null },
+    { fieldPath: 'createdAt', order: 'DESCENDING', arrayConfig: null },
+  ]],
   ['farmMembers', [
     { fieldPath: 'uid', order: 'ASCENDING', arrayConfig: null },
     { fieldPath: 'status', order: 'ASCENDING', arrayConfig: null },

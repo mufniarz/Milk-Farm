@@ -1767,3 +1767,121 @@ def test_scan_heartbeat_is_written():
     assert data["docsScanned"] == 3
     assert data["openFailures"] == 2
     assert data["lastRunAt"] is not None
+
+
+# ── Scenarios ───────────────────────────────────────────────────────────────
+
+def _seed_scenario_base(member=('owner', 'owner')):
+    seed(*member)
+    DB.collection("feeds").document("feed1").update(
+        {
+            "moisturePct": 50,
+            "pricePerKg": 0.1,
+            "category": "forage",
+            "nutrients": {
+                "proteina": 10,
+                "aNDF": 40,
+                "ADF": 25,
+            },
+        }
+    )
+    DB.collection("recipes").document("r1").set(
+        {
+            "farmId": "f1",
+            "name": "Base",
+            "animalGroupId": "lactating",
+        }
+    )
+    DB.collection("recipes").document("r1").collection("feeds").document(
+        "line1"
+    ).set({"feedId": "feed1", "kgAsFed": 10})
+
+
+def _save_request(uid="owner", **overrides):
+    import uuid
+
+    data = {
+        "farmId": "f1",
+        "scenarioId": str(uuid.uuid4()),
+        "name": "Cut corn",
+        "baseRecipeId": "r1",
+        "changes": {"feedPrices": {"feed1": 0.2}},
+    }
+    data.update(overrides)
+    return _Req(uid, data)
+
+
+def test_save_scenario_writes_server_snapshot_and_ignores_client_snapshot():
+    _seed_scenario_base()
+    req = _save_request(snapshot={"totalCost": 999})
+    result = _handler(main.save_scenario)(req)
+
+    assert result["scenarioId"] == req.data["scenarioId"]
+    assert result["snapshot"]["totalCost"] != 999
+    assert result["serverTime"].endswith("Z")
+    doc = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("scenarios")
+        .document(req.data["scenarioId"])
+        .get()
+        .to_dict()
+    )
+    assert doc["savedAt"] is not None
+    assert doc["deletedAt"] is None
+    assert doc["resultSnapshot"]["totalCost"] == result["snapshot"]["totalCost"]
+
+
+def test_save_scenario_rejects_unknown_feed():
+    _seed_scenario_base()
+    req = _save_request(changes={"feedPrices": {"nope": 1}})
+    with pytest.raises(https_fn.HttpsError) as exc:
+        _handler(main.save_scenario)(req)
+    assert "unknown_feed" in (exc.value.message or "")
+
+
+def test_save_scenario_rejects_override_not_in_current_overrides():
+    _seed_scenario_base()
+    req = _save_request(
+        changes={"targetOverrides": {"proteina": {"min": 15, "max": 17}}}
+    )
+    with pytest.raises(https_fn.HttpsError) as exc:
+        _handler(main.save_scenario)(req)
+    assert "invalid_override" in (exc.value.message or "")
+
+
+def test_delete_scenario_soft_deletes_for_owner():
+    _seed_scenario_base()
+    req = _save_request()
+    _handler(main.save_scenario)(req)
+    _handler(main.delete_scenario)(
+        _Req("owner", {"farmId": "f1", "scenarioId": req.data["scenarioId"]})
+    )
+    doc = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("scenarios")
+        .document(req.data["scenarioId"])
+        .get()
+        .to_dict()
+    )
+    assert doc["deletedAt"] is not None
+
+
+def test_delete_scenario_is_denied_for_feeder():
+    _seed_scenario_base()
+    req = _save_request()
+    _handler(main.save_scenario)(req)
+    DB.collection("farmMembers").document("f1_feeder").set(
+        {
+            "farmId": "f1",
+            "uid": "feeder",
+            "role": "feeder",
+            "status": "active",
+        }
+    )
+    with pytest.raises(https_fn.HttpsError) as exc:
+        _handler(main.delete_scenario)(
+            _Req("feeder", {"farmId": "f1", "scenarioId": req.data["scenarioId"]})
+        )
+    assert exc.value.code == https_fn.FunctionsErrorCode.PERMISSION_DENIED

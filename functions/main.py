@@ -6,6 +6,8 @@ and the Excel export function for recipe downloads.
 """
 import base64
 import io
+import json
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -2080,3 +2082,261 @@ def set_farm_milk_price(req: https_fn.CallableRequest):
 
     apply(db.transaction())
     return {"ok": True, "milkPricePerKg": value}
+
+
+# ── Scenarios ───────────────────────────────────────────────────────────────
+# Writes are callable-only (rules deny client writes). The server loads the
+# base recipe/feeds/targets, recomputes the snapshot, and writes the audit
+# record; the client cannot supply a snapshot.
+
+_SCENARIO_ROLES = ("owner", "farmAdmin", "consultant")
+_SCENARIO_DELETE_ROLES = ("owner", "farmAdmin")
+_SCENARIO_MAX_NAME = 100
+_SCENARIO_MAX_COUNT = 200
+
+
+def _target_ranges():
+    with open(os.path.join(os.path.dirname(__file__), "target_ranges.json")) as handle:
+        return json.load(handle)
+
+
+def _scenario_base(db, farm_id, recipe_id):
+    recipe_ref = db.collection("recipes").document(recipe_id)
+    recipe = recipe_ref.get()
+    if not recipe.exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.NOT_FOUND,
+            message="base-deleted",
+        )
+    recipe_data = recipe.to_dict() or {}
+    if recipe_data.get("farmId") != farm_id:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Recipe belongs to another farm.",
+        )
+    animal_group = recipe_data.get("animalGroupId")
+    ranges = _target_ranges()
+    if animal_group not in ranges:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="Unknown animal group.",
+        )
+
+    feeds = []
+    for line in recipe_ref.collection("feeds").stream():
+        line_data = line.to_dict() or {}
+        feed_ref = db.collection("feeds").document(line_data.get("feedId", ""))
+        feed = feed_ref.get()
+        if not feed.exists:
+            continue
+        feed_data = feed.to_dict() or {}
+        if feed_data.get("farmId") != farm_id:
+            continue
+        feeds.append(
+            {
+                "id": feed.id,
+                "name": feed_data.get("name", feed.id),
+                "moisturePct": feed_data.get("moisturePct", 0),
+                "nutrients": feed_data.get("nutrients") or {},
+                "pricePerKg": feed_data.get("pricePerKg", 0),
+                "category": feed_data.get("category", "concentrate"),
+                "kgAsFed": line_data.get("kgAsFed", 0),
+            }
+        )
+
+    override_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("targetOverrides")
+        .document(animal_group)
+    )
+    override_doc = override_ref.get()
+    overrides = (override_doc.to_dict() or {}).get("nutrients", {}) if override_doc.exists else {}
+    targets = []
+    for target in ranges[animal_group]:
+        entry = overrides.get(target["nutrientCode"])
+        if entry:
+            targets.append(
+                {
+                    **target,
+                    "minValue": entry.get("minValue"),
+                    "maxValue": entry.get("maxValue"),
+                    "source": "override",
+                }
+            )
+        else:
+            targets.append(target)
+    return {
+        "baseSource": "saved-recipe",
+        "recipeId": recipe_id,
+        "recipeName": recipe_data.get("name", recipe_id),
+        "animalGroupId": animal_group,
+        "feeds": feeds,
+        "targets": targets,
+    }
+
+
+def _validate_scenario_changes(base, changes, override_codes):
+    if not isinstance(changes, dict):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="changes must be an object.",
+        )
+    feed_ids = {feed["id"] for feed in base["feeds"]}
+    for key in ("feedPrices", "inclusions"):
+        values = changes.get(key)
+        if values is None:
+            continue
+        if not isinstance(values, dict):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message=f"{key} must be an object.",
+            )
+        unknown = set(values) - feed_ids
+        if unknown:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message=f"unknown_feed: {sorted(unknown)}",
+            )
+    overrides = changes.get("targetOverrides")
+    if overrides is not None:
+        if not isinstance(overrides, dict):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message="targetOverrides must be an object.",
+            )
+        unknown = set(overrides) - set(override_codes)
+        if unknown:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message=f"invalid_override: {sorted(unknown)}",
+            )
+        for entry in overrides.values():
+            if not isinstance(entry, dict):
+                raise https_fn.HttpsError(
+                    code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                    message="targetOverrides entries must be objects.",
+                )
+            for bound in ("min", "max"):
+                value = entry.get(bound)
+                if value is not None and (
+                    isinstance(value, bool) or not isinstance(value, (int, float))
+                ):
+                    raise https_fn.HttpsError(
+                        code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                        message="override bounds must be numbers or null.",
+                    )
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=60,
+    region="europe-west1",
+)
+def save_scenario(req: https_fn.CallableRequest):
+    """Validate and persist one scenario with a server-computed snapshot."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data
+    farm_id = _require_string(data, "farmId")
+    uid = req.auth.uid
+    db = _require_farm_role(farm_id, uid, _SCENARIO_ROLES)
+    name = _require_string(data, "name").strip()
+    if len(name) > _SCENARIO_MAX_NAME or "/" in name:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="name is too long or contains '/'.",
+        )
+    scenario_id = _require_string(data, "scenarioId")
+    try:
+        uuid.UUID(scenario_id)
+    except ValueError as exc:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="scenarioId must be a UUID.",
+        ) from exc
+
+    recipe_id = _require_string(data, "baseRecipeId")
+    base = _scenario_base(db, farm_id, recipe_id)
+    override_codes = set()
+    override_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("targetOverrides")
+        .document(base["animalGroupId"])
+        .get()
+    )
+    if override_ref.exists:
+        override_codes = set((override_ref.to_dict() or {}).get("nutrients", {}).keys())
+
+    changes = data.get("changes", {})
+    _validate_scenario_changes(base, changes, override_codes)
+
+    from scenario import apply_scenario  # local import keeps cold start lean
+
+    snapshot = apply_scenario(base, changes)
+    ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("scenarios")
+        .document(scenario_id)
+    )
+    if ref.get().exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.ALREADY_EXISTS,
+            message="scenarioId already exists.",
+        )
+    server_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ref.set(
+        {
+            "farmId": farm_id,
+            "name": name,
+            "baseSource": "saved-recipe",
+            "baseRecipeId": recipe_id,
+            "changes": changes,
+            "resultSnapshot": snapshot,
+            "createdBy": uid,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "savedAt": firestore.SERVER_TIMESTAMP,
+            "deletedAt": None,
+        }
+    )
+    return {
+        "scenarioId": scenario_id,
+        "snapshot": snapshot,
+        "serverTime": server_time,
+    }
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=30,
+    region="europe-west1",
+)
+def delete_scenario(req: https_fn.CallableRequest):
+    """Soft-delete a scenario; owner/admin only."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data
+    farm_id = _require_string(data, "farmId")
+    scenario_id = _require_string(data, "scenarioId")
+    db = _require_farm_role(farm_id, req.auth.uid, _SCENARIO_DELETE_ROLES)
+    ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("scenarios")
+        .document(scenario_id)
+    )
+    if not ref.get().exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.NOT_FOUND,
+            message="Scenario not found.",
+        )
+    ref.update({"deletedAt": firestore.SERVER_TIMESTAMP})
+    return {"ok": True}

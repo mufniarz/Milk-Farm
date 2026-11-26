@@ -299,7 +299,8 @@ XLSX with `Confronto`, `Scenari` and `Sensibilità`.
 
 ## Persistence test scope (next round)
 
-The persistence round's +N is these seven tests:
+The persistence round's +N is these seven tests (five callable tests are in;
+the two export tests land with `export_comparison`):
 
 1. save rejects an override key not in the farm's current overrides
    (`invalid_override`);
@@ -360,12 +361,12 @@ The first build must assert:
   default `<base name> — <date/time>`;
 - **always-new save**: `save_scenario` never edits an existing scenario; a
   changed what-if is saved as a new one (the audit stays simple);
-- **soft delete**: `delete_scenario` (owner/admin) sets `deletedAt`;
-  `/scenarios` hides deleted rows; exports reject selected deleted rows with
-  `scenario_deleted` and the detail “Deleted scenarios cannot be re-exported;
-  the previously exported workbook is the record”; the export selector
-  refreshes on open, hides deleted rows, and offers a one-click removal for a
-  stale selection;
+- **soft delete, no restore**: `delete_scenario` (owner/admin) sets
+  `deletedAt`; `/scenarios` hides deleted rows; exports reject selected
+  deleted rows with `scenario_deleted` and the detail “Deleted scenarios
+  cannot be re-exported; the previously exported workbook is the record”; the
+  UI states deletion cannot be undone. The export selector refreshes on open,
+  hides deleted rows, and offers a one-click removal for a stale selection;
 - builder flow: “Save scenario” in the toolbar, name dialog defaulted to
   `<base name> — <date/time>`; snapshot of the current builder state
   **including unsaved recipe changes**; no recipe-save prerequisite;
