@@ -18,6 +18,11 @@ def test_reference_confronto_rows_shape():
 
 
 def test_infeasible_cells_are_na():
+    # Golden relaxed values from the reference lactating solve with only the
+    # totalDM constraint (solverTotalDM=23.095): cost is €/head/day, protein
+    # is % DM. The relaxed cost is below the workbook 9.885 because the
+    # solver is free to miss the forage/concentrate targets; it is not a
+    # different cost basis.
     workbook = load_workbook(
         __import__("io").BytesIO(_build_confronto_workbook(_reference_confronto_rows()))
     )
@@ -52,6 +57,10 @@ def test_infeasible_cells_are_na():
         assert len(parts) == 6
         assert parts[4] in {"below_min", "above_max", "at_boundary"}
         assert parts[5] in {"", "min", "max"}
+        if parts[4] in ("below_min", "above_max"):
+            assert parts[5] == ""
+        else:
+            assert parts[5] in {"min", "max"}
     assert sheet.cell(row=2, column=3).value == "workbook"
     assert sheet.cell(row=4, column=3).value == "relaxed-fallback"
     strict_row = 4

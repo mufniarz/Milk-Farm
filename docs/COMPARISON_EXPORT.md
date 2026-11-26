@@ -1,3 +1,9 @@
+> **STATUS: two contract decisions are PENDING SIGN-OFF.**
+> `NA()` semantics (error vs string, including the all-NA strict row) and
+> Sensibilità width (15 data + `Scenario` = 16 total) are not signed.
+> Scenari code is blocked until a product owner is assigned and both are
+> recorded here. The proposed 25-column shape below is not a contract change.
+
 # Comparison export — format and semantics
 
 ## Scope: two sheets, two questions
@@ -515,7 +521,7 @@ production callable path for `Scenari`/`Sensibilità`, not only the sheet
 builders.
 
 
-## Tested Confronto shape (pending product sign-off)
+## Confronto PROPOSED shape — PENDING SIGN-OFF (owner: unassigned)
 
 This records what the implementation and tests assert; it does **not** replace
 the pending `NA()`/Sensibilità decisions.
