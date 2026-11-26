@@ -2557,6 +2557,56 @@ def _reference_confronto_rows():
     return rows
 
 
+def _saved_recipe_confronto_rows(db, farm_id, recipe_id):
+    from scenario import apply_scenario
+    from solver import solve_ration
+
+    base = _scenario_base(db, farm_id, recipe_id)
+    hand = apply_scenario(base, {})
+    feeds = [
+        {
+            "id": feed["id"],
+            "name": feed["name"],
+            "dmFactor": 1 - feed["moisturePct"] / 100,
+            "nutrients": feed["nutrients"],
+            "pricePerKg": feed["pricePerKg"],
+            "category": feed["category"],
+        }
+        for feed in base["feeds"]
+    ]
+    targets = [
+        {"code": target["nutrientCode"], "min": target["minValue"], "max": target["maxValue"]}
+        for target in base["targets"]
+        if target.get("isActive", True)
+    ]
+    constraints = {"totalDM": hand["totalDM"]}
+    relaxed = solve_ration(feeds, targets, constraints, mode="relaxed")
+    strict = solve_ration(feeds, targets, constraints, mode="strict")
+    return [
+        {
+            "source": "workbook",
+            "status": "hand-ration",
+            "totalDM": hand["totalDM"],
+            "totalCost": hand["totalCost"],
+            "warnings": _format_warnings(hand["warnings"]),
+        },
+        {
+            "source": "relaxed-solver",
+            "status": relaxed.get("status", ""),
+            "totalDM": relaxed.get("totalDM"),
+            "totalCost": relaxed.get("totalCost"),
+            "warnings": _format_warnings(relaxed.get("warnings", [])),
+        },
+        {
+            "source": "strict-solver",
+            "status": strict.get("status", ""),
+            "totalDM": strict.get("totalDM"),
+            "totalCost": strict.get("totalCost"),
+            "warnings": _format_warnings(strict.get("warnings", [])),
+        },
+    ]
+
+
 def _format_warnings(warnings):
     return "\n".join(
         f"{w['code']}|{w['value']}|{w['min']}|{w['max']}|{w['issue']}|{w.get('boundary', '')}"
@@ -2604,9 +2654,19 @@ def export_comparison(req: https_fn.CallableRequest):
     if data.get("scenarioIds"):
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
-            message="not_implemented: scenario export lands in A2",
+            message="not_implemented: scenario export lands in B",
         )
-    rows = _reference_confronto_rows()
+    if data.get("baseSource") == "builder":
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="unsupported_base_for_confronto",
+        )
+    if data.get("baseRecipeId"):
+        farm_id = _require_string(data, "farmId")
+        db = _require_farm_role(farm_id, req.auth.uid, _SCENARIO_ROLES)
+        rows = _saved_recipe_confronto_rows(db, farm_id, data["baseRecipeId"])
+    else:
+        rows = _reference_confronto_rows()
     content = _build_confronto_workbook(rows)
     bucket = storage.bucket()
     blob = bucket.blob(f"exports/confronto-{uuid.uuid4()}.xlsx")

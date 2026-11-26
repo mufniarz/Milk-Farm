@@ -1962,3 +1962,13 @@ def test_delete_scenario_is_denied_for_feeder():
             _Req("feeder", {"farmId": "f1", "scenarioId": req.data["scenarioId"]})
         )
     assert exc.value.code == https_fn.FunctionsErrorCode.PERMISSION_DENIED
+
+
+def test_saved_recipe_confronto_uses_recipe_rows():
+    _seed_scenario_base()
+    rows = main._saved_recipe_confronto_rows(DB, "f1", "r1")
+    assert [row["source"] for row in rows] == [
+        "workbook", "relaxed-solver", "strict-solver",
+    ]
+    assert rows[0]["status"] == "hand-ration"
+    assert rows[0]["totalCost"] > 0
