@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from firebase_functions import firestore_fn, https_fn, options, scheduler_fn
-from firebase_admin import firestore, initialize_app
+from firebase_admin import firestore, initialize_app, storage
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
@@ -2495,3 +2495,119 @@ def delete_scenario(req: https_fn.CallableRequest):
         return {"ok": True, "alreadyDeleted": True}
     ref.update({"deletedAt": firestore.SERVER_TIMESTAMP})
     return {"ok": True, "alreadyDeleted": False}
+
+
+# ── Comparison export A1: reference Confronto only ──────────────────────────
+_COMPARISON_HEADERS = [
+    ("source", "Fonte"),
+    ("status", "Stato"),
+    ("totalDM", "SS totali"),
+    ("totalCost", "Costo"),
+    ("warnings", "Avvisi"),
+]
+
+
+def _reference_confronto_rows():
+    from solver import solve_ration
+
+    data = json.load(open(os.path.join(os.path.dirname(__file__), "tests", "reference_rations.json")))
+    reference = data["lactating"]
+    feeds = [
+        {
+            "id": feed["id"],
+            "name": feed["name"],
+            "dmFactor": feed["dmFactor"],
+            "nutrients": feed["nutrients"],
+            "pricePerKg": feed["pricePerKg"],
+            "category": feed.get("category", "concentrate"),
+        }
+        for feed in reference["feeds"]
+    ]
+    targets = [
+        {"code": target["nutrientCode"], "min": target["minValue"], "max": target["maxValue"]}
+        for target in reference["targets"]
+        if target.get("isActive", True)
+    ]
+    relaxed = solve_ration(feeds, targets, {}, mode="relaxed")
+    strict = solve_ration(feeds, targets, {}, mode="strict")
+    rows = [
+        {
+            "source": "workbook",
+            "status": "hand-ration",
+            "totalDM": reference["workbookTotalDM"],
+            "totalCost": reference["costPerHead"],
+            "warnings": "",
+        },
+        {
+            "source": "relaxed-solver",
+            "status": relaxed.get("status", ""),
+            "totalDM": relaxed.get("totalDM"),
+            "totalCost": relaxed.get("totalCost"),
+            "warnings": _format_warnings(relaxed.get("warnings", [])),
+        },
+        {
+            "source": "strict-solver",
+            "status": strict.get("status", ""),
+            "totalDM": strict.get("totalDM"),
+            "totalCost": strict.get("totalCost"),
+            "warnings": _format_warnings(strict.get("warnings", [])),
+        },
+    ]
+    return rows
+
+
+def _format_warnings(warnings):
+    return "\n".join(
+        f"{w['code']}|{w['value']}|{w['min']}|{w['max']}|{w['issue']}|{w.get('boundary', '')}"
+        for w in warnings
+    )
+
+
+def _build_confronto_workbook(rows):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Confronto"
+    for column, (_, header) in enumerate(_COMPARISON_HEADERS, start=1):
+        ws.cell(row=1, column=column, value=header).font = Font(bold=True)
+    for row_index, row in enumerate(rows, start=2):
+        for column, (key, _) in enumerate(_COMPARISON_HEADERS, start=1):
+            value = row.get(key)
+            cell = ws.cell(row=row_index, column=column, value=value)
+            if key == "totalCost" and isinstance(value, (int, float)):
+                cell.number_format = '€ #,##0.000'
+            elif key == "totalDM" and isinstance(value, (int, float)):
+                cell.number_format = "0.000"
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer.read()
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=60,
+    region="europe-west1",
+)
+def export_comparison(req: https_fn.CallableRequest):
+    """A1: reference Confronto only; scenario sheets land in A2/B."""
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Sign in required.",
+        )
+    data = req.data or {}
+    if data.get("scenarioIds"):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="not_implemented: scenario export lands in A2",
+        )
+    rows = _reference_confronto_rows()
+    content = _build_confronto_workbook(rows)
+    bucket = storage.bucket()
+    blob = bucket.blob(f"exports/confronto-{uuid.uuid4()}.xlsx")
+    blob.upload_from_string(
+        content,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    url = blob.generate_signed_url(expiration=timedelta(minutes=15))
+    return {"url": url, "rows": len(rows)}
