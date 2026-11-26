@@ -441,3 +441,25 @@ Do not use the export in a client conversation until:
   tolerance is the workbook-parity gate.
 - The client-side `target-safety` override warning is directional (below the
   reference floor) and does not use `BOUNDARY_EPS`.
+
+
+## Local render smoke (2026-11-27)
+
+`docs/screenshots/export-smoke.xlsx` was built from the reference Confronto
+plus a one-scenario `Scenari`/`Sensibilità` sample and rendered with the
+office renderer (en-US locale, not LibreOffice `it-IT`):
+
+- `Confronto` headers and `Fonte` values visible; warnings wrap;
+- strict row shows `#N/A` for DM and cost, not blank/0;
+- cost cells carry `€ #,##0.000`; en-US renders `€ 9.885`, so the locale
+  check is still `it-IT`-specific and was not performed;
+- `Sensibilità` shows all 15 headers (`feed_top1` + four deltas, top2/top3
+  `#N/A` for one feed);
+- column widths were widened after the first render clipped headers and
+  values.
+
+Screenshots: `docs/screenshots/export-smoke-confronto.png`,
+`docs/screenshots/export-smoke-sensibilita.png`.
+
+Signed URL is still unverified: no Firebase auth/Storage session in this
+environment.

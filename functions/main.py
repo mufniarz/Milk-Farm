@@ -2658,6 +2658,9 @@ def _add_sensibilita_sheet(workbook, rows):
         ]
     for column, header in enumerate(headers, start=1):
         sheet.cell(row=1, column=column, value=header).font = Font(bold=True)
+    sheet.column_dimensions["A"].width = 20
+    for column in range(2, 17):
+        sheet.column_dimensions[sheet.cell(1, column).column_letter].width = 14
     for row_index, row in enumerate(rows, start=2):
         sheet.cell(row=row_index, column=1, value=row["scenario"])
         for column, header in enumerate(headers[1:], start=2):
@@ -2707,6 +2710,9 @@ def _add_scenari_sheet(workbook, rows):
                ("status", "Stato")]
     for column, (_, header) in enumerate(headers, start=1):
         sheet.cell(row=1, column=column, value=header).font = Font(bold=True)
+    sheet.column_dimensions["A"].width = 24
+    for column in range(2, 6):
+        sheet.column_dimensions[sheet.cell(1, column).column_letter].width = 16
     for row_index, row in enumerate(rows, start=2):
         for column, (key, _) in enumerate(headers, start=1):
             value = row.get(key)
@@ -2735,6 +2741,16 @@ def _build_confronto_workbook(rows):
                 cell.number_format = '€ #,##0.000'
             elif key == "totalDM" and isinstance(value, (int, float)):
                 cell.number_format = "0.000"
+    for column_cells in ws.columns:
+        width = max(
+            (len(str(cell.value)) for cell in column_cells if cell.value is not None),
+            default=10,
+        )
+        ws.column_dimensions[column_cells[0].column_letter].width = min(width + 2, 60)
+        for cell in column_cells:
+            if cell.column_letter == "E":
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.freeze_panes = "A2"
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
