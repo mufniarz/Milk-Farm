@@ -36,6 +36,13 @@ def test_infeasible_cells_are_na():
     assert sum(
         1 for row in sheet.iter_rows() for cell in row if cell.value == "=NA()"
     ) == 20
+    relaxed = sheet[3]
+    assert not any(cell.value == "=NA()" for cell in relaxed[6:])
+    assert relaxed[7].value is not None and relaxed[7].value > 0
+    unreachable = sheet.cell(row=4, column=25).value
+    assert unreachable
+    for line in unreachable.splitlines():
+        assert len(line.split("|")) == 6
     assert sheet.cell(row=2, column=3).value == "workbook"
     assert sheet.cell(row=4, column=3).value == "relaxed-fallback"
     strict_row = 4

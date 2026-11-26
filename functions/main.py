@@ -2568,8 +2568,8 @@ def _reference_confronto_rows():
     }
     return [
         _confronto_row("workbook", "hand-ration", "workbook", workbook),
-        _confronto_row("relaxed-solver", relaxed.get("status", ""), "self", relaxed),
-        _confronto_row("strict-solver", strict.get("status", ""), "relaxed-fallback", strict),
+        _confronto_row("relaxed-solver", relaxed.get("status", ""), "self", relaxed, unreachable=relaxed.get("unreachableTargets")),
+        _confronto_row("strict-solver", strict.get("status", ""), "relaxed-fallback", strict, unreachable=strict.get("unreachableTargets")),
     ]
 
 
@@ -2600,8 +2600,8 @@ def _saved_recipe_confronto_rows(db, farm_id, recipe_id):
     strict = solve_ration(feeds, targets, constraints, mode="strict")
     return [
         _confronto_row("workbook", "hand-ration", "workbook", hand, hand.get("warnings", [])),
-        _confronto_row("relaxed-solver", relaxed.get("status", ""), "self", relaxed),
-        _confronto_row("strict-solver", strict.get("status", ""), "relaxed-fallback", strict),
+        _confronto_row("relaxed-solver", relaxed.get("status", ""), "self", relaxed, unreachable=relaxed.get("unreachableTargets")),
+        _confronto_row("strict-solver", strict.get("status", ""), "relaxed-fallback", strict, unreachable=strict.get("unreachableTargets")),
     ]
 
 
