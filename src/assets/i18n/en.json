@@ -151,7 +151,8 @@
     "NEW_KG": "New kg as-fed",
     "ADD_INCLUSION": "Add inclusion",
     "ADD_OVERRIDE": "Add target",
-    "CLEAR_CHANGES": "Clear"
+    "CLEAR_CHANGES": "Clear",
+    "DISCARD_CHANGES": "Unsaved changes. Discard?"
   },
   "COMMON": {
     "LOADING": "Loading...",

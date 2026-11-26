@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -98,6 +99,9 @@ const MAX_SELECTION = 20;
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let row">
+              <button mat-icon-button (click)="loadIntoBuilder(row)" [disabled]="!row.baseRecipeId && !row.baseLines?.length">
+                <mat-icon>open_in_new</mat-icon>
+              </button>
               <button mat-icon-button (click)="remove(row)">
                 <mat-icon>delete</mat-icon>
               </button>
@@ -142,6 +146,7 @@ export class ScenariosComponent implements OnInit {
   private farmContext = inject(FarmContextService);
   private snackBar = inject(MatSnackBar);
   private translate = inject(TranslateService);
+  private router = inject(Router);
 
   readonly rows = signal<ScenarioRow[]>([]);
   readonly loading = signal(false);
@@ -186,6 +191,12 @@ export class ScenariosComponent implements OnInit {
     if (checked) next.add(id);
     else next.delete(id);
     this.selected.set(next);
+  }
+
+  loadIntoBuilder(row: ScenarioRow): void {
+    void this.router.navigate(['/recipes/new'], {
+      queryParams: { scenario: row.id },
+    });
   }
 
   async remove(row: ScenarioRow): Promise<void> {

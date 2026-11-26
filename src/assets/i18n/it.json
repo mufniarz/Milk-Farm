@@ -151,7 +151,8 @@
     "NEW_KG": "Nuovi kg t.q.",
     "ADD_INCLUSION": "Aggiungi inclusione",
     "ADD_OVERRIDE": "Aggiungi obiettivo",
-    "CLEAR_CHANGES": "Pulisci"
+    "CLEAR_CHANGES": "Pulisci",
+    "DISCARD_CHANGES": "Modifiche non salvate. Scartare?"
   },
   "COMMON": {
     "LOADING": "Caricamento...",

@@ -55,13 +55,7 @@ import { TargetService } from '../../core/services/target.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
 import { ScenarioService } from '../../core/services/scenario.service';
 import { buildBuilderScenarioPayload } from '../../core/utils/scenario-payload';
-import {
-  emptyScenarioDraft,
-  setFeedPrice,
-  setInclusion,
-  setTargetOverride,
-  draftToChanges,
-} from '../../core/utils/scenario-change-draft';
+import { ScenarioDraftController } from '../../core/services/scenario-draft-controller';
 import { TARGET_RANGES } from '../../core/data/initial-data';
 import { ChartData, ChartType } from 'chart.js';
 
@@ -888,6 +882,7 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   private targetService = inject(TargetService);
   private farmContext = inject(FarmContextService);
   private scenarioService = inject(ScenarioService);
+  private scenarioDraftController = inject(ScenarioDraftController);
   private snackBar = inject(MatSnackBar);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -906,7 +901,6 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   animalCount = 1;
   constraints: OptimizationConstraints = {};
   targets: EffectiveNutrientTarget[] = this.referenceTargets('lactating');
-  readonly scenarioDraft = signal(emptyScenarioDraft());
   scenarioFeedId = '';
   scenarioPrice: number | null = null;
   scenarioKg: number | null = null;
@@ -971,6 +965,7 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   }
 
   constructor() {
+    setTimeout(() => void this.loadScenarioFromQuery(), 800);
     // Overrides can only be read once the active farm is known.
     effect(() => {
       if (this.farmContext.activeFarmId()) {
@@ -1227,32 +1222,53 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     }
   }
 
+  async loadScenarioFromQuery(): Promise<void> {
+    const id = this.route.snapshot.queryParamMap.get('scenario');
+    const farmId = this.farmContext.activeFarmId();
+    if (!id || !farmId) return;
+    if (this.scenarioDraftController.dirty() &&
+        !confirm(this.translate.instant('RECIPES.DISCARD_CHANGES'))) {
+      return;
+    }
+    const row = await this.scenarioService.get(farmId, id);
+    if (!row) return;
+    const lines = new Map((row.baseLines ?? []).map((line) => [line.feedId, line.kgAsFed]));
+    this.feedEntries.update((entries) =>
+      entries.map((entry) => ({
+        ...entry,
+        selected: lines.has(entry.feed.id ?? ''),
+        kgAsFed: lines.get(entry.feed.id ?? '') ?? entry.kgAsFed,
+      })),
+    );
+    this.scenarioDraftController.load(row.changes);
+  }
+
   clearScenarioChanges(): void {
-    this.scenarioDraft.set(emptyScenarioDraft());
+    this.scenarioDraftController.clear();
   }
 
   addPriceChange(): void {
     if (!this.scenarioFeedId || this.scenarioPrice === null) return;
-    this.scenarioDraft.update((draft) =>
-      setFeedPrice(draft, this.scenarioFeedId, Number(this.scenarioPrice)),
+    this.scenarioDraftController.setFeedPrice(
+      this.scenarioFeedId,
+      Number(this.scenarioPrice),
     );
   }
 
   addInclusionChange(): void {
     if (!this.scenarioFeedId || this.scenarioKg === null) return;
-    this.scenarioDraft.update((draft) =>
-      setInclusion(draft, this.scenarioFeedId, Number(this.scenarioKg)),
+    this.scenarioDraftController.setInclusion(
+      this.scenarioFeedId,
+      Number(this.scenarioKg),
     );
   }
 
   addOverrideChange(): void {
     if (!this.scenarioNutrient) return;
-    this.scenarioDraft.update((draft) =>
-      setTargetOverride(draft, this.scenarioNutrient, {
-        min: this.scenarioMin === null ? null : Number(this.scenarioMin),
-        max: this.scenarioMax === null ? null : Number(this.scenarioMax),
-      }),
-    );
+    this.scenarioDraftController.setTargetOverride(this.scenarioNutrient, {
+      min: this.scenarioMin === null ? null : Number(this.scenarioMin),
+      max: this.scenarioMax === null ? null : Number(this.scenarioMax),
+    });
   }
 
   async saveScenario(): Promise<void> {
@@ -1281,8 +1297,9 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
       await this.scenarioService.save({
         ...payload,
         name,
-        changes: draftToChanges(this.scenarioDraft()),
+        changes: this.scenarioDraftController.toChanges(),
       });
+      this.scenarioDraftController.saved();
       this.snackBar.open(
         this.translate.instant('RECIPES.SCENARIO_SAVED'),
         undefined,

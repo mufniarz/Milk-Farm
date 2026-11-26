@@ -7,6 +7,7 @@ export interface ScenarioRow {
   baseRecipeId: string | null;
   baseHash?: string | null;
   changes: ScenarioChanges;
+  baseLines?: { feedId: string; kgAsFed: number }[];
   snapshot: ScenarioSnapshot;
   savedAt: Date | null;
   /** null until the server recompute compares snapshot vs current truth. */
