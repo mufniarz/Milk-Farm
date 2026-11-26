@@ -476,9 +476,8 @@ environment.
 - Screenshot: `docs/screenshots/export-prod-confronto.png`.
 - The renderer is en-US, so `it-IT` (`€ 9.885,000`) is still unverified.
 
-**Open anomaly:** direct scenario gets succeeded with the test user, but
-Firestore REST `runQuery` on scenarios (and other farm collections) returned
-`PERMISSION_DENIED`, while the Admin SDK query returned the expected
-`smoke-live-2`, `smoke-live-1` order with the deleted row excluded. This may be
-a REST query/rules interaction, not the app SDK path; it needs a browser check
-of `/scenarios` before the page is called client-ready.
+**Query check:** the Firestore JS SDK, signed in as the test owner, ran the
+exact `/scenarios` query and returned `smoke-live-2`, `smoke-live-1` (newest
+first, deleted excluded) with no index error. A direct REST `runQuery` with
+the same ID token returned `PERMISSION_DENIED`; that is a REST-specific auth
+quirk, not the app SDK path. Smoke documents were removed.
