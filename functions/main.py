@@ -2500,13 +2500,33 @@ def delete_scenario(req: https_fn.CallableRequest):
 
 
 # ── Comparison export A1: reference Confronto only ──────────────────────────
-_COMPARISON_HEADERS = [
-    ("source", "Fonte"),
-    ("status", "Stato"),
-    ("totalDM", "SS totali"),
-    ("totalCost", "Costo"),
-    ("warnings", "Avvisi"),
+_NUTRIENT_CODES = [
+    "umidita", "proteina", "ee", "amido", "zuccheri", "ceneri",
+    "aNDF", "uNDF", "NFC", "ADF", "ADL", "pectine",
+    "ADF_aNDF", "uNDF_aNDF", "emicellulosa", "foraggiPct", "concentratiPct",
 ]
+_COMPARISON_HEADERS = [
+    ("source", "Fonte"), ("status", "Stato"),
+    ("diagnostics_from", "Diagnostica da"),
+    ("totalAsFed", "Totale tal quale"),
+    ("totalDM", "SS totali"), ("totalCost", "Costo"),
+] + [(code, code) for code in _NUTRIENT_CODES] + [
+    ("warnings", "Avvisi"),
+    ("unreachableTargets", "Obiettivi non raggiungibili"),
+]
+
+
+def _confronto_row(source, status, diagnostics_from, snapshot, warnings=None, unreachable=None):
+    return {
+        "source": source, "status": status,
+        "diagnostics_from": diagnostics_from,
+        "totalAsFed": snapshot.get("totalAsFed"),
+        "totalDM": snapshot.get("totalDM"),
+        "totalCost": snapshot.get("totalCost"),
+        **{code: (snapshot.get("nutrients") or {}).get(code) for code in _NUTRIENT_CODES},
+        "warnings": _format_warnings(warnings or snapshot.get("warnings", [])),
+        "unreachableTargets": _format_warnings(unreachable or []),
+    }
 
 
 def _reference_confronto_rows():
@@ -2533,30 +2553,17 @@ def _reference_confronto_rows():
     constraints = {"totalDM": reference["solverTotalDM"]}
     relaxed = solve_ration(feeds, targets, constraints, mode="relaxed")
     strict = solve_ration(feeds, targets, constraints, mode="strict")
-    rows = [
-        {
-            "source": "workbook",
-            "status": "hand-ration",
-            "totalDM": reference["workbookTotalDM"],
-            "totalCost": reference["costPerHead"],
-            "warnings": "",
-        },
-        {
-            "source": "relaxed-solver",
-            "status": relaxed.get("status", ""),
-            "totalDM": relaxed.get("totalDM"),
-            "totalCost": relaxed.get("totalCost"),
-            "warnings": _format_warnings(relaxed.get("warnings", [])),
-        },
-        {
-            "source": "strict-solver",
-            "status": strict.get("status", ""),
-            "totalDM": strict.get("totalDM"),
-            "totalCost": strict.get("totalCost"),
-            "warnings": _format_warnings(strict.get("warnings", [])),
-        },
+    workbook = {
+        "totalAsFed": reference["totalAsFed"],
+        "totalDM": reference["workbookTotalDM"],
+        "totalCost": reference["costPerHead"],
+        "nutrients": reference["analysis"],
+    }
+    return [
+        _confronto_row("workbook", "hand-ration", "workbook", workbook),
+        _confronto_row("relaxed-solver", relaxed.get("status", ""), "self", relaxed),
+        _confronto_row("strict-solver", strict.get("status", ""), "relaxed-fallback", strict),
     ]
-    return rows
 
 
 def _saved_recipe_confronto_rows(db, farm_id, recipe_id):
@@ -2585,27 +2592,9 @@ def _saved_recipe_confronto_rows(db, farm_id, recipe_id):
     relaxed = solve_ration(feeds, targets, constraints, mode="relaxed")
     strict = solve_ration(feeds, targets, constraints, mode="strict")
     return [
-        {
-            "source": "workbook",
-            "status": "hand-ration",
-            "totalDM": hand["totalDM"],
-            "totalCost": hand["totalCost"],
-            "warnings": _format_warnings(hand["warnings"]),
-        },
-        {
-            "source": "relaxed-solver",
-            "status": relaxed.get("status", ""),
-            "totalDM": relaxed.get("totalDM"),
-            "totalCost": relaxed.get("totalCost"),
-            "warnings": _format_warnings(relaxed.get("warnings", [])),
-        },
-        {
-            "source": "strict-solver",
-            "status": strict.get("status", ""),
-            "totalDM": strict.get("totalDM"),
-            "totalCost": strict.get("totalCost"),
-            "warnings": _format_warnings(strict.get("warnings", [])),
-        },
+        _confronto_row("workbook", "hand-ration", "workbook", hand, hand.get("warnings", [])),
+        _confronto_row("relaxed-solver", relaxed.get("status", ""), "self", relaxed),
+        _confronto_row("strict-solver", strict.get("status", ""), "relaxed-fallback", strict),
     ]
 
 
@@ -2734,15 +2723,17 @@ def _build_confronto_workbook(rows):
     for row_index, row in enumerate(rows, start=2):
         for column, (key, _) in enumerate(_COMPARISON_HEADERS, start=1):
             value = row.get(key)
-            if value is None and key in ("totalDM", "totalCost"):
+            if value is None and key in ("totalDM", "totalAsFed", "totalCost", *_NUTRIENT_CODES):
                 cell = ws.cell(row=row_index, column=column, value="=NA()")
-                cell.number_format = '€ #,##0.000' if key == "totalCost" else "0.000"
+                cell.number_format = '€ #,##0.000' if key == "totalCost" else ("0.000" if key in ("totalDM", "totalAsFed") else "0.00")
                 continue
             cell = ws.cell(row=row_index, column=column, value=value)
             if key == "totalCost" and isinstance(value, (int, float)):
                 cell.number_format = '€ #,##0.000'
-            elif key == "totalDM" and isinstance(value, (int, float)):
+            elif key in ("totalDM", "totalAsFed") and isinstance(value, (int, float)):
                 cell.number_format = "0.000"
+            elif key in _NUTRIENT_CODES and isinstance(value, (int, float)):
+                cell.number_format = "0.00"
     for column_cells in ws.columns:
         width = max(
             (len(str(cell.value)) for cell in column_cells if cell.value is not None),
@@ -2750,7 +2741,7 @@ def _build_confronto_workbook(rows):
         )
         ws.column_dimensions[column_cells[0].column_letter].width = min(width + 2, 60)
         for cell in column_cells:
-            if cell.column_letter == "E":
+            if cell.column_letter in ("X", "Y"):
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
     ws.freeze_panes = "A2"
     buffer = io.BytesIO()

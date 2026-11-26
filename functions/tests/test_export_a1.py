@@ -22,9 +22,17 @@ def test_infeasible_cells_are_na():
         __import__("io").BytesIO(_build_confronto_workbook(_reference_confronto_rows()))
     )
     sheet = workbook["Confronto"]
+    headers = [sheet.cell(row=1, column=column).value for column in range(1, 26)]
+    assert len(headers) == 25
+    assert headers[2] == "Diagnostica da"
+    assert headers[3] == "Totale tal quale"
+    assert "proteina" in headers
+    assert headers[-2:] == ["Avvisi", "Obiettivi non raggiungibili"]
+    assert sheet.cell(row=2, column=3).value == "workbook"
+    assert sheet.cell(row=4, column=3).value == "relaxed-fallback"
     strict_row = 4
-    assert sheet.cell(row=strict_row, column=3).value == "=NA()"
-    assert sheet.cell(row=strict_row, column=4).value == "=NA()"
+    assert sheet.cell(row=strict_row, column=5).value == "=NA()"
+    assert sheet.cell(row=strict_row, column=6).value == "=NA()"
 
 
 def test_export_rejects_scenarios_before_workbook():
