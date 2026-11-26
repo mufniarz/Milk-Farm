@@ -335,6 +335,7 @@
     "SELECTED": "selected",
     "CAP": "You can select at most 20 scenarios.",
     "DELETE_CONFIRM": "Delete this scenario? This cannot be undone.",
-    "DIVERGED": "Diverged"
+    "DIVERGED": "Diverged",
+    "BUILDER": "Builder"
   }
 }

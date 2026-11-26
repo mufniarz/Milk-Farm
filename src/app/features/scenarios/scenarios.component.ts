@@ -63,7 +63,7 @@ const MAX_SELECTION = 20;
             <th mat-header-cell *matHeaderCellDef>
               {{ 'SCENARIOS.BASE' | translate }}
             </th>
-            <td mat-cell *matCellDef="let row">{{ row.baseRecipeId }}</td>
+            <td mat-cell *matCellDef="let row">{{ row.baseRecipeId ?? ('SCENARIOS.BUILDER' | translate) }}</td>
           </ng-container>
           <ng-container matColumnDef="savedAt">
             <th mat-header-cell *matHeaderCellDef>

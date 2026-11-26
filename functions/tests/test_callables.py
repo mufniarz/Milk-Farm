@@ -1882,6 +1882,43 @@ def test_delete_scenario_soft_deletes_for_owner():
     assert doc["deletedAt"] is not None
 
 
+def test_save_scenario_accepts_validated_builder_base():
+    _seed_scenario_base()
+    req = _save_request(
+        baseSource="builder",
+        baseLines=[{"feedId": "feed1", "kgAsFed": 10}],
+        animalGroupId="lactating",
+    )
+    req.data.pop("baseRecipeId", None)
+    result = _handler(main.save_scenario)(req)
+    doc = (
+        DB.collection("farms")
+        .document("f1")
+        .collection("scenarios")
+        .document(req.data["scenarioId"])
+        .get()
+        .to_dict()
+    )
+    assert doc["baseSource"] == "builder"
+    assert doc["baseRecipeId"] is None
+    assert len(doc["baseHash"]) == 64
+    assert doc["baseLines"] == [{"feedId": "feed1", "kgAsFed": 10}]
+    assert result["snapshot"]["totalCost"] > 0
+
+
+def test_save_scenario_builder_base_rejects_unknown_feed():
+    _seed_scenario_base()
+    req = _save_request(
+        baseSource="builder",
+        baseLines=[{"feedId": "missing", "kgAsFed": 10}],
+        animalGroupId="lactating",
+    )
+    req.data.pop("baseRecipeId", None)
+    with pytest.raises(https_fn.HttpsError) as exc:
+        _handler(main.save_scenario)(req)
+    assert "unknown_feed" in (exc.value.message or "")
+
+
 def test_delete_scenario_is_idempotent():
     _seed_scenario_base()
     req = _save_request()

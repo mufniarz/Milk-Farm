@@ -5,6 +5,7 @@ Hosts the LP solver endpoint for automatic ration optimization
 and the Excel export function for recipe downloads.
 """
 import base64
+import hashlib
 import io
 import json
 import os
@@ -2176,6 +2177,114 @@ def _scenario_base(db, farm_id, recipe_id):
     }
 
 
+def _scenario_base_from_builder(db, farm_id, data):
+    """Validate a builder-state base: feeds must exist and have positive DM."""
+    lines = data.get("baseLines")
+    if not isinstance(lines, list) or not lines:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="baseLines is required for a builder base.",
+        )
+    animal_group = data.get("animalGroupId")
+    ranges = _target_ranges()
+    if animal_group not in ranges:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="Unknown animal group.",
+        )
+    feeds = []
+    for line in lines:
+        if not isinstance(line, dict):
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message="baseLines entries must be objects.",
+            )
+        feed_id = line.get("feedId")
+        kg = line.get("kgAsFed")
+        if not isinstance(feed_id, str) or not feed_id:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message="baseLines feedId is required.",
+            )
+        if isinstance(kg, bool) or not isinstance(kg, (int, float)) or kg < 0:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message="baseLines kgAsFed must be a non-negative number.",
+            )
+        feed = db.collection("feeds").document(feed_id).get()
+        if not feed.exists:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message=f"unknown_feed: {feed_id}",
+            )
+        feed_data = feed.to_dict() or {}
+        if feed_data.get("farmId") != farm_id:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+                message="Feed belongs to another farm.",
+            )
+        feeds.append(
+            {
+                "id": feed_id,
+                "name": feed_data.get("name", feed_id),
+                "moisturePct": feed_data.get("moisturePct", 0),
+                "nutrients": feed_data.get("nutrients") or {},
+                "pricePerKg": feed_data.get("pricePerKg", 0),
+                "category": feed_data.get("category", "concentrate"),
+                "kgAsFed": kg,
+            }
+        )
+    if sum(f["kgAsFed"] * (1 - f["moisturePct"] / 100) for f in feeds) <= 0:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="Base has no dry matter.",
+        )
+
+    override_ref = (
+        db.collection("farms")
+        .document(farm_id)
+        .collection("targetOverrides")
+        .document(animal_group)
+    )
+    override_doc = override_ref.get()
+    overrides = (override_doc.to_dict() or {}).get("nutrients", {}) if override_doc.exists else {}
+    targets = []
+    for target in ranges[animal_group]:
+        entry = overrides.get(target["nutrientCode"])
+        if entry:
+            targets.append(
+                {
+                    **target,
+                    "minValue": entry.get("minValue"),
+                    "maxValue": entry.get("maxValue"),
+                    "source": "override",
+                }
+            )
+        else:
+            targets.append(target)
+    return {
+        "baseSource": "builder",
+        "recipeId": None,
+        "recipeName": data.get("name", "Builder"),
+        "animalGroupId": animal_group,
+        "feeds": feeds,
+        "targets": targets,
+    }
+
+
+def _base_hash(base):
+    normalized = sorted(
+        (
+            {"feedId": feed["id"], "kgAsFed": round(feed["kgAsFed"], 6)}
+            for feed in base["feeds"]
+        ),
+        key=lambda line: line["feedId"],
+    )
+    return hashlib.sha256(
+        json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
 def _validate_scenario_changes(base, changes, override_codes):
     if not isinstance(changes, dict):
         raise https_fn.HttpsError(
@@ -2270,8 +2379,18 @@ def save_scenario(req: https_fn.CallableRequest):
             message="scenarioId must be a UUID.",
         ) from exc
 
-    recipe_id = _require_string(data, "baseRecipeId")
-    base = _scenario_base(db, farm_id, recipe_id)
+    base_source = data.get("baseSource", "saved-recipe")
+    if base_source not in ("saved-recipe", "builder"):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="unsupported_base_source",
+        )
+    if base_source == "builder":
+        base = _scenario_base_from_builder(db, farm_id, data)
+        recipe_id = None
+    else:
+        recipe_id = _require_string(data, "baseRecipeId")
+        base = _scenario_base(db, farm_id, recipe_id)
     override_codes = set()
     override_ref = (
         db.collection("farms")
@@ -2305,8 +2424,15 @@ def save_scenario(req: https_fn.CallableRequest):
         {
             "farmId": farm_id,
             "name": name,
-            "baseSource": "saved-recipe",
+            "baseSource": base_source,
             "baseRecipeId": recipe_id,
+            "baseHash": _base_hash(base) if base_source == "builder" else None,
+            "baseLines": [
+                {"feedId": feed["id"], "kgAsFed": feed["kgAsFed"]}
+                for feed in base["feeds"]
+            ]
+            if base_source == "builder"
+            else None,
             "changes": changes,
             "resultSnapshot": snapshot,
             "createdBy": uid,

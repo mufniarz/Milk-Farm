@@ -3,8 +3,9 @@ import { ScenarioChanges, ScenarioSnapshot } from './scenario.model';
 export interface ScenarioRow {
   id: string;
   name: string;
-  baseSource: 'saved-recipe' | 'workbook';
-  baseRecipeId: string;
+  baseSource: 'saved-recipe' | 'workbook' | 'builder';
+  baseRecipeId: string | null;
+  baseHash?: string | null;
   changes: ScenarioChanges;
   snapshot: ScenarioSnapshot;
   savedAt: Date | null;
@@ -16,7 +17,8 @@ export interface SaveScenarioInput {
   farmId: string;
   scenarioId: string;
   name: string;
-  baseRecipeId: string;
+  baseRecipeId: string | null;
+  baseHash?: string | null;
   changes: ScenarioChanges;
 }
 

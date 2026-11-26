@@ -335,6 +335,7 @@
     "SELECTED": "selezionati",
     "CAP": "Puoi selezionare al massimo 20 scenari.",
     "DELETE_CONFIRM": "Eliminare questo scenario? L’operazione non può essere annullata.",
-    "DIVERGED": "Variato"
+    "DIVERGED": "Variato",
+    "BUILDER": "Builder"
   }
 }

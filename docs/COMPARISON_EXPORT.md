@@ -123,11 +123,11 @@ The export takes an explicit `scenarioIds` list (or a date-range selection)
 with a **maximum of 20**; it never silently caps. The sheet header names the
 selected range and count.
 
-**One base per export.** All selected scenarios must share the **pair**
-`(baseSource, baseRecipeId)`; the export refuses a mixed selection with a
-clear message. Checking only `baseSource` is insufficient: two different
-saved recipes both have `saved-recipe`. Mixed bases would make `delta_cost`
-incomparable across rows.
+**One base per export.** All selected scenarios must share the **triple**
+`(baseSource, baseRecipeId, baseHash)`; the export refuses a mixed selection
+with a clear message. Saved-recipe scenarios use `baseHash: null`; builder
+snapshots use the server hash, so two different builder moments are not
+silently combined. Checking only `baseSource` is insufficient.
 
 ### Base
 
@@ -194,10 +194,11 @@ with the Python `apply_scenario` (`functions/scenario.py`). It shows **current
 truth**: current feed prices, current availability and current target
 overrides. If the farm's overrides changed since the scenario was saved, the
 exported ration reflects the current overrides and `diverged` is true;
-`saved_at` and the stored snapshot remain the audit record. `diverged` also
-includes warnings; a code deploy that changes workbook ideals can therefore
-flip it for untouched scenarios—the export is still current truth, the
-snapshot is still the audit. `diverged` also
+`saved_at` and the stored snapshot remain the audit record. `diverged` also includes warnings; a code deploy that changes workbook ideals
+can therefore flip it for untouched scenarios—the export is still current
+truth, the snapshot is still the audit. A builder snapshot's base is its
+stored `baseLines`, so a later recipe edit does not flip it; saved-recipe
+scenarios compare against the current recipe, as before. `diverged` also
 covers `lines`, so a feed price change is visible even when totals coincide. The server runtime
 stays Python: no second functions runtime. The TS `applyScenario` is the
 client preview and is pinned to the Python implementation by the shared value
@@ -370,10 +371,11 @@ The first build must assert:
   cannot be re-exported; the previously exported workbook is the record”; the
   UI states deletion cannot be undone. The export selector refreshes on open,
   hides deleted rows, and offers a one-click removal for a stale selection;
-- builder flow: **blocked** — the callable accepts only changes against a
-  saved recipe, so it cannot capture unsaved recipe lines. Decide: require a
-  saved recipe, add a validated base snapshot, or auto-save a draft. Until
-  then the toolbar button is not implemented;
+- builder flow: **backend supports it** — `baseSource: 'builder'` carries
+  `baseLines` (feedId, kgAsFed); the server validates feeds, farm ownership
+  and positive DM, then stores `baseLines` + a server-computed `baseHash`
+  (SHA-256 of normalized lines). The builder toolbar/load UI is next; no
+  recipe-save prerequisite;
   “Load into builder” shows “Saving creates a new scenario; the loaded one is
   preserved,” and asks before discarding unsaved changes;
 - the server snapshot is canonical; `save_scenario` returns it and the client
