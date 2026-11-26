@@ -58,3 +58,15 @@ Screenshots: [loading](screenshots/loading-confirmed.png),
 - The heartbeat stale banner was verified visually with an error heartbeat and
   an empty queue; the screenshot is [stale-banner](screenshots/stale-banner.png).
 - Excel/LibreOffice visual parse of the CSV (fixture provided; no app here).
+
+
+## Accuracy CSV, Italian locale (2026-11-27)
+
+The fixture `docs/screenshots/accuracy-smoke.csv` was imported with the
+semicolon filter and rendered in LibreOffice set to Italian:
+
+- BOM present, `;` delimiter, CRLF line endings;
+- columns split correctly (`date`, `herdGroupId`, ...), not one column;
+- fixture values are integers, so comma-decimal rendering is not exercised
+  by this fixture (the exporter test covers comma decimals separately);
+- screenshot: `docs/screenshots/accuracy-smoke-it.png`.
