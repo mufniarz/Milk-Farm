@@ -2689,11 +2689,23 @@ def _scenario_export_rows(db, farm_id, base, scenario_ids):
     rows = []
     for data in docs:
         snapshot = apply_scenario(base, data.get("changes") or {})
+        saved = data.get("resultSnapshot") or {}
+        saved_cost = saved.get("totalCost")
         row = {
             "scenario": data.get("name", data["_id"]),
             "base_cost": base_snapshot["totalCost"],
             "scenario_cost": snapshot["totalCost"],
             "delta_cost": snapshot["totalCost"] - base_snapshot["totalCost"],
+            "base_DM": base_snapshot["totalDM"],
+            "scenario_DM": snapshot["totalDM"],
+            "delta_DM": snapshot["totalDM"] - base_snapshot["totalDM"],
+            "scenario_cost_saved": saved_cost,
+            "saved_at": data.get("savedAt"),
+            "diverged": (
+                saved_cost is None
+                or abs(snapshot["totalCost"] - saved_cost)
+                > max(0.001, 0.001 * abs(saved_cost))
+            ),
             "status": snapshot["status"],
         }
         row.update(_sensitivity_columns(snapshot))
@@ -2703,13 +2715,18 @@ def _scenario_export_rows(db, farm_id, base, scenario_ids):
 
 def _add_scenari_sheet(workbook, rows):
     sheet = workbook.create_sheet("Scenari")
-    headers = [("scenario", "Scenario"), ("base_cost", "Costo base"),
-               ("scenario_cost", "Costo scenario"), ("delta_cost", "Delta costo"),
-               ("status", "Stato")]
+    headers = [
+        ("scenario", "Scenario"), ("base_cost", "Costo base"),
+        ("scenario_cost", "Costo scenario"), ("delta_cost", "Delta costo"),
+        ("base_DM", "SS base"), ("scenario_DM", "SS scenario"),
+        ("delta_DM", "Delta SS"), ("scenario_cost_saved", "Costo salvato"),
+        ("saved_at", "Salvato il"), ("diverged", "Variato"),
+        ("status", "Stato"),
+    ]
     for column, (_, header) in enumerate(headers, start=1):
         sheet.cell(row=1, column=column, value=header).font = Font(bold=True)
     sheet.column_dimensions["A"].width = 24
-    for column in range(2, 6):
+    for column in range(2, len(headers) + 1):
         sheet.column_dimensions[sheet.cell(1, column).column_letter].width = 16
     for row_index, row in enumerate(rows, start=2):
         for column, (key, _) in enumerate(headers, start=1):

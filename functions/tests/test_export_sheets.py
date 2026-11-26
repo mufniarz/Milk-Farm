@@ -49,8 +49,10 @@ def test_scenari_and_sensibilita_sheets_render():
     _add_scenari_sheet(workbook, rows)
     _add_sensibilita_sheet(workbook, rows)
     sheet = workbook["Scenari"]
-    assert [sheet.cell(1, c).value for c in range(1, 6)] == [
-        "Scenario", "Costo base", "Costo scenario", "Delta costo", "Stato",
+    assert [sheet.cell(1, c).value for c in range(1, 12)] == [
+        "Scenario", "Costo base", "Costo scenario", "Delta costo",
+        "SS base", "SS scenario", "Delta SS", "Costo salvato",
+        "Salvato il", "Variato", "Stato",
     ]
     assert sheet.cell(2, 4).value == -0.2
     assert sheet.cell(3, 4).value == 0.3
