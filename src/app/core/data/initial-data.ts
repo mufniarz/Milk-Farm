@@ -158,7 +158,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "fieno fasciato 1 taglio aziendale",
     "category": "forage",
     "pricePerKg": 0.15,
-    "moisturePct": 23.2,
+    "moisturePct": 23.22,
     "nutrients": {
       "proteina": 7.92,
       "ee": 2.74,
@@ -176,7 +176,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "fieno fasciato 1 taglio aziendale (manze)",
     "category": "forage",
     "pricePerKg": 0.15,
-    "moisturePct": 44.2,
+    "moisturePct": 44.23,
     "nutrients": {
       "proteina": 11.63,
       "ee": 2.84,
@@ -194,7 +194,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "fieno fasciato 2 taglio aziendale",
     "category": "forage",
     "pricePerKg": 0.15,
-    "moisturePct": 46,
+    "moisturePct": 46.02,
     "nutrients": {
       "proteina": 13.12,
       "ee": 1.95,
@@ -212,7 +212,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "fieno fasciato 2 taglio aziendale (asciutta)",
     "category": "forage",
     "pricePerKg": 0.15,
-    "moisturePct": 15.2,
+    "moisturePct": 15.15,
     "nutrients": {
       "proteina": 11.01,
       "ee": 2.73,
@@ -230,7 +230,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "fieno fasciato 2 taglio aziendale (manze)",
     "category": "forage",
     "pricePerKg": 0.15,
-    "moisturePct": 23.4,
+    "moisturePct": 23.36,
     "nutrients": {
       "proteina": 13.38,
       "ee": 3.16,
@@ -248,7 +248,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "fieno frumento",
     "category": "forage",
     "pricePerKg": 0.25,
-    "moisturePct": 8.9,
+    "moisturePct": 8.91,
     "nutrients": {
       "proteina": 9.98,
       "ee": 2.11,
@@ -284,7 +284,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "frumento trinciato",
     "category": "forage",
     "pricePerKg": 0.09,
-    "moisturePct": 77,
+    "moisturePct": 76.97,
     "nutrients": {
       "proteina": 9.26,
       "ee": 2.29,
@@ -302,7 +302,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "frumento trinciato (asciutta)",
     "category": "forage",
     "pricePerKg": 0.09,
-    "moisturePct": 77,
+    "moisturePct": 76.97,
     "nutrients": {
       "proteina": 9.26,
       "ee": 2.29,
@@ -320,7 +320,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "frumento trinciato (manze)",
     "category": "forage",
     "pricePerKg": 0.09,
-    "moisturePct": 68.6,
+    "moisturePct": 68.57,
     "nutrients": {
       "proteina": 8.43,
       "ee": 2.9,
@@ -338,7 +338,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "mais trinciato aziendale",
     "category": "forage",
     "pricePerKg": 0.07,
-    "moisturePct": 77,
+    "moisturePct": 76.97,
     "nutrients": {
       "proteina": 7.04,
       "ee": 2.91,
@@ -356,7 +356,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "mais trinciato aziendale (asciutta)",
     "category": "forage",
     "pricePerKg": 0.07,
-    "moisturePct": 75.5,
+    "moisturePct": 75.46,
     "nutrients": {
       "proteina": 6.85,
       "ee": 2.59,
@@ -410,7 +410,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "mix 1 medica 2 frumento",
     "category": "forage",
     "pricePerKg": 0.24,
-    "moisturePct": 12.7,
+    "moisturePct": 12.6809,
     "nutrients": {
       "proteina": 10.42,
       "ee": 1.85,
@@ -482,7 +482,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "mais 70/30",
     "category": "concentrate",
     "pricePerKg": 0.3,
-    "moisturePct": 12.1,
+    "moisturePct": 12.07,
     "nutrients": {
       "proteina": 8.46,
       "ee": 3.28,
@@ -500,7 +500,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "mangime milk life progeo",
     "category": "concentrate",
     "pricePerKg": 0.45,
-    "moisturePct": 12.4,
+    "moisturePct": 12.44,
     "nutrients": {
       "proteina": 20.5,
       "ee": 4.14,
@@ -554,7 +554,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "nucleo enzian",
     "category": "concentrate",
     "pricePerKg": 0.8,
-    "moisturePct": 7.2,
+    "moisturePct": 7.24,
     "nutrients": {
       "proteina": 23.7,
       "ee": 15.7,
@@ -608,7 +608,7 @@ export const FEEDS_SEED: FeedSeed[] = [
     "name": "soia estrazione",
     "category": "concentrate",
     "pricePerKg": 0,
-    "moisturePct": 11.2,
+    "moisturePct": 11.18,
     "nutrients": {
       "proteina": 49.08,
       "ee": 2.1,

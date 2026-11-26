@@ -285,7 +285,7 @@ function parseSheet(ws) {
       name: String(name).trim().replace(/\s+/g, " "),
       category,
       pricePerKg: typeof priceRaw === "number" ? round(priceRaw, 3) : 0,
-      moisturePct: typeof moistRaw === "number" ? round(moistRaw * 100, 1) : 0,
+      moisturePct: typeof moistRaw === "number" ? round(moistRaw * 100, 4) : 0,
       nutrients,
     });
   }
@@ -436,7 +436,7 @@ function buildSheetReference(sheet) {
       (sum, r) => sum + r.kgAsFed * feedByName.get(r.name).dmFactor,
       0,
     ),
-    3,
+    5,
   );
   const costPerHead = round(
     quantities.reduce(

@@ -6,7 +6,7 @@
       {
         "id": "f0",
         "name": "mais trinciato aziendale",
-        "dmFactor": 0.23,
+        "dmFactor": 0.2303,
         "nutrients": {
           "proteina": 7.04,
           "ee": 2.91,
@@ -24,7 +24,7 @@
       {
         "id": "f1",
         "name": "fieno frumento",
-        "dmFactor": 0.911,
+        "dmFactor": 0.9109,
         "nutrients": {
           "proteina": 9.98,
           "ee": 2.11,
@@ -42,7 +42,7 @@
       {
         "id": "f2",
         "name": "frumento trinciato",
-        "dmFactor": 0.23,
+        "dmFactor": 0.2303,
         "nutrients": {
           "proteina": 9.26,
           "ee": 2.29,
@@ -60,7 +60,7 @@
       {
         "id": "f3",
         "name": "fieno fasciato 1 taglio aziendale",
-        "dmFactor": 0.768,
+        "dmFactor": 0.7678,
         "nutrients": {
           "proteina": 7.92,
           "ee": 2.74,
@@ -78,7 +78,7 @@
       {
         "id": "f4",
         "name": "fieno fasciato 2 taglio aziendale",
-        "dmFactor": 0.54,
+        "dmFactor": 0.5398,
         "nutrients": {
           "proteina": 13.12,
           "ee": 1.95,
@@ -168,7 +168,7 @@
       {
         "id": "f9",
         "name": "mais 70/30",
-        "dmFactor": 0.879,
+        "dmFactor": 0.8793,
         "nutrients": {
           "proteina": 8.46,
           "ee": 3.28,
@@ -186,7 +186,7 @@
       {
         "id": "f10",
         "name": "nucleo enzian",
-        "dmFactor": 0.928,
+        "dmFactor": 0.9276,
         "nutrients": {
           "proteina": 23.7,
           "ee": 15.7,
@@ -240,7 +240,7 @@
       {
         "id": "f13",
         "name": "mangime milk life progeo",
-        "dmFactor": 0.876,
+        "dmFactor": 0.8756,
         "nutrients": {
           "proteina": 20.5,
           "ee": 4.14,
@@ -423,7 +423,7 @@
     },
     "totalAsFed": 48.3,
     "workbookTotalDM": 23.10246,
-    "solverTotalDM": 23.095,
+    "solverTotalDM": 23.10246,
     "costPerHead": 9.885,
     "groupTotal": 9.885,
     "totalLoadAsFed": 48.3,
@@ -437,7 +437,7 @@
       {
         "id": "f0",
         "name": "mais trinciato aziendale",
-        "dmFactor": 0.245,
+        "dmFactor": 0.2454,
         "nutrients": {
           "proteina": 6.85,
           "ee": 2.59,
@@ -455,7 +455,7 @@
       {
         "id": "f1",
         "name": "fieno frumento",
-        "dmFactor": 0.911,
+        "dmFactor": 0.9109,
         "nutrients": {
           "proteina": 9.98,
           "ee": 2.11,
@@ -473,7 +473,7 @@
       {
         "id": "f2",
         "name": "frumento trinciato",
-        "dmFactor": 0.23,
+        "dmFactor": 0.2303,
         "nutrients": {
           "proteina": 9.26,
           "ee": 2.29,
@@ -491,7 +491,7 @@
       {
         "id": "f3",
         "name": "fieno fasciato 1 taglio aziendale",
-        "dmFactor": 0.768,
+        "dmFactor": 0.7678,
         "nutrients": {
           "proteina": 7.92,
           "ee": 2.74,
@@ -509,7 +509,7 @@
       {
         "id": "f4",
         "name": "fieno fasciato 2 taglio aziendale",
-        "dmFactor": 0.848,
+        "dmFactor": 0.8485,
         "nutrients": {
           "proteina": 11.01,
           "ee": 2.73,
@@ -581,7 +581,7 @@
       {
         "id": "f8",
         "name": "mais 70/30",
-        "dmFactor": 0.879,
+        "dmFactor": 0.8793,
         "nutrients": {
           "proteina": 8.46,
           "ee": 3.28,
@@ -599,7 +599,7 @@
       {
         "id": "f9",
         "name": "soia estrazione",
-        "dmFactor": 0.888,
+        "dmFactor": 0.8882,
         "nutrients": {
           "proteina": 49.08,
           "ee": 2.1,
@@ -708,7 +708,7 @@
     },
     "totalAsFed": 19.9,
     "workbookTotalDM": 6.6545,
-    "solverTotalDM": 6.648,
+    "solverTotalDM": 6.6545,
     "costPerHead": 2.176,
     "groupTotal": 217.6,
     "totalLoadAsFed": 1990,
@@ -722,7 +722,7 @@
       {
         "id": "f0",
         "name": "mais trinciato aziendale",
-        "dmFactor": 0.245,
+        "dmFactor": 0.2454,
         "nutrients": {
           "proteina": 6.85,
           "ee": 2.59,
@@ -740,7 +740,7 @@
       {
         "id": "f1",
         "name": "fieno frumento",
-        "dmFactor": 0.911,
+        "dmFactor": 0.9109,
         "nutrients": {
           "proteina": 9.98,
           "ee": 2.11,
@@ -758,7 +758,7 @@
       {
         "id": "f2",
         "name": "frumento trinciato",
-        "dmFactor": 0.314,
+        "dmFactor": 0.3143,
         "nutrients": {
           "proteina": 8.43,
           "ee": 2.9,
@@ -776,7 +776,7 @@
       {
         "id": "f3",
         "name": "fieno fasciato 1 taglio aziendale",
-        "dmFactor": 0.558,
+        "dmFactor": 0.5577,
         "nutrients": {
           "proteina": 11.63,
           "ee": 2.84,
@@ -794,7 +794,7 @@
       {
         "id": "f4",
         "name": "fieno fasciato 2 taglio aziendale",
-        "dmFactor": 0.766,
+        "dmFactor": 0.7664,
         "nutrients": {
           "proteina": 13.38,
           "ee": 3.16,
@@ -830,7 +830,7 @@
       {
         "id": "f6",
         "name": "mix 1 medica 2 frumento",
-        "dmFactor": 0.873,
+        "dmFactor": 0.8732,
         "nutrients": {
           "proteina": 10.42,
           "ee": 1.85,
@@ -884,7 +884,7 @@
       {
         "id": "f9",
         "name": "mais 70/30",
-        "dmFactor": 0.879,
+        "dmFactor": 0.8793,
         "nutrients": {
           "proteina": 8.46,
           "ee": 3.28,
@@ -975,7 +975,7 @@
     },
     "totalAsFed": 10,
     "workbookTotalDM": 7.06836,
-    "solverTotalDM": 7.068,
+    "solverTotalDM": 7.06836,
     "costPerHead": 1.992,
     "groupTotal": 199.2,
     "totalLoadAsFed": 1000,
