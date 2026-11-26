@@ -2709,7 +2709,7 @@ def _scenario_export_rows(db, farm_id, base, scenario_ids):
             ),
             "status": snapshot["status"],
         }
-        for code in ("aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF"):
+        for code in _NUTRIENT_CODES:
             base_value = (base_snapshot.get("nutrients") or {}).get(code)
             scenario_value = (snapshot.get("nutrients") or {}).get(code)
             row[f"base_{code}"] = base_value
@@ -2735,7 +2735,7 @@ def _add_scenari_sheet(workbook, rows):
         ("status", "Stato"),
     ] + [
         (f"{prefix}_{code}", f"{label} {code}")
-        for code in ("aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF")
+        for code in _NUTRIENT_CODES
         for prefix, label in (("base", "Base"), ("scenario", "Scenario"), ("delta", "Delta"))
     ]
     for column, (_, header) in enumerate(headers, start=1):

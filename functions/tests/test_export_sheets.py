@@ -54,8 +54,8 @@ def test_scenari_and_sensibilita_sheets_render():
         "SS base", "SS scenario", "Delta SS", "Costo salvato",
         "Salvato il", "Variato", "Stato",
     ]
-    assert sheet.max_column == 26
-    assert sheet.cell(1, 12).value == "Base aNDF"
+    assert sheet.max_column == 62
+    assert sheet.cell(1, 12).value == "Base umidita"
     assert sheet.cell(2, 4).value == -0.2
     assert sheet.cell(3, 4).value == 0.3
     sensitivity = workbook["Sensibilità"]
