@@ -2852,7 +2852,7 @@ def export_comparison(req: https_fn.CallableRequest):
 
 @scheduler_fn.on_schedule(
     schedule="every 24 hours",
-    time_zone="Etc/UTC",
+    timezone=scheduler_fn.Timezone("Etc/UTC"),
     region="europe-west1",
     memory=options.MemoryOption.MB_256,
     timeout_sec=120,
