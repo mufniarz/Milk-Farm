@@ -2523,7 +2523,14 @@ def _confronto_row(source, status, diagnostics_from, snapshot, warnings=None, un
         "totalAsFed": snapshot.get("totalAsFed"),
         "totalDM": snapshot.get("totalDM"),
         "totalCost": snapshot.get("totalCost"),
-        **{code: (snapshot.get("nutrients") or {}).get(code) for code in _NUTRIENT_CODES},
+        **{
+            code: (
+                snapshot.get("nutrients")
+                or snapshot.get("nutrientAnalysis")
+                or {}
+            ).get(code)
+            for code in _NUTRIENT_CODES
+        },
         "warnings": _format_warnings(warnings or snapshot.get("warnings", [])),
         "unreachableTargets": _format_warnings(unreachable or []),
     }

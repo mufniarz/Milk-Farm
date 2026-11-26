@@ -26,8 +26,16 @@ def test_infeasible_cells_are_na():
     assert len(headers) == 25
     assert headers[2] == "Diagnostica da"
     assert headers[3] == "Totale tal quale"
-    assert "proteina" in headers
+    assert headers[6:23] == [
+        "umidita", "proteina", "ee", "amido", "zuccheri", "ceneri",
+        "aNDF", "uNDF", "NFC", "ADF", "ADL", "pectine",
+        "ADF_aNDF", "uNDF_aNDF", "emicellulosa", "foraggiPct",
+        "concentratiPct",
+    ]
     assert headers[-2:] == ["Avvisi", "Obiettivi non raggiungibili"]
+    assert sum(
+        1 for row in sheet.iter_rows() for cell in row if cell.value == "=NA()"
+    ) == 20
     assert sheet.cell(row=2, column=3).value == "workbook"
     assert sheet.cell(row=4, column=3).value == "relaxed-fallback"
     strict_row = 4
