@@ -55,6 +55,7 @@ import { TargetService } from '../../core/services/target.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
 import { ScenarioService } from '../../core/services/scenario.service';
 import { buildBuilderScenarioPayload } from '../../core/utils/scenario-payload';
+import { loadScenarioFlow } from '../../core/utils/scenario-load-flow';
 import { ScenarioDraftController } from '../../core/services/scenario-draft-controller';
 import { TARGET_RANGES } from '../../core/data/initial-data';
 import { ChartData, ChartType } from 'chart.js';
@@ -1227,21 +1228,23 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     const id = this.route.snapshot.queryParamMap.get('scenario');
     const farmId = this.farmContext.activeFarmId();
     if (!id || !farmId) return;
-    if (this.scenarioDraftController.dirty() &&
-        !confirm(this.translate.instant('RECIPES.DISCARD_CHANGES'))) {
-      return;
-    }
-    const row = await this.scenarioService.get(farmId, id);
-    if (!row) return;
-    const lines = new Map((row.baseLines ?? []).map((line) => [line.feedId, line.kgAsFed]));
-    this.feedEntries.update((entries) =>
-      entries.map((entry) => ({
-        ...entry,
-        selected: lines.has(entry.feed.id ?? ''),
-        kgAsFed: lines.get(entry.feed.id ?? '') ?? entry.kgAsFed,
-      })),
-    );
-    this.scenarioDraftController.load(row.changes);
+    await loadScenarioFlow({
+      isDirty: () => this.scenarioDraftController.dirty(),
+      confirmDiscard: () =>
+        confirm(this.translate.instant('RECIPES.DISCARD_CHANGES')),
+      getScenario: () => this.scenarioService.get(farmId, id),
+      applyBaseLines: (baseLines) => {
+        const lines = new Map(baseLines.map((line) => [line.feedId, line.kgAsFed]));
+        this.feedEntries.update((entries) =>
+          entries.map((entry) => ({
+            ...entry,
+            selected: lines.has(entry.feed.id ?? ''),
+            kgAsFed: lines.get(entry.feed.id ?? '') ?? entry.kgAsFed,
+          })),
+        );
+      },
+      loadChanges: (changes) => this.scenarioDraftController.load(changes),
+    });
   }
 
   clearScenarioChanges(): void {
