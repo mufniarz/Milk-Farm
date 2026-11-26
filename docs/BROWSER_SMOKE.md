@@ -70,3 +70,12 @@ semicolon filter and rendered in LibreOffice set to Italian:
 - fixture values are integers, so comma-decimal rendering is not exercised
   by this fixture (the exporter test covers comma decimals separately);
 - screenshot: `docs/screenshots/accuracy-smoke-it.png`.
+
+
+## CSV comma-decimal fixture (2026-11-27)
+
+`docs/screenshots/accuracy-decimals.csv` uses semicolons and comma decimals.
+LibreOffice imported it into columns, but its CSV filter rendered `100,5` as
+`100.5` (document locale en-US despite the GUI locale). So this fixture proves
+delimiter parsing, **not** comma-decimal display. Screenshot:
+`docs/screenshots/accuracy-decimals-it.png`.

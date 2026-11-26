@@ -85,3 +85,10 @@ Keep the previous functions revision and the previous rules release. A
 rollback of functions is a redeploy of the prior source revision; a rules
 rollback is the prior rules file. There is no staging project; production is
 the only environment and the smoke script is the gate.
+
+
+## Failure retention
+
+`functions/retention.py` (`should_expire_failure`) defines the 90-day rule:
+resolved/dead failures expire, except `manual-adjustment` and `written-off`.
+The scheduled cleanup function and Firestore TTL policy are not wired yet.
