@@ -2614,6 +2614,60 @@ def _format_warnings(warnings):
     )
 
 
+def _sensitivity_columns(snapshot):
+    if snapshot.get("status") == "infeasible" or not snapshot.get("lines"):
+        return {f"feed_top{slot}": None for slot in (1, 2, 3)} | {
+            f"delta_top{slot}_{shock}": None
+            for slot in (1, 2, 3)
+            for shock in ("+5", "-5", "+10", "-10")
+        }
+    ranking = sorted(
+        (
+            {
+                "feedId": line["feedId"],
+                "contribution": line["unitCostPerKgAsFed"] * line["kgAsFed"],
+                "line": line,
+            }
+            for line in snapshot["lines"]
+        ),
+        key=lambda item: (-item["contribution"], item["feedId"]),
+    )[:3]
+    result = {}
+    for slot in (1, 2, 3):
+        item = ranking[slot - 1] if len(ranking) >= slot else None
+        result[f"feed_top{slot}"] = item["feedId"] if item else None
+        for shock in ("+5", "-5", "+10", "-10"):
+            if not item:
+                result[f"delta_top{slot}_{shock}"] = None
+            else:
+                pct = int(shock) / 100
+                result[f"delta_top{slot}_{shock}"] = (
+                    item["line"]["unitCostPerKgAsFed"] * item["line"]["kgAsFed"] * pct
+                )
+    return result
+
+
+def _add_sensibilita_sheet(workbook, rows):
+    sheet = workbook.create_sheet("Sensibilità")
+    headers = ["Scenario"]
+    for slot in (1, 2, 3):
+        headers.append(f"feed_top{slot}")
+        headers += [
+            f"delta_top{slot}_+5%", f"delta_top{slot}_-5%",
+            f"delta_top{slot}_+10%", f"delta_top{slot}_-10%",
+        ]
+    for column, header in enumerate(headers, start=1):
+        sheet.cell(row=1, column=column, value=header).font = Font(bold=True)
+    for row_index, row in enumerate(rows, start=2):
+        sheet.cell(row=row_index, column=1, value=row["scenario"])
+        for column, header in enumerate(headers[1:], start=2):
+            key = header.replace("%", "")
+            value = row.get(key)
+            cell = sheet.cell(row=row_index, column=column, value="=NA()" if value is None else value)
+            if header.startswith("delta_"):
+                cell.number_format = '€ #,##0.000'
+
+
 def _scenario_export_rows(db, farm_id, base, scenario_ids):
     from export_validation import validate_scenario_selection
     from scenario import apply_scenario
@@ -2634,15 +2688,15 @@ def _scenario_export_rows(db, farm_id, base, scenario_ids):
     rows = []
     for data in docs:
         snapshot = apply_scenario(base, data.get("changes") or {})
-        rows.append(
-            {
-                "scenario": data.get("name", data["_id"]),
-                "base_cost": base_snapshot["totalCost"],
-                "scenario_cost": snapshot["totalCost"],
-                "delta_cost": snapshot["totalCost"] - base_snapshot["totalCost"],
-                "status": snapshot["status"],
-            }
-        )
+        row = {
+            "scenario": data.get("name", data["_id"]),
+            "base_cost": base_snapshot["totalCost"],
+            "scenario_cost": snapshot["totalCost"],
+            "delta_cost": snapshot["totalCost"] - base_snapshot["totalCost"],
+            "status": snapshot["status"],
+        }
+        row.update(_sensitivity_columns(snapshot))
+        rows.append(row)
     return rows
 
 
@@ -2725,6 +2779,7 @@ def export_comparison(req: https_fn.CallableRequest):
         from openpyxl import load_workbook
         workbook = load_workbook(BytesIO(content))
         _add_scenari_sheet(workbook, scenario_rows)
+        _add_sensibilita_sheet(workbook, scenario_rows)
         buffer = BytesIO()
         workbook.save(buffer)
         content = buffer.getvalue()
