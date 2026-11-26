@@ -659,5 +659,5 @@ those observed values. `check:calculator` passes at current tolerances.
 
 ## Current baseline
 
-Full gates: **80 pytest / 67 Karma / 22 rules** on `b850989`; CI green.
-`04c3e72` is docs-only (verified by `git diff --stat`).
+Full gates: **80 pytest / 67 Karma / 22 rules** on `2651a3c` (re-run after
+the docs-only rounds; no code change since `b850989`).
