@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+if [ -x functions/venv/bin/python ]; then
+  (cd functions && ./venv/bin/python -m pytest tests/test_export_a1.py tests/test_retention.py -q)
+fi
