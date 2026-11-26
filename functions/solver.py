@@ -8,6 +8,7 @@ from pulp import LpProblem, LpMinimize, LpVariable, lpSum, PULP_CBC_CMD, constan
 
 FIBRE_CODES = {"aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF"}
 BOUNDARY_EPS = 0.001
+VIOLATION_GUARD = 0.0002
 
 
 def solve_ration(feeds, targets, constraints, mode="relaxed"):
@@ -236,7 +237,7 @@ def classify_target(code, value, min_value, max_value):
     Shared by the solver's relaxed warnings. The TS scenario classifier uses
     the same 0.001 boundary rule; the parity fixture pins both.
     """
-    if min_value is not None and value < min_value - 1e-4:
+    if min_value is not None and value < min_value - VIOLATION_GUARD:
         return {
             "code": code,
             "value": value,
@@ -244,7 +245,7 @@ def classify_target(code, value, min_value, max_value):
             "max": max_value,
             "issue": "below_min",
         }
-    if max_value is not None and value > max_value + 1e-4:
+    if max_value is not None and value > max_value + VIOLATION_GUARD:
         return {
             "code": code,
             "value": value,

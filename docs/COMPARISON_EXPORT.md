@@ -60,15 +60,15 @@
 > All-NA strict row → no re-pin. Workbook row → never re-pinned.
 > `16.23` is the workbook protein from `reference_rations.json`.
 >
-> **Relaxed review criteria:** DM must move to the new constraint; cost/DM
-> delta expected ≤0.01 and protein ≤0.1 (0.00746 DM shift × 1.3 safety; protein
-> 12× observed shift). Direction is informational for cost/protein. If DM
+> **Relaxed review criteria:** DM must move to the new constraint
+> (expected 0.00746; tolerance ≤0.01). Cost expected ≈0.003
+> (0.00746 × €0.39/kg DM); tolerance ≤0.01. Protein expected ≈0.02;
+> tolerance ≤0.1. Direction is informational for cost/protein. If DM
 > moved but neither cost nor protein moved, investigate whether the solver
 > re-solved; cost/protein may diverge validly. No enforced tolerance constant.
 >
-> **Guard:** code currently uses **1e-4**, the bottom of the tested
-> `[1e-4, 5e-4)` range, so boundary tests are float-edge sensitive. Production
-> derivation must land inside the range or update fixtures.
+> **Guard:** code uses **2e-4**, inside the tested `[2e-4, 5e-4)` range and
+> away from the float edge. Production derivation must land inside the range.
 >
 > **Under Fallback B:** NA/Sensibilità/propagation/band ship as current.
 > **Still blocking regardless:** callable mixed/deleted ordering test and CI

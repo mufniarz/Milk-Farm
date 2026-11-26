@@ -10,6 +10,7 @@ import {
 } from '../models/scenario.model';
 
 const BOUNDARY_EPS = 0.001;
+const VIOLATION_GUARD = 0.0002;
 
 /**
  * Apply a saved scenario's changes to a base ration and recompute everything
@@ -99,7 +100,7 @@ export function classifyScenarioTarget(
 ): { status: ScenarioCompliance; warning?: ScenarioWarning } {
   const min = target.minValue;
   const max = target.maxValue;
-  if (min !== null && value < min - 1e-4) {
+  if (min !== null && value < min - VIOLATION_GUARD) {
     return {
       status: 'below_min',
       warning: {
@@ -111,7 +112,7 @@ export function classifyScenarioTarget(
       },
     };
   }
-  if (max !== null && value > max + 1e-4) {
+  if (max !== null && value > max + VIOLATION_GUARD) {
     return {
       status: 'above_max',
       warning: {

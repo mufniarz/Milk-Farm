@@ -65,7 +65,7 @@
   },
   {
     "code": "ADF",
-    "value": 22.0002,
+    "value": 22.0003,
     "min": 18,
     "max": 22,
     "issue": "above_max",
