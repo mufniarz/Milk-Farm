@@ -15,10 +15,17 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  Timestamp,
+  collection,
   doc,
   getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'demo-milk-farm';
@@ -498,5 +505,42 @@ test('a feeder cannot read a scenario', async () => {
   const feeder = dbFor('feeder');
   await assertFails(
     getDoc(doc(feeder, 'farms', 'f1', 'scenarios', 's1')),
+  );
+});
+
+
+test('scenario list query excludes deleted and orders newest first', async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore();
+    const scenarios = collection(adminDb, 'farms', 'f1', 'scenarios');
+    await setDoc(doc(scenarios, 'old'), {
+      farmId: 'f1',
+      deletedAt: null,
+      createdAt: Timestamp.fromMillis(1000),
+    });
+    await setDoc(doc(scenarios, 'new'), {
+      farmId: 'f1',
+      deletedAt: null,
+      createdAt: Timestamp.fromMillis(2000),
+    });
+    await setDoc(doc(scenarios, 'deleted'), {
+      farmId: 'f1',
+      deletedAt: Timestamp.fromMillis(3000),
+      createdAt: Timestamp.fromMillis(3000),
+    });
+  });
+
+  const db = dbFor('member');
+  const rows = await getDocs(
+    query(
+      collection(db, 'farms', 'f1', 'scenarios'),
+      where('deletedAt', '==', null),
+      orderBy('createdAt', 'desc'),
+      limit(200),
+    ),
+  );
+  assert.deepEqual(
+    rows.docs.map((entry) => entry.id),
+    ['new', 'old'],
   );
 });
