@@ -477,18 +477,24 @@ test('registration creates the farm before the owner membership', async () => {
 });
 
 
-test('scenarios are operator-read and callable-written only', async () => {
+test('an admin can read a scenario', async () => {
   const member = dbFor('member');
   await assertSucceeds(
     getDoc(doc(member, 'farms', 'f1', 'scenarios', 's1')),
   );
+});
+
+test('a client cannot write a scenario', async () => {
+  const member = dbFor('member');
   await assertFails(
     setDoc(doc(member, 'farms', 'f1', 'scenarios', 's1'), {
       farmId: 'f1',
       name: 'client write',
     }),
   );
+});
 
+test('a feeder cannot read a scenario', async () => {
   const feeder = dbFor('feeder');
   await assertFails(
     getDoc(doc(feeder, 'farms', 'f1', 'scenarios', 's1')),

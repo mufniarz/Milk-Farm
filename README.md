@@ -334,6 +334,15 @@ The Stage 2 comparison is a separate XLSX `Confronto` sheet (not CSV) with
 `it-IT` LibreOffice/Excel check. See
 [`docs/COMPARISON_EXPORT.md`](docs/COMPARISON_EXPORT.md).
 
+### Parity fixtures are gates
+
+`src/assets/boundary-cases.json` and
+`src/assets/scenario-parity-cases.json` are required gates: changing a
+nutrient, the ration calculator, `BOUNDARY_EPS`, or `applyScenario` must
+regenerate them, and CI fails if the Karma/pytest parity assertions do not
+hold. They caught the TS strict-`<` vs Python 1e-4 drift and the scenario
+nutrient/line drift.
+
 ## Follow-up deadlines
 
 - **Browser smoke** — done; CSV-in-Excel, stale-heartbeat banner and 360 px

@@ -151,14 +151,17 @@ def apply_scenario(base, changes, now=None):
         "totalDM": result["totalDM"],
         "totalCost": result["totalCost"],
         "nutrients": result["nutrients"],
-        "lines": [
-            {
-                "feedId": feed["id"],
-                "kgAsFed": feed["kgAsFed"],
-                "unitCostPerKgAsFed": feed["pricePerKg"],
-            }
-            for feed in feeds
-        ],
+        "lines": sorted(
+            [
+                {
+                    "feedId": feed["id"],
+                    "kgAsFed": feed["kgAsFed"],
+                    "unitCostPerKgAsFed": feed["pricePerKg"],
+                }
+                for feed in feeds
+            ],
+            key=lambda line: line["feedId"],
+        ),
         "targets": targets,
         "compliance": compliance,
         "warnings": warnings,

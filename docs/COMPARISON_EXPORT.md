@@ -160,8 +160,10 @@ is `computed` with warnings, not `infeasible`. The `Stato` column in
 
 - `scenario`, `base_source` (header `Base di confronto`), `status`,
   `diagnostics_from`, `computed_at`, `diverged`; `Fonte` is a
-  `Confronto`-only column
-  (workbook/relaxed/strict) and is not present in `Scenari`;
+  `Confronto`-only column (workbook/relaxed/strict) and is not present in
+  `Scenari`;
+- `lines` sort by `feedId` ascending in both TS and Python, pinned by the
+  parity fixture;
 - `scenario_cost_saved`, `saved_at` — the stored snapshot's cost and save
   time, so a recompute that differs from what the farm saw is readable;
   `NA()` when the snapshot is absent. A `diverged` boolean is true when any
@@ -192,7 +194,8 @@ with the Python `apply_scenario` (`functions/scenario.py`). It shows **current
 truth**: current feed prices, current availability and current target
 overrides. If the farm's overrides changed since the scenario was saved, the
 exported ration reflects the current overrides and `diverged` is true;
-`saved_at` and the stored snapshot remain the audit record. The server runtime
+`saved_at` and the stored snapshot remain the audit record. `diverged` also
+covers `lines`, so a feed price change is visible even when totals coincide. The server runtime
 stays Python: no second functions runtime. The TS `applyScenario` is the
 client preview and is pinned to the Python implementation by the shared value
 fixture. The export formatter reads the server recompute; a stale browser
@@ -242,9 +245,11 @@ An infeasible scenario is `NA()` in every numeric cell, with
 ### Sensitivity
 
 Sensitivity is **per scenario** and lives in a third sheet, `Sensibilità`:
-one row per scenario, **12 delta-cost columns** (top 3 ingredients × ±5%/±10%
-price shocks), plus the scenario/base identification. Rows-per-shock is
-rejected for readability.
+one row per scenario, **15 columns**: `feed_top1`, four delta columns
+(`+5%`, `−5%`, `+10%`, `−10%`), then `feed_top2` + four, `feed_top3` + four.
+The feed-id columns make each row self-describing even when the top 3 differ
+between scenarios. Fewer than 3 feeds → the missing slot and its four deltas
+are `NA()`. Rows-per-shock is rejected for readability.
 
 - **Input:** the server `ScenarioSnapshot` (same recompute as `Scenari`),
   including its `lines` array `{feedId, kgAsFed, unitCostPerKgAsFed}`; not
@@ -258,14 +263,16 @@ rejected for readability.
   `NA()`.
 - Only saved scenarios; the builder's unsaved state is not exported. The pure
   function is `topThreeByCostContribution`; price shocks are price-only, not
-  inclusion.
+  inclusion. An infeasible scenario keeps its row with `Stato = infeasible`
+  and 12 `NA()` deltas.
 
 ## `export_comparison` signature
 
-`export_comparison(baseSource, baseRecipeId, scenarioIds?, mode)` returns one
-XLSX with `Confronto`, `Scenari` and `Sensibilità`. An empty/omitted
-`scenarioIds` returns `Confronto` only. `mode` is `relaxed` (default) or
-`strict`; scenarios are not solver modes.
+`export_comparison(baseSource, baseRecipeId, scenarioIds?)` returns one XLSX
+with `Confronto`, `Scenari` and `Sensibilità`. An empty/omitted `scenarioIds`
+returns `Confronto` only. There is no `mode` argument: `Confronto` always
+contains workbook + relaxed + strict, and scenarios are always `computed`.
+The callable returns a signed Storage URL, same pattern as `export_recipe`.
 
 ## Build acceptance tests
 
@@ -304,7 +311,12 @@ The first build must assert:
   `{ scenarioId, snapshot, serverTime }` and errors
   `{ code, detail }` (`invalid_override`, `unknown_feed`, `mixed_base`, ...);
 - UI: builder creates; `/scenarios` lists all farm scenarios, sorted by
-  `createdAt` (single-field index); export selects from the page;
+  `createdAt` (single-field auto-index; no composite entry); export selects
+  from the page;
+- `scenario` name is required (non-empty);
+- the server snapshot is canonical; `save_scenario` returns it and the client
+  replaces its preview, so a version-skewed preview cannot become the stored
+  record;
 - `savedAt` is server time, never the payload;
 - base recipe deleted: scenarios remain, replay returns
   `status: infeasible`, `reason: base-deleted`; export row is `NA()` with a

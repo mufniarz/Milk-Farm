@@ -63,11 +63,13 @@ export function applyScenario(
     totalDM: result.totalDM,
     totalCost: result.totalCost,
     nutrients: result.nutrients,
-    lines: feeds.map((feed) => ({
-      feedId: feed.id,
-      kgAsFed: feed.kgAsFed,
-      unitCostPerKgAsFed: feed.pricePerKg,
-    })),
+    lines: feeds
+      .map((feed) => ({
+        feedId: feed.id,
+        kgAsFed: feed.kgAsFed,
+        unitCostPerKgAsFed: feed.pricePerKg,
+      }))
+      .sort((a, b) => a.feedId.localeCompare(b.feedId)),
     targets,
     compliance,
     warnings,
