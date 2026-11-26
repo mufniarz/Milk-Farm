@@ -94,5 +94,21 @@
     "max": 22,
     "issue": "met",
     "boundary": ""
+  },
+  {
+    "code": "ADF",
+    "value": 17.9999,
+    "min": 18,
+    "max": 22,
+    "issue": "at_boundary",
+    "boundary": "min"
+  },
+  {
+    "code": "ADF",
+    "value": 36.4999,
+    "min": 29,
+    "max": 36.5,
+    "issue": "at_boundary",
+    "boundary": "max"
   }
 ]
