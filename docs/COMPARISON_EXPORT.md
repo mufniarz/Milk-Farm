@@ -426,9 +426,12 @@ Do not use the export in a client conversation until:
    headers) — distinct from the accuracy CSV check;
 2. strict returns both `unreachableTargets` and `warnings` (done);
 3. boundary warnings are present (done);
-4. the workbook row is implemented with group-matching ideals and the same
+4. the export callable calls `validate_scenario_selection` **before**
+   building; a mixed-base or deleted selection returns the error and produces
+   no workbook and no signed URL (test required);
+5. the workbook row is implemented with group-matching ideals and the same
    classifier;
-5. the four-decimal decision is applied (fix before use, or footnote present
+6. the four-decimal decision is applied (fix before use, or footnote present
    and scheduled). The fix regenerates `boundary-cases.json` and
    `scenario-parity-cases.json`; CI must pass before deploy.
 
