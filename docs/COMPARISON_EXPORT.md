@@ -463,3 +463,22 @@ Screenshots: `docs/screenshots/export-smoke-confronto.png`,
 
 Signed URL is still unverified: no Firebase auth/Storage session in this
 environment.
+
+
+## Signed URL smoke (2026-11-27, nicola-milk-farm = staging)
+
+- Authentication: test Firebase user, `export_comparison()` no args.
+- Response: 3 rows + signed URL, HTTP 200.
+- Download: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+  5,389 bytes, valid XLSX.
+- Workbook: one `Confronto` sheet; workbook 23.10246/€9.885; relaxed
+  23.095/€9.0062; strict `#N/A`; cost format `€ #,##0.000`.
+- Screenshot: `docs/screenshots/export-prod-confronto.png`.
+- The renderer is en-US, so `it-IT` (`€ 9.885,000`) is still unverified.
+
+**Open anomaly:** direct scenario gets succeeded with the test user, but
+Firestore REST `runQuery` on scenarios (and other farm collections) returned
+`PERMISSION_DENIED`, while the Admin SDK query returned the expected
+`smoke-live-2`, `smoke-live-1` order with the deleted row excluded. This may be
+a REST query/rules interaction, not the app SDK path; it needs a browser check
+of `/scenarios` before the page is called client-ready.

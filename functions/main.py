@@ -16,6 +16,8 @@ from firebase_functions import firestore_fn, https_fn, options, scheduler_fn
 from firebase_admin import firestore, initialize_app, storage
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+import google.auth
+from google.auth.transport import requests as google_requests
 
 from solver import solve_ration
 
@@ -2805,5 +2807,20 @@ def export_comparison(req: https_fn.CallableRequest):
         content,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    url = blob.generate_signed_url(expiration=timedelta(minutes=15))
+    credentials, _ = google.auth.default()
+    credentials.refresh(google_requests.Request())
+    service_account_email = getattr(credentials, "service_account_email", None)
+    if not service_account_email or service_account_email == "default":
+        request = google_requests.Request()
+        response = request(
+            url="http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email",
+            headers={"Metadata-Flavor": "Google"},
+        )
+        service_account_email = response.text.strip()
+    url = blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=15),
+        service_account_email=service_account_email,
+        access_token=credentials.token,
+    )
     return {"url": url, "rows": len(rows)}
