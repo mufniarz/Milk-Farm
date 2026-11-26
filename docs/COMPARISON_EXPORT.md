@@ -650,8 +650,14 @@ the output precision.
 
 Commit 1 (6b182d9) carried unrounded moisture and 5dp solver DM. Observed
 reference values: hand/workbook DM **23.10246** (was 23.095); relaxed solver
-DM 23.102, cost 9.0069, protein 15.8014. The relaxed DM is the solver's
-3-decimal output (sheet format `0.000`); the underlying constraint is
-23.10246 at 5 dp. Cost rose only 0.0007 because the relaxed solver rebalanced
+DM 23.102, cost 9.0069, protein 15.8014. **Signed convention:** solver rows emit DM at **3 dp** (sheet format
+`0.000`); the workbook row retains **5 dp**. The underlying constraint is
+23.10246. This is intentional, not truncation. Cost rose only 0.0007 because the relaxed solver rebalanced
 toward cheaper ingredients as the constraint tightened. Commit 2 re-pins the A1 goldens to
 those observed values. `check:calculator` passes at current tolerances.
+
+
+## Current baseline
+
+Full gates: **80 pytest / 67 Karma / 22 rules** on `b850989`; CI green.
+`04c3e72` is docs-only (verified by `git diff --stat`).

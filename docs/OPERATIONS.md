@@ -103,3 +103,11 @@ Smoke documents were removed.
 owner has been named. Production deploy is blocked until both exist and one
 synthetic alert is delivered. To close: name operator email + IAM owner, create
 the log alert, deliver a test notification.
+
+
+## Production deferral (2026-11-27)
+
+Production deployment is **deferred pending the alert owner**. This is an
+accepted decision, not an open-ended wait: no production project is created
+until operator email + Monitoring IAM owner are named and one synthetic alert
+is delivered.
