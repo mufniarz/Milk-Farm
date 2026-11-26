@@ -129,3 +129,11 @@ column splitting is verified. LibreOffice's CSV filter renders comma decimals
 with a dot under its document locale, so it cannot prove Excel's decimal
 display. The Excel `it-IT` open is deferred to first user acceptance; the file
 must not be changed on the basis of the LibreOffice render.
+
+
+## Builder DOM spec — accepted gap (2026-11-27)
+
+Deferred to first user acceptance. Existing coverage: `ScenarioDraftController`
+specs, `loadScenarioFlow` specs and `buildBuilderScenarioPayload` spec. There
+is no mounted-panel DOM test for save/load/discard. DOM-level verification must
+be added before any further builder UI change ships.
