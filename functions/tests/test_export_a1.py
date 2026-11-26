@@ -43,7 +43,9 @@ def test_infeasible_cells_are_na():
     ) == 20
     relaxed = sheet[3]
     assert not any(cell.value == "=NA()" for cell in relaxed[6:])
-    assert 14.0 <= relaxed[7].value <= 18.0  # proteina, DM basis; mix not pinned
+    # Deterministic across 10 runs with pinned PuLP/CBC; re-pin only with
+    # a parity review. Protein is % DM, cost EUR/head/day.
+    assert relaxed[7].value == 15.8016
     assert relaxed[5].value == 9.0062  # costo
     assert relaxed[4].value == 23.095  # SS
     unreachable = sheet.cell(row=4, column=25).value
@@ -57,6 +59,16 @@ def test_infeasible_cells_are_na():
         assert len(parts) == 6
         assert parts[4] in {"below_min", "above_max"}
         assert parts[5] == ""
+    warning_lines = sheet.cell(row=3, column=24).value.splitlines()
+    assert warning_lines
+    assert any(line.split("|")[4] == "at_boundary" for line in warning_lines)
+    for line in warning_lines:
+        parts = line.split("|")
+        assert parts[4] in {"below_min", "above_max", "at_boundary"}
+        if parts[4] == "at_boundary":
+            assert parts[5] in {"min", "max"}
+        else:
+            assert parts[5] == ""
     assert sheet.cell(row=2, column=3).value == "workbook"
     assert sheet.cell(row=4, column=3).value == "relaxed-fallback"
     strict_row = 4

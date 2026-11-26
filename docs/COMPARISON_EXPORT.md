@@ -2,7 +2,9 @@
 > `NA()` semantics (error vs string, including the all-NA strict row) and
 > Sensibilità width (15 data + `Scenario` = 16 total) are not signed.
 > Scenari code is blocked until a product owner is assigned and both are
-> recorded here. The proposed 25-column shape below is not a contract change.
+> recorded here. **Fallback:** if unsigned by **2026-12-04**, Scenari is
+> built against the last signed contract (string `n/a`, 16-column
+> Sensibilità, no cross-sheet propagation) with rework risk recorded. The proposed 25-column shape below is not a contract change.
 
 # Comparison export — format and semantics
 
