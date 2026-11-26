@@ -196,7 +196,7 @@
     },
     {
       "collectionGroup": "feedingTriggerFailures",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "status",
@@ -210,7 +210,7 @@
     },
     {
       "collectionGroup": "feedingTriggerFailures",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "status",

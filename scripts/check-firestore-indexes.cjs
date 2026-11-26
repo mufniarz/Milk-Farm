@@ -46,7 +46,11 @@ const required = [
   ['feedingTriggerFailures', [
     { fieldPath: 'status', order: 'ASCENDING', arrayConfig: null },
     { fieldPath: 'deadAt', order: 'ASCENDING', arrayConfig: null },
-  ]],
+  ], 'COLLECTION_GROUP'],
+  ['feedingTriggerFailures', [
+    { fieldPath: 'status', order: 'ASCENDING', arrayConfig: null },
+    { fieldPath: 'resolvedAt', order: 'ASCENDING', arrayConfig: null },
+  ], 'COLLECTION_GROUP'],
   ['feedingTriggerFailures', [
     { fieldPath: 'status', order: 'ASCENDING', arrayConfig: null },
     { fieldPath: 'resolvedAt', order: 'ASCENDING', arrayConfig: null },
