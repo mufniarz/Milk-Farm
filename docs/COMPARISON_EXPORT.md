@@ -52,10 +52,23 @@
 > source of truth). Relaxed row = `9.0062` / `23.095` / `15.8016`. Strict row
 > is all-NA and has no numeric pin.
 >
-> **Re-pin rule:** workbook row is never re-pinned. Relaxed cost/DM/protein
-> have no parity anchor; **no tolerance gate** — record old/new/delta for
-> engineering review. Four-decimal does not change the workbook row's
-> contract values.
+> **General re-pin rule:** any solver row with numeric values is re-pinned.
+> Strict row with numeric values → anchor `9.885`/`23.10246` (workbook).
+> Relaxed row → no parity anchor; record old/new/delta and review.
+> All-NA strict row → no re-pin. Workbook row → never re-pinned.
+> `16.23` is the workbook protein from `reference_rations.json`.
+>
+> **Relaxed review criteria:** cost/DM delta expected ≤0.01; protein ≤0.1;
+> direction must match the DM shift; cost and protein must move together —
+> if only one moves, investigate before merging. `REPIN_REVIEW_TOLERANCE` is
+> defined for reference only and is not enforced.
+>
+> **Guard range locked by tests:** `[1e-4, 5e-4)`; production derivation must
+> land inside it or update fixtures.
+>
+> **Under Fallback B:** NA/Sensibilità/propagation/band ship as current.
+> **Still blocking regardless:** CI determinism of 15.8016 and callable
+> mixed/deleted ordering test.
 >
 > **Fallback B rework scope:** `NA()`→string changes Scenari NA checks;
 > Sensibilità 16→15 changes header/tests; propagation allowed changes
