@@ -87,7 +87,7 @@ not in Angular i18n; an English export is a refactor, not a config switch.
 
 ### Cell formats
 
-- Cost: `€ #,##0.000` → `€ 9.373,000` under `it-IT`; the format code uses
+- Cost: `€ #,##0.000` → `€ 9,373` under `it-IT`; the format code uses
   en-US separators and Excel renders it per locale. Do not rewrite it to
   `€ #.##0,000`.
 - Totals: `0.000` for `totalAsFed` **and** `totalDM`; cost `€ #,##0.000`;
@@ -474,10 +474,27 @@ environment.
 - Workbook: one `Confronto` sheet; workbook 23.10246/€9.885; relaxed
   23.095/€9.0062; strict `#N/A`; cost format `€ #,##0.000`.
 - Screenshot: `docs/screenshots/export-prod-confronto.png`.
-- The renderer is en-US, so `it-IT` (`€ 9.885,000`) is still unverified.
+- The renderer is en-US, so `it-IT` (`€ 9,885`) is still unverified.
 
 **Query check:** the Firestore JS SDK, signed in as the test owner, ran the
 exact `/scenarios` query and returned `smoke-live-2`, `smoke-live-1` (newest
 first, deleted excluded) with no index error. A direct REST `runQuery` with
 the same ID token returned `PERMISSION_DENIED`; that is a REST-specific auth
 quirk, not the app SDK path. Smoke documents were removed.
+
+
+## Italian locale render (2026-11-27)
+
+With LibreOffice's locale set to Italian (Italy), the production workbook
+renders:
+
+- `SS totali`: `23,102` and `23,095`;
+- `Costo`: `€ 9,885` and `€ 9,006`;
+- strict cells: `#N/A`.
+
+Correction to the earlier contract example: `€ 9.885,000` would mean 9,885
+euros with three decimals. The correct Italian render of 9.885 is
+`€ 9,885` (comma decimal, no thousands separator because the value is below
+1,000). The format code `€ #,##0.000` is correct.
+
+Screenshot: `docs/screenshots/export-prod-confronto-it.png`.
