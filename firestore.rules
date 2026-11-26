@@ -140,6 +140,15 @@ service cloud.firestore {
           && resource.data.status == 'draft';
       }
 
+      // ── Scenarios (callable-written; owner/admin/consultant read) ──
+      match /scenarios/{scenarioId} {
+        allow read: if hasRole(
+          farmId,
+          ['owner', 'farmAdmin', 'consultant']
+        );
+        allow write: if false;
+      }
+
       // ── Milk records (economics: owner/admin/consultant only) ──
       match /milkRecords/{recordId} {
         allow read: if hasRole(

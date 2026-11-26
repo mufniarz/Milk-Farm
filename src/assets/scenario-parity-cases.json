@@ -10,8 +10,14 @@
         "moisturePct": 50,
         "nutrients": {
           "proteina": 10,
+          "ee": 2,
+          "amido": 20,
+          "zuccheri": 2,
+          "ceneri": 6,
           "aNDF": 40,
-          "ADF": 25
+          "uNDF": 10,
+          "ADF": 25,
+          "ADL": 3
         },
         "pricePerKg": 0.1,
         "category": "forage",
@@ -23,8 +29,14 @@
         "moisturePct": 10,
         "nutrients": {
           "proteina": 40,
+          "ee": 2,
+          "amido": 10,
+          "zuccheri": 5,
+          "ceneri": 6,
           "aNDF": 10,
-          "ADF": 5
+          "uNDF": 5,
+          "ADF": 5,
+          "ADL": 1
         },
         "pricePerKg": 0.5,
         "category": "concentrate",
@@ -58,9 +70,40 @@
       "changes": {},
       "expected": {
         "status": "computed",
-        "totalAsFed": 12,
+        "totalAsFed": 12.0,
         "totalDM": 6.8,
-        "totalCost": 2,
+        "totalCost": 2.0,
+        "nutrients": {
+          "proteina": 17.9412,
+          "ADL": 2.4706,
+          "amido": 17.3529,
+          "ADF": 19.7059,
+          "zuccheri": 2.7941,
+          "uNDF": 8.6765,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 32.0588,
+          "NFC": 42.0,
+          "emicellulosa": 12.3529,
+          "pectine": 21.8529,
+          "ADF_aNDF": 61.4679,
+          "uNDF_aNDF": 27.0642,
+          "umidita": 43.3333,
+          "foraggiPct": 73.5294,
+          "concentratiPct": 26.4706
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.1
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 2,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "met",
           "aNDF": "met",
@@ -78,9 +121,40 @@
       },
       "expected": {
         "status": "computed",
-        "totalAsFed": 12,
+        "totalAsFed": 12.0,
         "totalDM": 6.8,
-        "totalCost": 3,
+        "totalCost": 3.0,
+        "nutrients": {
+          "proteina": 17.9412,
+          "ADL": 2.4706,
+          "amido": 17.3529,
+          "ADF": 19.7059,
+          "zuccheri": 2.7941,
+          "uNDF": 8.6765,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 32.0588,
+          "NFC": 42.0,
+          "emicellulosa": 12.3529,
+          "pectine": 21.8529,
+          "ADF_aNDF": 61.4679,
+          "uNDF_aNDF": 27.0642,
+          "umidita": 43.3333,
+          "foraggiPct": 73.5294,
+          "concentratiPct": 26.4706
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.2
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 2,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "met",
           "aNDF": "met",
@@ -98,18 +172,61 @@
       },
       "expected": {
         "status": "computed",
-        "totalAsFed": 14,
+        "totalAsFed": 14.0,
         "totalDM": 8.6,
-        "totalCost": 3,
+        "totalCost": 3.0,
+        "nutrients": {
+          "proteina": 22.5581,
+          "ADL": 2.1628,
+          "amido": 15.814,
+          "ADF": 16.6279,
+          "zuccheri": 3.2558,
+          "uNDF": 7.907,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 27.4419,
+          "NFC": 42.0,
+          "emicellulosa": 10.814,
+          "pectine": 22.9302,
+          "ADF_aNDF": 60.5932,
+          "uNDF_aNDF": 28.8136,
+          "umidita": 38.5714,
+          "foraggiPct": 58.1395,
+          "concentratiPct": 41.8605
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.1
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 4,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "above_max",
           "aNDF": "below_min",
           "ADF": "below_min"
         },
         "warnings": [
-          "ADF",
-          "aNDF",
-          "proteina"
+          {
+            "code": "ADF",
+            "issue": "below_min",
+            "boundary": ""
+          },
+          {
+            "code": "aNDF",
+            "issue": "below_min",
+            "boundary": ""
+          },
+          {
+            "code": "proteina",
+            "issue": "above_max",
+            "boundary": ""
+          }
         ]
       }
     },
@@ -125,16 +242,51 @@
       },
       "expected": {
         "status": "computed",
-        "totalAsFed": 12,
+        "totalAsFed": 12.0,
         "totalDM": 6.8,
-        "totalCost": 2,
+        "totalCost": 2.0,
+        "nutrients": {
+          "proteina": 17.9412,
+          "ADL": 2.4706,
+          "amido": 17.3529,
+          "ADF": 19.7059,
+          "zuccheri": 2.7941,
+          "uNDF": 8.6765,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 32.0588,
+          "NFC": 42.0,
+          "emicellulosa": 12.3529,
+          "pectine": 21.8529,
+          "ADF_aNDF": 61.4679,
+          "uNDF_aNDF": 27.0642,
+          "umidita": 43.3333,
+          "foraggiPct": 73.5294,
+          "concentratiPct": 26.4706
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.1
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 2,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "met",
           "aNDF": "below_min",
           "ADF": "met"
         },
         "warnings": [
-          "aNDF"
+          {
+            "code": "aNDF",
+            "issue": "below_min",
+            "boundary": ""
+          }
         ]
       }
     },
@@ -156,18 +308,61 @@
       },
       "expected": {
         "status": "computed",
-        "totalAsFed": 13,
+        "totalAsFed": 13.0,
         "totalDM": 7.7,
         "totalCost": 3.5,
+        "nutrients": {
+          "proteina": 20.5195,
+          "ADL": 2.2987,
+          "amido": 16.4935,
+          "ADF": 17.987,
+          "zuccheri": 3.0519,
+          "uNDF": 8.2468,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 29.4805,
+          "NFC": 42.0,
+          "emicellulosa": 11.4935,
+          "pectine": 22.4545,
+          "ADF_aNDF": 61.0132,
+          "uNDF_aNDF": 27.9736,
+          "umidita": 40.7692,
+          "foraggiPct": 64.9351,
+          "concentratiPct": 35.0649
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.2
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 3,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "above_max",
           "aNDF": "below_min",
           "ADF": "below_min"
         },
         "warnings": [
-          "ADF",
-          "aNDF",
-          "proteina"
+          {
+            "code": "ADF",
+            "issue": "below_min",
+            "boundary": ""
+          },
+          {
+            "code": "aNDF",
+            "issue": "below_min",
+            "boundary": ""
+          },
+          {
+            "code": "proteina",
+            "issue": "above_max",
+            "boundary": ""
+          }
         ]
       }
     },
@@ -183,9 +378,40 @@
       },
       "expected": {
         "status": "computed",
-        "totalAsFed": 12,
+        "totalAsFed": 12.0,
         "totalDM": 6.8,
-        "totalCost": 2,
+        "totalCost": 2.0,
+        "nutrients": {
+          "proteina": 17.9412,
+          "ADL": 2.4706,
+          "amido": 17.3529,
+          "ADF": 19.7059,
+          "zuccheri": 2.7941,
+          "uNDF": 8.6765,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 32.0588,
+          "NFC": 42.0,
+          "emicellulosa": 12.3529,
+          "pectine": 21.8529,
+          "ADF_aNDF": 61.4679,
+          "uNDF_aNDF": 27.0642,
+          "umidita": 43.3333,
+          "foraggiPct": 73.5294,
+          "concentratiPct": 26.4706
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.1
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 2,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "met",
           "aNDF": "met",
@@ -203,18 +429,61 @@
       },
       "expected": {
         "status": "computed",
-        "totalAsFed": 10,
-        "totalDM": 5,
-        "totalCost": 1,
+        "totalAsFed": 10.0,
+        "totalDM": 5.0,
+        "totalCost": 1.0,
+        "nutrients": {
+          "proteina": 10.0,
+          "ADL": 3.0,
+          "amido": 20.0,
+          "ADF": 25.0,
+          "zuccheri": 2.0,
+          "uNDF": 10.0,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 40.0,
+          "NFC": 42.0,
+          "emicellulosa": 15.0,
+          "pectine": 20.0,
+          "ADF_aNDF": 62.5,
+          "uNDF_aNDF": 25.0,
+          "umidita": 50.0,
+          "foraggiPct": 100.0,
+          "concentratiPct": 0.0
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.1
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 0,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "below_min",
           "aNDF": "above_max",
           "ADF": "above_max"
         },
         "warnings": [
-          "ADF",
-          "aNDF",
-          "proteina"
+          {
+            "code": "ADF",
+            "issue": "above_max",
+            "boundary": ""
+          },
+          {
+            "code": "aNDF",
+            "issue": "above_max",
+            "boundary": ""
+          },
+          {
+            "code": "proteina",
+            "issue": "below_min",
+            "boundary": ""
+          }
         ]
       }
     },
@@ -230,9 +499,40 @@
       },
       "expected": {
         "status": "computed",
-        "totalAsFed": 12,
+        "totalAsFed": 12.0,
         "totalDM": 6.8,
-        "totalCost": 2,
+        "totalCost": 2.0,
+        "nutrients": {
+          "proteina": 17.9412,
+          "ADL": 2.4706,
+          "amido": 17.3529,
+          "ADF": 19.7059,
+          "zuccheri": 2.7941,
+          "uNDF": 8.6765,
+          "ee": 2.0,
+          "ceneri": 6.0,
+          "aNDF": 32.0588,
+          "NFC": 42.0,
+          "emicellulosa": 12.3529,
+          "pectine": 21.8529,
+          "ADF_aNDF": 61.4679,
+          "uNDF_aNDF": 27.0642,
+          "umidita": 43.3333,
+          "foraggiPct": 73.5294,
+          "concentratiPct": 26.4706
+        },
+        "lines": [
+          {
+            "feedId": "silage",
+            "kgAsFed": 10,
+            "unitCostPerKgAsFed": 0.1
+          },
+          {
+            "feedId": "soy",
+            "kgAsFed": 2,
+            "unitCostPerKgAsFed": 0.5
+          }
+        ],
         "compliance": {
           "proteina": "met",
           "aNDF": "met",

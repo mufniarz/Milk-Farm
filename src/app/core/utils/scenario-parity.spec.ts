@@ -25,8 +25,26 @@ describe('scenario parity fixture', () => {
       expect(result.compliance).toEqual(
         expected.compliance as Record<string, ScenarioCompliance>,
       );
-      expect(result.warnings.map((warning) => warning.code)).toEqual(
-        expected.warnings,
+      expect(
+        result.warnings.map((warning) => ({
+          code: warning.code,
+          issue: warning.issue,
+          boundary: warning.boundary ?? '',
+        })),
+      ).toEqual(
+        expected.warnings as Array<{
+          code: string;
+          issue: 'below_min' | 'above_max' | 'at_boundary';
+          boundary: string;
+        }>,
+      );
+      expect(result.lines).toEqual(expected.lines);
+      const expectedNutrients = expected.nutrients as Record<string, number>;
+      for (const [code, value] of Object.entries(expectedNutrients)) {
+        expect(result.nutrients[code]).toBeCloseTo(value, 4);
+      }
+      expect(Object.keys(result.nutrients).sort()).toEqual(
+        Object.keys(expectedNutrients).sort(),
       );
     }
   });

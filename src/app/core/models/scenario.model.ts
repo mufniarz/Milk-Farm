@@ -74,6 +74,12 @@ export interface ScenarioSnapshot {
   totalDM: number;
   totalCost: number;
   nutrients: Record<string, number>;
+  /** Per-feed scenario lines, needed for sensitivity ranking. */
+  lines: {
+    feedId: string;
+    kgAsFed: number;
+    unitCostPerKgAsFed: number;
+  }[];
   /** Effective targets after the scenario overrides (needed by the export). */
   targets: ScenarioBaseTarget[];
   compliance: Record<string, ScenarioCompliance>;

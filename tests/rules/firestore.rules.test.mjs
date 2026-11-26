@@ -129,6 +129,12 @@ beforeEach(async () => {
         retryCount: 1,
       },
     );
+    await setDoc(doc(db, 'farms', 'f1', 'scenarios', 's1'), {
+      farmId: 'f1',
+      name: 'Smoke scenario',
+      baseSource: 'saved-recipe',
+      baseRecipeId: 'r1',
+    });
     await setDoc(doc(db, 'farms', 'f1', 'milkRecords', 'g1_2026-11-20'), {
       farmId: 'f1',
       herdGroupId: 'g1',
@@ -467,5 +473,24 @@ test('registration creates the farm before the owner membership', async () => {
       status: 'active',
       invitedBy: null,
     }),
+  );
+});
+
+
+test('scenarios are operator-read and callable-written only', async () => {
+  const member = dbFor('member');
+  await assertSucceeds(
+    getDoc(doc(member, 'farms', 'f1', 'scenarios', 's1')),
+  );
+  await assertFails(
+    setDoc(doc(member, 'farms', 'f1', 'scenarios', 's1'), {
+      farmId: 'f1',
+      name: 'client write',
+    }),
+  );
+
+  const feeder = dbFor('feeder');
+  await assertFails(
+    getDoc(doc(feeder, 'farms', 'f1', 'scenarios', 's1')),
   );
 });

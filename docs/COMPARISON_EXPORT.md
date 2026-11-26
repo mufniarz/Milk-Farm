@@ -188,7 +188,11 @@ effective targets** (base + `targetOverrides`). This is what makes an
 override scenario visible when its value deltas are zero.
 
 The export **recomputes server-side** from saved `changes` + current base
-with the Python `apply_scenario` (`functions/scenario.py`). The server runtime
+with the Python `apply_scenario` (`functions/scenario.py`). It shows **current
+truth**: current feed prices, current availability and current target
+overrides. If the farm's overrides changed since the scenario was saved, the
+exported ration reflects the current overrides and `diverged` is true;
+`saved_at` and the stored snapshot remain the audit record. The server runtime
 stays Python: no second functions runtime. The TS `applyScenario` is the
 client preview and is pinned to the Python implementation by the shared value
 fixture. The export formatter reads the server recompute; a stale browser
@@ -241,17 +245,26 @@ one row per scenario, **12 delta-cost columns** (top 3 ingredients × ±5%/±10%
 price shocks), plus the scenario/base identification. Rows-per-shock is
 rejected for readability.
 
-- **Input:** the server `ScenarioSnapshot` (same recompute as `Scenari`), not
+- **Input:** the server `ScenarioSnapshot` (same recompute as `Scenari`),
+  including its `lines` array `{feedId, kgAsFed, unitCostPerKgAsFed}`; not
   the saved snapshot or the client payload.
 - **Ranking:** per scenario, `unitCostPerKgAsFed × kgAsFed` summed per feed,
   descending; ties by `feedId` alphabetically, take 3.
-- **Shock:** ±5%/±10% on the feed's unit cost, quantity fixed; the delta is
-  `newCost − scenarioCost`.
+- **Shock:** ±5%/±10% on **exactly one** of the top-3 ingredients at a time,
+  quantity fixed, other two at their scenario values (tornado analysis, not
+  combinations); the delta is `newCost − scenarioCost`.
 - **Output:** 12 `delta_cost` values per scenario; infeasible scenarios are
   `NA()`.
 - Only saved scenarios; the builder's unsaved state is not exported. The pure
   function is `topThreeByCostContribution`; price shocks are price-only, not
   inclusion.
+
+## `export_comparison` signature
+
+`export_comparison(baseSource, baseRecipeId, scenarioIds?, mode)` returns one
+XLSX with `Confronto`, `Scenari` and `Sensibilità`. An empty/omitted
+`scenarioIds` returns `Confronto` only. `mode` is `relaxed` (default) or
+`strict`; scenarios are not solver modes.
 
 ## Build acceptance tests
 
@@ -284,6 +297,14 @@ The first build must assert:
 - save rejects a `targetOverrides` key not in the farm's current overrides and
   an `inclusions`/`feedPrices` key not in the base's line list;
 - the server recompute, not the client payload, writes the audit snapshot;
+- rules: owner/admin/consultant read, client writes denied, all writes via
+  the callable; feeder denied;
+- `save_scenario` accepts **one** scenario, client-generated UUID, returns
+  `{ scenarioId, snapshot, serverTime }` and errors
+  `{ code, detail }` (`invalid_override`, `unknown_feed`, `mixed_base`, ...);
+- UI: builder creates; `/scenarios` lists all farm scenarios, sorted by
+  `createdAt` (single-field index); export selects from the page;
+- `savedAt` is server time, never the payload;
 - base recipe deleted: scenarios remain, replay returns
   `status: infeasible`, `reason: base-deleted`; export row is `NA()` with a
   note;

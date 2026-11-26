@@ -121,6 +121,7 @@ def apply_scenario(base, changes, now=None):
             "totalDM": 0,
             "totalCost": 0,
             "nutrients": {},
+            "lines": [],
             "targets": targets,
             "compliance": {},
             "warnings": [],
@@ -150,6 +151,14 @@ def apply_scenario(base, changes, now=None):
         "totalDM": result["totalDM"],
         "totalCost": result["totalCost"],
         "nutrients": result["nutrients"],
+        "lines": [
+            {
+                "feedId": feed["id"],
+                "kgAsFed": feed["kgAsFed"],
+                "unitCostPerKgAsFed": feed["pricePerKg"],
+            }
+            for feed in feeds
+        ],
         "targets": targets,
         "compliance": compliance,
         "warnings": warnings,

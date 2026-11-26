@@ -25,6 +25,17 @@ def test_scenario_parity_fixture_matches_python():
         assert result["totalDM"] == expected["totalDM"], case["name"]
         assert result["totalCost"] == expected["totalCost"], case["name"]
         assert result["compliance"] == expected["compliance"], case["name"]
+        assert result["lines"] == expected["lines"], case["name"]
+        for code, value in expected["nutrients"].items():
+            assert abs(result["nutrients"][code] - value) <= 1e-4, (
+                case["name"], code, result["nutrients"][code], value
+            )
+        assert set(result["nutrients"]) == set(expected["nutrients"])
         assert [
-            warning["code"] for warning in result["warnings"]
+            {
+                "code": warning["code"],
+                "issue": warning["issue"],
+                "boundary": warning.get("boundary", ""),
+            }
+            for warning in result["warnings"]
         ] == expected["warnings"], case["name"]
