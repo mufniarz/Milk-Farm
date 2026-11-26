@@ -2211,7 +2211,7 @@ def _validate_scenario_changes(base, changes, override_codes):
                 code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
                 message=f"invalid_override: {sorted(unknown)}",
             )
-        for entry in overrides.values():
+        for code, entry in overrides.items():
             if not isinstance(entry, dict):
                 raise https_fn.HttpsError(
                     code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
@@ -2226,6 +2226,17 @@ def _validate_scenario_changes(base, changes, override_codes):
                         code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
                         message="override bounds must be numbers or null.",
                     )
+            min_value = entry.get("min")
+            max_value = entry.get("max")
+            if (
+                min_value is not None
+                and max_value is not None
+                and min_value > max_value
+            ):
+                raise https_fn.HttpsError(
+                    code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                    message=f"invalid_override: invalid_bounds {code} min {min_value} > max {max_value}",
+                )
 
 
 @https_fn.on_call(
@@ -2333,10 +2344,13 @@ def delete_scenario(req: https_fn.CallableRequest):
         .collection("scenarios")
         .document(scenario_id)
     )
-    if not ref.get().exists:
+    existing = ref.get()
+    if not existing.exists:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.NOT_FOUND,
             message="Scenario not found.",
         )
+    if (existing.to_dict() or {}).get("deletedAt") is not None:
+        return {"ok": True, "alreadyDeleted": True}
     ref.update({"deletedAt": firestore.SERVER_TIMESTAMP})
-    return {"ok": True}
+    return {"ok": True, "alreadyDeleted": False}

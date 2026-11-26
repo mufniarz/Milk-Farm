@@ -299,8 +299,9 @@ XLSX with `Confronto`, `Scenari` and `Sensibilità`.
 
 ## Persistence test scope (next round)
 
-The persistence round's +N is these seven tests (five callable tests are in;
-the two export tests land with `export_comparison`):
+The persistence round's +N is these seven tests (five callable tests were in;
+three more—idempotent delete, bad name, invalid bounds—are now in; the two
+export tests land with `export_comparison`):
 
 1. save rejects an override key not in the farm's current overrides
    (`invalid_override`);
@@ -362,7 +363,9 @@ The first build must assert:
 - **always-new save**: `save_scenario` never edits an existing scenario; a
   changed what-if is saved as a new one (the audit stays simple);
 - **soft delete, no restore**: `delete_scenario` (owner/admin) sets
-  `deletedAt`; `/scenarios` hides deleted rows; exports reject selected
+  `deletedAt` explicitly to `null` on create and a server timestamp on delete;
+  a second delete returns `{ alreadyDeleted: true }` without overwriting the
+  timestamp; `/scenarios` hides deleted rows; exports reject selected
   deleted rows with `scenario_deleted` and the detail “Deleted scenarios
   cannot be re-exported; the previously exported workbook is the record”; the
   UI states deletion cannot be undone. The export selector refreshes on open,
@@ -373,7 +376,8 @@ The first build must assert:
   “Load into builder” shows “Saving creates a new scenario; the loaded one is
   preserved,” and asks before discarding unsaved changes;
 - the server snapshot is canonical; `save_scenario` returns it and the client
-  replaces its preview, showing a toast if the preview differed;
+  replaces its preview, showing a generic “the saved snapshot differs from
+  your preview” toast if it differed;
 - changes scope: `inclusions`/`feedPrices` only for feeds in the base’s line
   list; `targetOverrides` only for the farm’s current override keys;
 - the server recompute, not the client payload, writes `savedAt` and the

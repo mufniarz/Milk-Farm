@@ -336,8 +336,10 @@ The Stage 2 comparison is a separate XLSX `Confronto` sheet (not CSV) with
 
 ### Parity fixtures are gates
 
-`src/assets/boundary-cases.json` and
-`src/assets/scenario-parity-cases.json` are required gates: changing a
+`src/assets/boundary-cases.json`,
+`src/assets/scenario-parity-cases.json`, and the workbook target chain
+(`functions/tests/targets.json` → `initial-data.ts` → `target_ranges.json`,
+checked by `scripts/check-target-parity.cjs`) are required gates: changing a
 nutrient, the ration calculator, `BOUNDARY_EPS`, or `applyScenario` must
 regenerate them, and CI fails if the Karma/pytest parity assertions do not
 hold. They caught the TS strict-`<` vs Python 1e-4 drift and the scenario

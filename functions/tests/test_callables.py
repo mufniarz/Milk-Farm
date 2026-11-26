@@ -1850,6 +1850,20 @@ def test_save_scenario_rejects_override_not_in_current_overrides():
     assert "invalid_override" in (exc.value.message or "")
 
 
+def test_save_scenario_rejects_invalid_bounds():
+    _seed_scenario_base()
+    # Add a current override so the key is allowed, then invert its bounds.
+    _handler(main.set_target_override)(override_request())
+    req = _save_request(
+        changes={
+            "targetOverrides": {"proteina": {"min": 18, "max": 15}}
+        }
+    )
+    with pytest.raises(https_fn.HttpsError) as exc:
+        _handler(main.save_scenario)(req)
+    assert "invalid_bounds" in (exc.value.message or "")
+
+
 def test_delete_scenario_soft_deletes_for_owner():
     _seed_scenario_base()
     req = _save_request()
@@ -1866,6 +1880,24 @@ def test_delete_scenario_soft_deletes_for_owner():
         .to_dict()
     )
     assert doc["deletedAt"] is not None
+
+
+def test_delete_scenario_is_idempotent():
+    _seed_scenario_base()
+    req = _save_request()
+    _handler(main.save_scenario)(req)
+    payload = {"farmId": "f1", "scenarioId": req.data["scenarioId"]}
+    first = _handler(main.delete_scenario)(_Req("owner", payload))
+    second = _handler(main.delete_scenario)(_Req("owner", payload))
+    assert first["alreadyDeleted"] is False
+    assert second["alreadyDeleted"] is True
+
+
+def test_save_scenario_rejects_bad_name():
+    _seed_scenario_base()
+    for name in ("a/b", "x" * 101):
+        with pytest.raises(https_fn.HttpsError):
+            _handler(main.save_scenario)(_save_request(name=name))
 
 
 def test_delete_scenario_is_denied_for_feeder():
