@@ -644,3 +644,11 @@ Rounding the output to 4 dp would give 23.1025, not 23.10246. Commit 1 must
 **stop rounding the intermediate moisture/DM** (carry unrounded moisture) and
 keep the computed DM at 5 dp / format only on display; do not simply change
 the output precision.
+
+
+## Four-decimal fix observed (2026-11-27)
+
+Commit 1 (6b182d9) carried unrounded moisture and 5dp solver DM. Observed
+reference values: hand/workbook DM **23.10246** (was 23.095); relaxed solver
+DM 23.102, cost 9.0069, protein 15.8014. Commit 2 re-pins the A1 goldens to
+those observed values. `check:calculator` passes at current tolerances.

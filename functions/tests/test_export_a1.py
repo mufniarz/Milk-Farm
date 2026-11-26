@@ -45,9 +45,9 @@ def test_infeasible_cells_are_na():
     assert not any(cell.value == "=NA()" for cell in relaxed[6:])
     # Deterministic across 10 runs with pinned PuLP/CBC; re-pin only with
     # a parity review. Protein is % DM, cost EUR/head/day.
-    assert relaxed[7].value == 15.8016
-    assert relaxed[5].value == 9.0062  # costo
-    assert relaxed[4].value == 23.095  # SS
+    assert relaxed[7].value == 15.8014
+    assert relaxed[5].value == 9.0069  # costo
+    assert relaxed[4].value == 23.102  # SS
     unreachable = sheet.cell(row=4, column=25).value
     assert unreachable
     lines = unreachable.splitlines()
