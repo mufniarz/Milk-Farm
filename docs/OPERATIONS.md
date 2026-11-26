@@ -106,8 +106,11 @@ Smoke documents were removed.
   `scheduled-feeding-retry` severity >= ERROR, 300s rate limit).
 - Synthetic ERROR log emitted to `scheduled-feeding-retry` at 2026-11-27
   23:45 UTC.
+- **Owner:** `marcin.ufniarz@savvyworker.com` owns both the operator email and
+  Monitoring IAM.
 - **Delivery confirmation:** check the operator inbox for the Monitoring
-  notification. Production remains deferred until that email is observed.
+  notification. Production remains deferred **pending inbox confirmation**,
+  not pending an owner.
 
 
 ## Production deferral (2026-11-27)
