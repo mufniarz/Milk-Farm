@@ -2709,6 +2709,16 @@ def _scenario_export_rows(db, farm_id, base, scenario_ids):
             ),
             "status": snapshot["status"],
         }
+        for code in ("aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF"):
+            base_value = (base_snapshot.get("nutrients") or {}).get(code)
+            scenario_value = (snapshot.get("nutrients") or {}).get(code)
+            row[f"base_{code}"] = base_value
+            row[f"scenario_{code}"] = scenario_value
+            row[f"delta_{code}"] = (
+                scenario_value - base_value
+                if base_value is not None and scenario_value is not None
+                else None
+            )
         row.update(_sensitivity_columns(snapshot))
         rows.append(row)
     return rows
@@ -2723,6 +2733,10 @@ def _add_scenari_sheet(workbook, rows):
         ("delta_DM", "Delta SS"), ("scenario_cost_saved", "Costo salvato"),
         ("saved_at", "Salvato il"), ("diverged", "Variato"),
         ("status", "Stato"),
+    ] + [
+        (f"{prefix}_{code}", f"{label} {code}")
+        for code in ("aNDF", "ADF", "uNDF", "ADF_aNDF", "uNDF_aNDF")
+        for prefix, label in (("base", "Base"), ("scenario", "Scenario"), ("delta", "Delta"))
     ]
     for column, (_, header) in enumerate(headers, start=1):
         sheet.cell(row=1, column=column, value=header).font = Font(bold=True)
