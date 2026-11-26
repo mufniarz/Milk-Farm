@@ -2528,8 +2528,9 @@ def _reference_confronto_rows():
         for target in reference["targets"]
         if target.get("isActive", True)
     ]
-    relaxed = solve_ration(feeds, targets, {}, mode="relaxed")
-    strict = solve_ration(feeds, targets, {}, mode="strict")
+    constraints = {"totalDM": reference["solverTotalDM"]}
+    relaxed = solve_ration(feeds, targets, constraints, mode="relaxed")
+    strict = solve_ration(feeds, targets, constraints, mode="strict")
     rows = [
         {
             "source": "workbook",
@@ -2572,6 +2573,10 @@ def _build_confronto_workbook(rows):
     for row_index, row in enumerate(rows, start=2):
         for column, (key, _) in enumerate(_COMPARISON_HEADERS, start=1):
             value = row.get(key)
+            if value is None and key in ("totalDM", "totalCost"):
+                cell = ws.cell(row=row_index, column=column, value="=NA()")
+                cell.number_format = '€ #,##0.000' if key == "totalCost" else "0.000"
+                continue
             cell = ws.cell(row=row_index, column=column, value=value)
             if key == "totalCost" and isinstance(value, (int, float)):
                 cell.number_format = '€ #,##0.000'
