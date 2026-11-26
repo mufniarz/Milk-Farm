@@ -97,12 +97,17 @@ deleted; `manual-adjustment`, `written-off` and young documents remained.
 Smoke documents were removed.
 
 
-## Accepted production blocker — alert delivery (2026-11-27)
+## Alert delivery (2026-11-27)
 
-**Status: accepted blocker, no owner.** No operator email or Monitoring IAM
-owner has been named. Production deploy is blocked until both exist and one
-synthetic alert is delivered. To close: name operator email + IAM owner, create
-the log alert, deliver a test notification.
+- Operator email: `marcin.ufniarz@savvyworker.com`.
+- Email channel: `projects/nicola-milk-farm/notificationChannels/14355749898937653947`.
+- Alert policy: `projects/nicola-milk-farm/alertPolicies/14049935868585474179`
+  (`Milk Farm feeding retry scan errors`, log-match on
+  `scheduled-feeding-retry` severity >= ERROR, 300s rate limit).
+- Synthetic ERROR log emitted to `scheduled-feeding-retry` at 2026-11-27
+  23:45 UTC.
+- **Delivery confirmation:** check the operator inbox for the Monitoring
+  notification. Production remains deferred until that email is observed.
 
 
 ## Production deferral (2026-11-27)
