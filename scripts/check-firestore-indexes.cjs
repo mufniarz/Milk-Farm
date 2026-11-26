@@ -47,6 +47,10 @@ const required = [
     { fieldPath: 'status', order: 'ASCENDING', arrayConfig: null },
     { fieldPath: 'deadAt', order: 'ASCENDING', arrayConfig: null },
   ]],
+  ['feedingTriggerFailures', [
+    { fieldPath: 'status', order: 'ASCENDING', arrayConfig: null },
+    { fieldPath: 'resolvedAt', order: 'ASCENDING', arrayConfig: null },
+  ]],
 ];
 
 const missing = required.filter(

@@ -20,6 +20,7 @@ import google.auth
 from google.auth.transport import requests as google_requests
 
 from solver import solve_ration
+from retention import should_expire_failure
 
 initialize_app()
 
@@ -2847,3 +2848,36 @@ def export_comparison(req: https_fn.CallableRequest):
         access_token=credentials.token,
     )
     return {"url": url, "rows": len(rows)}
+
+
+@scheduler_fn.on_schedule(
+    schedule="every 24 hours",
+    time_zone="Etc/UTC",
+    region="europe-west1",
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=120,
+)
+def scheduled_failure_cleanup(event):
+    """Delete resolved/dead failures older than 90 days.
+
+    Excludes manual-adjustment and written-off via should_expire_failure.
+    """
+    db = firestore.client()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    deleted = 0
+    for status, timestamp_field in (
+        ("resolved", "resolvedAt"),
+        ("dead", "deadAt"),
+    ):
+        docs = (
+            db.collection_group("feedingTriggerFailures")
+            .where("status", "==", status)
+            .where(timestamp_field, "<", cutoff)
+            .stream()
+        )
+        for doc in docs:
+            data = doc.to_dict() or {}
+            if should_expire_failure(data):
+                doc.reference.delete()
+                deleted += 1
+    return {"deleted": deleted}
