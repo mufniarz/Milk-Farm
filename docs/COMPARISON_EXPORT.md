@@ -513,3 +513,22 @@ With a seeded recipe and one saved scenario (`feedPrices` change):
 The smoke recipe, feed and scenario were deleted afterward. This verifies the
 production callable path for `Scenari`/`Sensibilità`, not only the sheet
 builders.
+
+
+## Tested Confronto shape (pending product sign-off)
+
+This records what the implementation and tests assert; it does **not** replace
+the pending `NA()`/Sensibilità decisions.
+
+- 25 columns in order: `Fonte`, `Stato`, `Diagnostica da`, `Totale tal
+  quale`, `SS totali`, `Costo`, the 17 codes in `_NUTRIENT_CODES` order,
+  `Avvisi`, `Obiettivi non raggiungibili`.
+- `diagnostics_from`: `workbook`, `self`, `relaxed-fallback`.
+- `unreachableTargets`: newline-separated `code|value|min|max|issue|boundary`;
+  `issue` ∈ {`below_min`,`above_max`,`at_boundary`}; `boundary` ∈
+  {``,`min`,`max`}.
+- Strict row: `totalAsFed`, `totalDM`, `totalCost` and 17 nutrients are
+  `=NA()` (20 cells); relaxed row has none.
+- `NA()` is an Excel error value that propagates; display is
+  renderer-localized (`#N/A` in LibreOffice it-IT, potentially `#N/D` in
+  Excel it-IT).
