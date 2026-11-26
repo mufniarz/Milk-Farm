@@ -650,3 +650,24 @@ calculator:
    scenarios + deltas) in one workbook; acceptance list is in
    [`docs/COMPARISON_EXPORT.md`](COMPARISON_EXPORT.md). The `it-IT` XLSX check
    is a pre-ship gate.
+
+
+### Builder save blocker (discovered 2026-11-27)
+
+`save_scenario` accepts only `(baseSource, baseRecipeId, name, changes)` and
+loads the base from the saved recipe. The contract also says the builder's
+**unsaved recipe changes** are captured by “Save scenario”. Those are
+incompatible: a change to a recipe line is not a scenario `change`, and the
+callable has no base snapshot to apply it to.
+
+Options, decide before builder integration:
+
+1. require the recipe to be saved first (contradicts “no recipe-save
+   prerequisite”);
+2. add a validated base snapshot to the save payload (contradicts
+   server-canonical base; the server must compare it to the recipe/feeds);
+3. auto-save the recipe as a new draft, then the scenario (changes the
+   recipe library).
+
+Until decided, the builder “Save scenario” UI is not implemented. The
+`/scenarios` list/delete and callables are unaffected.

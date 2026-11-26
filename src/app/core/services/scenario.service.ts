@@ -45,7 +45,7 @@ export class ScenarioService {
         changes: data['changes'] ?? {},
         snapshot: data['resultSnapshot'] as ScenarioSnapshot,
         savedAt: toDate(data['savedAt']),
-        diverged: false,
+        diverged: null,
       };
     });
   }
@@ -69,7 +69,7 @@ export class ScenarioService {
       changes: data['changes'] ?? {},
       snapshot: data['resultSnapshot'] as ScenarioSnapshot,
       savedAt: toDate(data['savedAt']),
-      diverged: false,
+      diverged: null,
     };
   }
 

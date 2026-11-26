@@ -14,7 +14,7 @@ function row(id: string): ScenarioRow {
     baseRecipeId: 'r1',
     changes: {},
     savedAt: null,
-    diverged: false,
+    diverged: null,
     snapshot: {
       status: 'computed',
       totalAsFed: 10,

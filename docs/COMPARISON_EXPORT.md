@@ -370,9 +370,10 @@ The first build must assert:
   cannot be re-exported; the previously exported workbook is the record”; the
   UI states deletion cannot be undone. The export selector refreshes on open,
   hides deleted rows, and offers a one-click removal for a stale selection;
-- builder flow: “Save scenario” in the toolbar, name dialog defaulted to
-  `<base name> — <date/time>`; snapshot of the current builder state
-  **including unsaved recipe changes**; no recipe-save prerequisite;
+- builder flow: **blocked** — the callable accepts only changes against a
+  saved recipe, so it cannot capture unsaved recipe lines. Decide: require a
+  saved recipe, add a validated base snapshot, or auto-save a draft. Until
+  then the toolbar button is not implemented;
   “Load into builder” shows “Saving creates a new scenario; the loaded one is
   preserved,” and asks before discarding unsaved changes;
 - the server snapshot is canonical; `save_scenario` returns it and the client

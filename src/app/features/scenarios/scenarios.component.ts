@@ -87,6 +87,14 @@ const MAX_SELECTION = 20;
               {{ row.snapshot.totalCost | number: '1.3-3' }}
             </td>
           </ng-container>
+          <ng-container matColumnDef="diverged">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'SCENARIOS.DIVERGED' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let row">
+              {{ row.diverged === null ? '—' : (row.diverged ? 'Sì' : 'No') }}
+            </td>
+          </ng-container>
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let row">
@@ -146,6 +154,7 @@ export class ScenariosComponent implements OnInit {
     'savedAt',
     'status',
     'cost',
+    'diverged',
     'actions',
   ];
 

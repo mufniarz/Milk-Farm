@@ -8,7 +8,8 @@ export interface ScenarioRow {
   changes: ScenarioChanges;
   snapshot: ScenarioSnapshot;
   savedAt: Date | null;
-  diverged: boolean;
+  /** null until the server recompute compares snapshot vs current truth. */
+  diverged: boolean | null;
 }
 
 export interface SaveScenarioInput {

@@ -334,6 +334,7 @@
     "COST": "Cost",
     "SELECTED": "selected",
     "CAP": "You can select at most 20 scenarios.",
-    "DELETE_CONFIRM": "Delete this scenario? This cannot be undone."
+    "DELETE_CONFIRM": "Delete this scenario? This cannot be undone.",
+    "DIVERGED": "Diverged"
   }
 }
