@@ -140,10 +140,18 @@
     "AT_BOUNDARY": "al minimo di riferimento (fragile)",
     "AT_BOUNDARY_OVERRIDE": "al tuo obiettivo (fragile)",
     "REFERENCE_SHORT": "rif.",
-    "SAVE_SCENARIO": "Salva razione attuale",
+    "SAVE_SCENARIO": "Salva scenario",
     "SCENARIO_NAME": "Nome scenario",
     "SCENARIO_SAVED": "Scenario salvato.",
-    "SCENARIO_FAILED": "Impossibile salvare lo scenario."
+    "SCENARIO_FAILED": "Impossibile salvare lo scenario.",
+    "SCENARIO_CHANGES": "Modifiche scenario",
+    "FEED": "Alimento",
+    "NEW_PRICE": "Nuovo prezzo €/kg",
+    "ADD_PRICE": "Aggiungi prezzo",
+    "NEW_KG": "Nuovi kg t.q.",
+    "ADD_INCLUSION": "Aggiungi inclusione",
+    "ADD_OVERRIDE": "Aggiungi obiettivo",
+    "CLEAR_CHANGES": "Pulisci"
   },
   "COMMON": {
     "LOADING": "Caricamento...",

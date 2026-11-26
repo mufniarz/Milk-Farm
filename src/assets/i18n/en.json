@@ -140,10 +140,18 @@
     "AT_BOUNDARY": "at the reference floor (fragile)",
     "AT_BOUNDARY_OVERRIDE": "at your target (fragile)",
     "REFERENCE_SHORT": "ref.",
-    "SAVE_SCENARIO": "Save current ration",
+    "SAVE_SCENARIO": "Save scenario",
     "SCENARIO_NAME": "Scenario name",
     "SCENARIO_SAVED": "Scenario saved.",
-    "SCENARIO_FAILED": "Could not save the scenario."
+    "SCENARIO_FAILED": "Could not save the scenario.",
+    "SCENARIO_CHANGES": "Scenario changes",
+    "FEED": "Feed",
+    "NEW_PRICE": "New price €/kg",
+    "ADD_PRICE": "Add price",
+    "NEW_KG": "New kg as-fed",
+    "ADD_INCLUSION": "Add inclusion",
+    "ADD_OVERRIDE": "Add target",
+    "CLEAR_CHANGES": "Clear"
   },
   "COMMON": {
     "LOADING": "Loading...",

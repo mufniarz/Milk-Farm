@@ -55,6 +55,13 @@ import { TargetService } from '../../core/services/target.service';
 import { FarmContextService } from '../../core/services/farm-context.service';
 import { ScenarioService } from '../../core/services/scenario.service';
 import { buildBuilderScenarioPayload } from '../../core/utils/scenario-payload';
+import {
+  emptyScenarioDraft,
+  setFeedPrice,
+  setInclusion,
+  setTargetOverride,
+  draftToChanges,
+} from '../../core/utils/scenario-change-draft';
 import { TARGET_RANGES } from '../../core/data/initial-data';
 import { ChartData, ChartType } from 'chart.js';
 
@@ -511,6 +518,60 @@ interface RecipeFeedEntry {
               </mat-card-content>
             </mat-card>
 
+            <mat-card class="scenario-card">
+              <mat-card-title>{{ 'RECIPES.SCENARIO_CHANGES' | translate }}</mat-card-title>
+              <mat-card-content>
+                <div class="scenario-row">
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'RECIPES.FEED' | translate }}</mat-label>
+                    <mat-select [(ngModel)]="scenarioFeedId">
+                      @for (entry of selectedFeeds(); track entry.feed.id) {
+                        <mat-option [value]="entry.feed.id">{{ entry.feed.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'RECIPES.NEW_PRICE' | translate }}</mat-label>
+                    <input matInput type="number" [(ngModel)]="scenarioPrice" />
+                  </mat-form-field>
+                  <button mat-stroked-button (click)="addPriceChange()">
+                    {{ 'RECIPES.ADD_PRICE' | translate }}
+                  </button>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'RECIPES.NEW_KG' | translate }}</mat-label>
+                    <input matInput type="number" [(ngModel)]="scenarioKg" />
+                  </mat-form-field>
+                  <button mat-stroked-button (click)="addInclusionChange()">
+                    {{ 'RECIPES.ADD_INCLUSION' | translate }}
+                  </button>
+                </div>
+                <div class="scenario-row">
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'RECIPES.NUTRIENT' | translate }}</mat-label>
+                    <mat-select [(ngModel)]="scenarioNutrient">
+                      @for (target of targets; track target.nutrientCode) {
+                        <mat-option [value]="target.nutrientCode">{{ target.nutrientCode }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'RECIPES.MIN' | translate }}</mat-label>
+                    <input matInput type="number" [(ngModel)]="scenarioMin" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'RECIPES.MAX' | translate }}</mat-label>
+                    <input matInput type="number" [(ngModel)]="scenarioMax" />
+                  </mat-form-field>
+                  <button mat-stroked-button (click)="addOverrideChange()">
+                    {{ 'RECIPES.ADD_OVERRIDE' | translate }}
+                  </button>
+                  <button mat-button (click)="clearScenarioChanges()">
+                    {{ 'RECIPES.CLEAR_CHANGES' | translate }}
+                  </button>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
             <!-- Save Button -->
             <button
               mat-stroked-button
@@ -845,6 +906,13 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
   animalCount = 1;
   constraints: OptimizationConstraints = {};
   targets: EffectiveNutrientTarget[] = this.referenceTargets('lactating');
+  readonly scenarioDraft = signal(emptyScenarioDraft());
+  scenarioFeedId = '';
+  scenarioPrice: number | null = null;
+  scenarioKg: number | null = null;
+  scenarioNutrient = '';
+  scenarioMin: number | null = null;
+  scenarioMax: number | null = null;
 
   feedEntries = signal<RecipeFeedEntry[]>([]);
   rationResult = signal<RationResult | null>(null);
@@ -1159,6 +1227,34 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     }
   }
 
+  clearScenarioChanges(): void {
+    this.scenarioDraft.set(emptyScenarioDraft());
+  }
+
+  addPriceChange(): void {
+    if (!this.scenarioFeedId || this.scenarioPrice === null) return;
+    this.scenarioDraft.update((draft) =>
+      setFeedPrice(draft, this.scenarioFeedId, Number(this.scenarioPrice)),
+    );
+  }
+
+  addInclusionChange(): void {
+    if (!this.scenarioFeedId || this.scenarioKg === null) return;
+    this.scenarioDraft.update((draft) =>
+      setInclusion(draft, this.scenarioFeedId, Number(this.scenarioKg)),
+    );
+  }
+
+  addOverrideChange(): void {
+    if (!this.scenarioNutrient) return;
+    this.scenarioDraft.update((draft) =>
+      setTargetOverride(draft, this.scenarioNutrient, {
+        min: this.scenarioMin === null ? null : Number(this.scenarioMin),
+        max: this.scenarioMax === null ? null : Number(this.scenarioMax),
+      }),
+    );
+  }
+
   async saveScenario(): Promise<void> {
     const farmId = this.farmContext.activeFarmId();
     if (!farmId || this.selectedFeeds().length === 0) return;
@@ -1182,7 +1278,11 @@ export class RecipeBuilderComponent implements OnInit, AfterViewInit {
     );
     if (!name) return;
     try {
-      await this.scenarioService.save({ ...payload, name });
+      await this.scenarioService.save({
+        ...payload,
+        name,
+        changes: draftToChanges(this.scenarioDraft()),
+      });
       this.snackBar.open(
         this.translate.instant('RECIPES.SCENARIO_SAVED'),
         undefined,
