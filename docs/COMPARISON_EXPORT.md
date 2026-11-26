@@ -9,12 +9,27 @@
 > 3. cross-sheet = **no** propagation (Scenari computes independently);
 > 4. `at_boundary` = warnings-only, never in `unreachableTargets`.
 >
-> **Four-decimal re-pin procedure (engineering):** fix moisture precision →
-> regenerate `boundary-cases.json` and `scenario-parity-cases.json` → both
-> parity tests and `check:calculator` pass → record old/new pinned values and
-> delta → re-pin within solver tolerance ε (CBC default) → deploy.
-> Engineering sign-off for re-pin; product sign-off only if a target
-> changes. The proposed 25-column shape below is not a contract change.
+> **Four-decimal re-pin procedure (engineering), two commits:**
+> **Commit 1 — fix only:** moisture precision + regenerated fixtures;
+> `test_workbook_parity.py`, scenario parity, `boundary-cases.json` parity and
+> `check:calculator` must pass at current tolerances; old goldens must fail
+> and the failure must be explained as precision shift.
+> **Commit 2 — re-pin only:** update goldens and record old/new/delta.
+> `ε = 1e-6` (solver feasibility). New pin outside old ±ε blocks and escalates.
+> Engineering signs; product signs only if a signed column, shape or decision
+> changes.
+>
+> **Constants:** `COST_PARITY_EUR=0.001`, `SS_PARITY_KG=0.001`,
+> `AT_BOUNDARY_BAND=0.001` **percentage points of the nutrient**, solver
+> `ε=1e-6`. They are separate constants.
+>
+> **Fallback B rework scope:** `NA()`→string changes Scenari NA checks;
+> Sensibilità 16→15 changes header/tests; propagation allowed changes
+> Scenari source; `at_boundary` reachable moves a category between fields.
+>
+> **Blocking before Scenari:** current-tree full run, CI determinism of
+> `15.8016`, callable mixed/deleted test. **Parallel:** no-unintended-errors,
+> Sensibilità it-IT, format/width diff. The proposed 25-column shape below is not a contract change.
 
 # Comparison export — format and semantics
 
