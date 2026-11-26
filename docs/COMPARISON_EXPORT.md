@@ -220,7 +220,9 @@ cannot export stale numbers.
 the snapshot. `diverged` uses a relative tolerance of **0.1% of the saved
 value with a 0.001 absolute floor** (`abs(diff) > max(0.001, 0.001 *
 abs(saved))`); it compares values, compliance statuses and warnings, so a
-boundary crossing or a warning change also sets it. `Sensibilità` uses the same server recomputed values.
+boundary crossing or a warning change also sets it. `Sensibilità` runs on the **server-recomputed** snapshot, not the stored one;
+the export callable recomputes first, then calls the pure sensitivity
+function. Stored snapshots are audit records only.
 
 **Classification parity:** the TS `applyScenario` and Python
 `apply_scenario` both use the shared boundary fixture
