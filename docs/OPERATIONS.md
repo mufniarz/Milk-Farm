@@ -116,3 +116,13 @@ Production deployment is **deferred pending the alert owner**. This is an
 accepted decision, not an open-ended wait: no production project is created
 until operator email + Monitoring IAM owner are named and one synthetic alert
 is delivered.
+
+
+## CSV renderer of record (2026-11-27)
+
+Accepted risk: **LibreOffice is the renderer of record for the CSV fixture.**
+The file is correctly shaped for Excel `it-IT` (BOM, `;`, comma decimals) and
+column splitting is verified. LibreOffice's CSV filter renders comma decimals
+with a dot under its document locale, so it cannot prove Excel's decimal
+display. The Excel `it-IT` open is deferred to first user acceptance; the file
+must not be changed on the basis of the LibreOffice render.
