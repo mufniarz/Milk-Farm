@@ -195,6 +195,9 @@ truth**: current feed prices, current availability and current target
 overrides. If the farm's overrides changed since the scenario was saved, the
 exported ration reflects the current overrides and `diverged` is true;
 `saved_at` and the stored snapshot remain the audit record. `diverged` also
+includes warnings; a code deploy that changes workbook ideals can therefore
+flip it for untouched scenarios—the export is still current truth, the
+snapshot is still the audit. `diverged` also
 covers `lines`, so a feed price change is visible even when totals coincide. The server runtime
 stays Python: no second functions runtime. The TS `applyScenario` is the
 client preview and is pinned to the Python implementation by the shared value
@@ -268,11 +271,21 @@ are `NA()`. Rows-per-shock is rejected for readability.
 
 ## `export_comparison` signature
 
-`export_comparison(baseSource, baseRecipeId, scenarioIds?)` returns one XLSX
-with `Confronto`, `Scenari` and `Sensibilità`. An empty/omitted `scenarioIds`
-returns `Confronto` only. There is no `mode` argument: `Confronto` always
-contains workbook + relaxed + strict, and scenarios are always `computed`.
-The callable returns a signed Storage URL, same pattern as `export_recipe`.
+`export_comparison(baseSource?, baseRecipeId?, scenarioIds?)` returns one
+XLSX with `Confronto`, `Scenari` and `Sensibilità`.
+
+- Empty/omitted `scenarioIds` → `Confronto` only; `baseSource`/`baseRecipeId`
+  are ignored and may be omitted.
+- Non-empty `scenarioIds` → both base parameters are required, otherwise
+  `missing_base_for_scenarios`; `scenarioIds.length > 20` → `too_many_scenarios`
+  (client also caps at 20).
+- `Confronto` always has workbook + relaxed + strict; there is no `mode`.
+- Scenarios are always `computed`; `Sensibilità` is always included when at
+  least one scenario is present.
+- The callable re-checks that every selected scenario has the same
+  `(baseSource, baseRecipeId)` and that none is soft-deleted; mismatch →
+  `mixed_base`, deleted → `scenario_deleted`.
+- Returns a signed Storage URL, same pattern as `export_recipe`.
 
 ## Build acceptance tests
 
@@ -304,6 +317,8 @@ The first build must assert:
 - export accepts only one `(baseSource, baseRecipeId)` pair;
 - save rejects a `targetOverrides` key not in the farm's current overrides and
   an `inclusions`/`feedPrices` key not in the base's line list;
+- save validates name and `scenarioId`; always inserts, never updates;
+- `delete_scenario` soft-deletes (owner/admin only);
 - the server recompute, not the client payload, writes the audit snapshot;
 - rules: owner/admin/consultant read, client writes denied, all writes via
   the callable; feeder denied;
@@ -311,12 +326,24 @@ The first build must assert:
   `{ scenarioId, snapshot, serverTime }` and errors
   `{ code, detail }` (`invalid_override`, `unknown_feed`, `mixed_base`, ...);
 - UI: builder creates; `/scenarios` lists all farm scenarios, sorted by
-  `createdAt` (single-field auto-index; no composite entry); export selects
-  from the page;
-- `scenario` name is required (non-empty);
+  `createdAt` (single-field auto-index; no composite entry), most recent 50
+  with pagination deferred; export selects from the page;
+- `/scenarios` row: name, base, `savedAt`, `Stato`, `scenario_cost`,
+  `diverged`, checkbox, action menu (load into builder, delete);
+- `scenario` name: required, trimmed, non-empty, ≤ 100 chars, no `/`;
+- **always-new save**: `save_scenario` never edits an existing scenario; a
+  changed what-if is saved as a new one (the audit stays simple);
+- **soft delete**: `delete_scenario` (owner/admin) sets `deletedAt`;
+  `/scenarios` hides deleted rows; exports reject selected deleted rows;
+- builder flow: “Save scenario” in the toolbar, name dialog, snapshot of the
+  current builder state **including unsaved recipe changes**; no recipe-save
+  prerequisite;
 - the server snapshot is canonical; `save_scenario` returns it and the client
-  replaces its preview, so a version-skewed preview cannot become the stored
-  record;
+  replaces its preview, showing a toast if the preview differed;
+- changes scope: `inclusions`/`feedPrices` only for feeds in the base’s line
+  list; `targetOverrides` only for the farm’s current override keys;
+- the server recompute, not the client payload, writes `savedAt` and the
+  audit snapshot;
 - `savedAt` is server time, never the payload;
 - base recipe deleted: scenarios remain, replay returns
   `status: infeasible`, `reason: base-deleted`; export row is `NA()` with a
@@ -349,7 +376,8 @@ Do not use the export in a client conversation until:
 4. the workbook row is implemented with group-matching ideals and the same
    classifier;
 5. the four-decimal decision is applied (fix before use, or footnote present
-   and scheduled).
+   and scheduled). The fix regenerates `boundary-cases.json` and
+   `scenario-parity-cases.json`; CI must pass before deploy.
 
 ## Thresholds
 
