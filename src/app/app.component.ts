@@ -65,6 +65,14 @@ import { AuthService } from './core/services/auth.service';
             </a>
             <a
               mat-list-item
+              routerLink="/scenarios"
+              routerLinkActive="active-link"
+            >
+              <mat-icon matListItemIcon>compare_arrows</mat-icon>
+              <span matListItemTitle>{{ 'NAV.SCENARIOS' | translate }}</span>
+            </a>
+            <a
+              mat-list-item
               routerLink="/iofc"
               routerLinkActive="active-link"
             >

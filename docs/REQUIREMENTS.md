@@ -33,7 +33,7 @@ numbers.
 | Callable + trigger logic | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pytest tests/test_callables.py -q` | 30 passed — override set/clear, item upsert audit, delivery idempotency, negative-adjustment guard, missing-item guard, feeding confirmation (posted once, drafts ignored, untracked feeds skipped, overdraft flagged), retroactive posting, failure queue (claim/lock/resolve, three-dead bulk retry, dead audit, already-posted/written-off/missing/draft reasons, manual handled requires every item adjusted, manual write-off, acknowledge-no-action, adjustment-without-mark needs-review, 90-day write-off, cross-farm denial), farm milk price, scan heartbeat |
 | Workbook → fixtures | `pytest tests/test_workbook_parity.py -q` | 10 passed — targets, analysis and commercial rows match the workbook |
 | Browser-free calculator | `npm run check:calculator` | pass — reference ration, dry/heifer group totals, feeding guard |
-| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 52 passed — 3 calculator parity + 6 loading math + 2 once-daily guard + 3 scan-health + 3 target safety + 1 loading role effect + 3 recipe-warning + 2 override reference + 8 scenario + 1 boundary parity + 1 scenario parity + 11 accuracy + 8 IOFC (3 math + 4 wiring + 1 save guard) |
+| Client engine, loading, accuracy and IOFC (Karma) | `ng test --browsers=ChromeHeadlessNoSandbox` | 55 passed — 3 calculator parity + 6 loading math + 2 once-daily guard + 3 scan-health + 3 target safety + 1 loading role effect + 3 recipe-warning + 2 override reference + 8 scenario + 1 boundary parity + 1 scenario parity + 3 scenarios page + 11 accuracy + 8 IOFC (3 math + 4 wiring + 1 save guard) |
 | i18n keys | `npm run check:i18n` | 180 keys in both locales |
 | Firestore rules | `firebase emulators:exec --only firestore "npm run test:rules"` | 21 passed — tenant boundary, strict cutover (legacy-only denied), registration order (farm before owner membership), owner self-create, denied writes, inactive membership, feeder draft/confirm, confirmed immutability, feeder-name permissions, operator-only feedings, milk-record roles, failure-queue read-only, heartbeat read/write, scenario admin read, scenario client-write denied, scenario feeder read denied |
 | Membership backfill | `node scripts/seed-emulator-backfill.cjs` then `npm run backfill:members` | verified against a seeded emulator: dry-run `4 created / 1 unchanged` matched the real run; second run was `0 created / 5 unchanged`; an uncovered farm exited 1. Existing consultant roles were preserved, including a dual-role user (`farm-a` farmAdmin + `farm-b` consultant). **Not run against the target database** because deploy access is locked. |
@@ -631,10 +631,11 @@ calculator:
 
 ## M. Stage 2 plan (order and acceptance)
 
-1. **Scenarios** — persistence lifecycle: always-new `save_scenario`, soft
-   `delete_scenario` (owner/admin), builder save dialog with unsaved state,
-   `/scenarios` list (up to 200), client UUID; then service/UI. Acceptance:
-   the seven persistence tests in `COMPARISON_EXPORT.md`. The pure
+1. **Scenarios** — callables and `/scenarios` list/delete are implemented;
+   builder save/load with unsaved state and the discard confirmation remain.
+   The service uses the composite-index query; three page specs cover rows,
+   the 20 cap, and confirmed delete. Acceptance: the remaining persistence
+   tests in `COMPARISON_EXPORT.md`. The pure
    feature is implemented: `applyScenario(changes, base)`
    returns a `ScenarioSnapshot` with values, effective `targets`, compliance,
    `warnings` (all targets), and `computedAt`; 4 Karma specs cover price,

@@ -11,7 +11,8 @@
     "INVENTORY": "Scorte",
     "LOADING": "Carico",
     "ACCURACY": "Precisione",
-    "IOFC": "IOFC"
+    "IOFC": "IOFC",
+    "SCENARIOS": "Scenari"
   },
   "AUTH": {
     "LOGIN": "Accedi",
@@ -321,5 +322,18 @@
     "SAVE_DEFAULT": "Salva predefinito",
     "DEFAULT_SAVED": "Prezzo predefinito salvato.",
     "DEFAULT_FAILED": "Salvataggio del predefinito non riuscito."
+  },
+  "SCENARIOS": {
+    "TITLE": "Scenari",
+    "REFRESH": "Aggiorna",
+    "EMPTY": "Nessuno scenario salvato.",
+    "NAME": "Nome",
+    "BASE": "Ricetta base",
+    "SAVED_AT": "Salvato",
+    "STATUS": "Stato",
+    "COST": "Costo",
+    "SELECTED": "selezionati",
+    "CAP": "Puoi selezionare al massimo 20 scenari.",
+    "DELETE_CONFIRM": "Eliminare questo scenario? L’operazione non può essere annullata."
   }
 }

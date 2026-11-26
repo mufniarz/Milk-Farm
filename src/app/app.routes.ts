@@ -62,6 +62,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'scenarios',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/scenarios/scenarios.component').then(
+        (m) => m.ScenariosComponent
+      ),
+  },
+  {
     path: 'iofc',
     canActivate: [authGuard],
     loadComponent: () =>

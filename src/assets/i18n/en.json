@@ -11,7 +11,8 @@
     "INVENTORY": "Inventory",
     "LOADING": "Loading",
     "ACCURACY": "Accuracy",
-    "IOFC": "IOFC"
+    "IOFC": "IOFC",
+    "SCENARIOS": "Scenarios"
   },
   "AUTH": {
     "LOGIN": "Login",
@@ -321,5 +322,18 @@
     "SAVE_DEFAULT": "Save default",
     "DEFAULT_SAVED": "Default price saved.",
     "DEFAULT_FAILED": "Could not save the default price."
+  },
+  "SCENARIOS": {
+    "TITLE": "Scenarios",
+    "REFRESH": "Refresh",
+    "EMPTY": "No saved scenarios.",
+    "NAME": "Name",
+    "BASE": "Base recipe",
+    "SAVED_AT": "Saved",
+    "STATUS": "Status",
+    "COST": "Cost",
+    "SELECTED": "selected",
+    "CAP": "You can select at most 20 scenarios.",
+    "DELETE_CONFIRM": "Delete this scenario? This cannot be undone."
   }
 }
