@@ -75,7 +75,9 @@ semicolon filter and rendered in LibreOffice set to Italian:
 ## CSV comma-decimal fixture (2026-11-27)
 
 `docs/screenshots/accuracy-decimals.csv` uses semicolons and comma decimals.
-LibreOffice imported it into columns, but its CSV filter rendered `100,5` as
-`100.5` (document locale en-US despite the GUI locale). So this fixture proves
-delimiter parsing, **not** comma-decimal display. Screenshot:
+The file is correctly shaped for Excel `it-IT` (`;` delimiter, comma
+decimals, BOM). LibreOffice imported columns but rendered `100,5` as `100.5`
+because its CSV filter did not apply the document locale. This is a
+LibreOffice limitation, not a file defect; a manual Excel `it-IT` open is
+required before production. Screenshot:
 `docs/screenshots/accuracy-decimals-it.png`.
