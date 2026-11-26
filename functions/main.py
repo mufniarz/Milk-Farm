@@ -2782,7 +2782,15 @@ def export_comparison(req: https_fn.CallableRequest):
         base_id = _require_string(data, "baseRecipeId")
         base = _scenario_base(db, farm_id, base_id)
         rows = _saved_recipe_confronto_rows(db, farm_id, base_id)
-        scenario_rows = _scenario_export_rows(db, farm_id, base, data["scenarioIds"])
+        try:
+            scenario_rows = _scenario_export_rows(
+                db, farm_id, base, data["scenarioIds"]
+            )
+        except ValueError as exc:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message=str(exc),
+            ) from exc
     elif data.get("baseRecipeId"):
         farm_id = _require_string(data, "farmId")
         db = _require_farm_role(farm_id, req.auth.uid, _SCENARIO_ROLES)

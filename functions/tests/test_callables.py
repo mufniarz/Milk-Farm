@@ -1972,3 +1972,35 @@ def test_saved_recipe_confronto_uses_recipe_rows():
     ]
     assert rows[0]["status"] == "hand-ration"
     assert rows[0]["totalCost"] > 0
+
+
+def test_export_rejects_mixed_base_before_workbook():
+    _seed_scenario_base()
+    farm = "f1"
+    for sid, recipe in (("s1", "r1"), ("s2", "r2")):
+        DB.collection("farms").document(farm).collection("scenarios").document(sid).set(
+            {"farmId": farm, "name": sid, "baseSource": "saved-recipe",
+             "baseRecipeId": recipe, "baseHash": None, "deletedAt": None,
+             "changes": {}}
+        )
+    with pytest.raises(https_fn.HttpsError) as exc:
+        _handler(main.export_comparison)(
+            _Req("owner", {"farmId": farm, "baseSource": "saved-recipe",
+                           "baseRecipeId": "r1", "scenarioIds": ["s1", "s2"]})
+        )
+    assert "mixed_base" in (exc.value.message or "")
+
+
+def test_export_rejects_deleted_scenario_before_workbook():
+    _seed_scenario_base()
+    DB.collection("farms").document("f1").collection("scenarios").document("s1").set(
+        {"farmId": "f1", "name": "s1", "baseSource": "saved-recipe",
+         "baseRecipeId": "r1", "baseHash": None,
+         "deletedAt": firestore.SERVER_TIMESTAMP, "changes": {}}
+    )
+    with pytest.raises(https_fn.HttpsError) as exc:
+        _handler(main.export_comparison)(
+            _Req("owner", {"farmId": "f1", "baseSource": "saved-recipe",
+                           "baseRecipeId": "r1", "scenarioIds": ["s1"]})
+        )
+    assert "scenario_deleted" in (exc.value.message or "")
