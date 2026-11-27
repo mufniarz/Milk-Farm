@@ -108,17 +108,16 @@ Smoke documents were removed.
   23:45 UTC.
 - **Owner:** `marcin.ufniarz@savvyworker.com` owns both the operator email and
   Monitoring IAM.
-- **Delivery confirmation:** check the operator inbox for the Monitoring
-  notification. Production remains deferred **pending inbox confirmation**,
-  not pending an owner.
+- **Delivery confirmed 2026-11-27:** operator received the “Log alert fired”
+  email for incident `projects/nicola-milk-farm/alerts/0.ofhsi88rjivm`
+  (openTime 2026-11-27T00:01:08Z). Alert delivery is closed.
 
 
-## Production deferral (2026-11-27)
+## Production (2026-11-27)
 
-Production deployment is **deferred pending the alert owner**. This is an
-accepted decision, not an open-ended wait: no production project is created
-until operator email + Monitoring IAM owner are named and one synthetic alert
-is delivered.
+The alert gate is **satisfied**: email channel, policy, synthetic incident and
+inbox delivery are all confirmed. Production is still not created; that is now
+an environment/decision item, not an alert blocker.
 
 
 ## CSV renderer of record (2026-11-27)
