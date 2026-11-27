@@ -167,7 +167,7 @@ for i, text in enumerate(("Ruolo", "Uso tipico", "Accesso")):
 for role, use, access in [
     ("Titolare", "Controllo completo dell'azienda, obiettivi, report e impostazioni.", "Tutte le funzioni."),
     ("Amministratore", "Gestione quotidiana e modifica degli obiettivi.", "Tutte le funzioni operative ed economiche."),
-    ("Consulente", "Formulazione, scenari e report per l'azienda.", "Alimenti, ricette, scenari, scorte, report; sola lettura obiettivi."),
+    ("Consulente", "Formulazione, scenari e report per l'azienda.", "Alimenti, ricette, scenari, scorte, report; obiettivi in sola lettura."),
     ("Addetto", "Carico e conferma in stalla.", "Carico e conferma; report economici nascosti."),
 ]:
     cells = table.add_row().cells
@@ -271,8 +271,8 @@ feature("6", "Formulatore razione", "Ricette → Nuova Ricetta, o apri una ricet
          "Seleziona gli alimenti e inserisci i kg tal quale. La tabella mostra kg di sostanza secca, costo e analisi corrente.",
          "Facoltativo: imposta SS Totale e il rapporto foraggio minimo/massimo in Vincoli (rapporto foraggio = SS foraggio / SS totale; vedi Calcoli).",
          "Premi Calcola. L'ottimizzatore restituisce la razione di costo minimo; se gli obiettivi esatti non sono raggiungibili restituisce la razione fattibile più vicina in modalità rilassata.",
-         "Leggi lo stato: Ottimale, Rilassata o Impossibile.",
-         "Controlla gli avvisi: sotto il minimo, sopra il massimo, al limite (al minimo di riferimento o al tuo obiettivo) o obiettivi non raggiungibili. Passa il mouse/espandi per limite e valore.",
+         "Leggi lo stato: Soluzione ottimale trovata, Nessuna soluzione esatta (rilassata) o Nessuna soluzione fattibile (impossibile).",
+         "Controlla gli avvisi: sotto il minimo, sopra il massimo, al limite (al minimo di riferimento o al tuo obiettivo) o obiettivi non raggiungibili. Porta il cursore sopra o espandi per limite e valore.",
          "Controlla profilo nutrienti e range obiettivo; regola alimenti, quantità o vincoli.",
          "Salva Ricetta per memorizzarla, oppure Esporta Excel per un documento."],
         ["Un risultato rilassato è utilizzabile ma va segnalato: alcuni obiettivi non sono pienamente rispettati.",
@@ -325,13 +325,13 @@ feature("9", "Gruppi", "Menu → Gruppi",
          "Usa l'azione di eliminazione solo per un gruppo che non deve più esistere; i record storici non vengono riscritti."],
         ["Un gruppo senza ricetta attiva mostra costo alimentare zero e non può alimentare l'IOFC.",
          "Il numero capi è la fonte per uso giornaliero e costo; correggilo prima di leggere i report.",
-         "Un solo ricetta attiva per gruppo alla volta."])
+         "Una sola ricetta attiva per gruppo alla volta."])
 
 feature("10", "Scorte", "Menu → Scorte",
         "Giacenze in kg tal quale, uso giornaliero e giorni di copertura rispetto alle razioni attive.",
         "Titolare, amministratore e consulente.",
         ["Usa Aggiungi articolo per tracciare un alimento: soglia di riordino, posizione, costo unitario.",
-         "Registra una consegna con quantità e nota; il ledger registra il carico.",
+         "Registra una consegna con quantità e nota; il ledger registra l'entrata.",
          "Usa Correggi con delta firmato e motivo per una rettifica da inventario fisico.",
          "Leggi Giacenza, Uso giornaliero e Giorni di copertura (giorni = giacenza / uso giornaliero).",
          "Usa Registra carichi non scaricati per i carichi confermati con scarico scorte in sospeso.",
@@ -393,10 +393,10 @@ doc.add_heading("Analisi nutrizionale", level=2)
 para("Ogni alimento contribuisce con la sua percentuale di nutriente × la sua SS; la somma è divisa per la SS totale. I nutrienti derivati come NFC, pectine, emicellulosa, ADF/aNDF e uNDF/aNDF sono calcolati dall'analisi miscelata.")
 doc.add_heading("Ottimizzatore", level=2)
 bullets(["L'ottimizzatore minimizza il costo della razione rispettando SS totale, rapporto foraggio e obiettivi nutrizionali.",
-         "Ottimale: tutti gli obiettivi attivi sono rispettati.",
-         "Rilassata: viene mostrata la razione fattibile più vicina; alcuni obiettivi sono mancati e compaiono negli avvisi.",
-         "Impossibile (strict): nessuna razione può rispettare gli obiettivi con gli alimenti attuali; la risposta elenca gli obiettivi non raggiungibili.",
-         "Al limite: il valore è entro una piccola banda di un limite fibra; trattalo come fragile, non come violazione. Non blocca salvataggio o carico. Il formulatore lo etichetta al minimo di riferimento o al tuo obiettivo."])
+         "Soluzione ottimale trovata: tutti gli obiettivi attivi sono rispettati.",
+         "Nessuna soluzione esatta (rilassata): viene mostrata la razione fattibile più vicina; alcuni obiettivi sono mancati e compaiono negli avvisi.",
+         "Nessuna soluzione fattibile (strict): nessuna razione può rispettare gli obiettivi con gli alimenti attuali; la risposta elenca gli obiettivi non raggiungibili.",
+         "Al limite: il valore è entro una piccola banda di un limite relativo alla fibra; trattalo come fragile, non come violazione. Non blocca il salvataggio o il carico. Il formulatore lo etichetta al minimo di riferimento o al tuo obiettivo."])
 doc.add_heading("Precisione e IOFC", level=2)
 bullets(["Scostamento % = (caricato − chiamato) / chiamato × 100.",
          "Scostamento medio assoluto = media di |scostamento %| sulle righe.",
@@ -416,8 +416,8 @@ for i, text in enumerate(("Sintomo", "Cosa fare")):
     r.bold = True; r.font.size = Pt(9); r.font.color.rgb = RGBColor(0xFF,0xFF,0xFF)
     shade(table.rows[0].cells[i], "2E5B3E")
 for sym, action in [
-    ("L'ottimizzatore dice Impossibile", "Un obiettivo non è raggiungibile con gli alimenti scelti. Prova la modalità rilassata, aggiungi/cambia un alimento, riduci un vincolo o rivedi Obiettivi."),
-    ("Il risultato è Rilassata", "Alcuni obiettivi sono mancati per scelta. Leggi gli avvisi, decidi se il mancato rispetto è accettabile e documenta la scelta."),
+    ("L'ottimizzatore dice Nessuna soluzione fattibile", "Un obiettivo non è raggiungibile con gli alimenti scelti. Prova la modalità rilassata, aggiungi/cambia un alimento, riduci un vincolo o rivedi Obiettivi."),
+    ("Il risultato è Nessuna soluzione esatta", "Alcuni obiettivi sono mancati per scelta. Leggi gli avvisi, decidi se il mancato rispetto è accettabile e documenta la scelta."),
     ("Il gruppo non ha una ricetta attiva", "Assegnane una in Gruppi. Carico e IOFC la richiedono."),
     ("Il carico non si conferma", "Controlla la conferma di eccedenza, la regola di un carico al giorno e il banner di errore."),
     ("Le scorte non sono diminuite dopo la conferma", "L'alimento può essere non tracciato o lo scarico è fallito. Usa la coda guasti o Registra carichi non scaricati."),
@@ -441,7 +441,7 @@ for term, definition in [
     ("TMR / unifeed", "Razione totale miscelata."),
     ("aNDF / ADF / uNDF", "Frazioni fibrose usate per valutare sicurezza del rumine e struttura della razione."),
     ("NFC", "Carboidrati non fibrosi, calcolati dagli altri nutrienti."),
-    ("Rilassata", "Razione fattibile che manca alcuni obiettivi; il compromesso più vicino disponibile."),
+    ("Rilassata (Nessuna soluzione esatta)", "Razione fattibile che manca alcuni obiettivi; il compromesso più vicino disponibile."),
     ("Strict", "Soluzione che deve rispettare tutti gli obiettivi; se non può, è impossibile."),
     ("Snapshot", "Copia memorizzata dei valori al momento del salvataggio, conservata per audit anche quando i dati correnti cambiano."),
     ("Variato", "Il ricalcolo corrente differisce dallo snapshot salvato."),

@@ -361,7 +361,7 @@ feature("6", "Recipe builder", "Recipes → New recipe, or open a saved recipe",
             "Select feeds and enter kg as fed. The table shows kg dry matter, cost and the current analysis.",
             "Optional: set Total dry matter [SS Totale] and the minimum/maximum forage ratio under Constraints [Vincoli] (forage ratio = forage DM ÷ total DM; see Calculations).",
             "Press Calculate [Calcola]. The optimiser returns the least-cost ration; if the exact targets are unreachable it returns the closest feasible ration in relaxed mode.",
-            "Read the status: Optimal [Soluzione ottimale], Relaxed [Nessuna soluzione esatta] or Infeasible [Nessuna soluzione fattibile].",
+            "Read the status: Optimal — Soluzione ottimale trovata; Relaxed — Nessuna soluzione esatta; Infeasible — Nessuna soluzione fattibile.",
             "Review warnings: below minimum, above maximum, at-boundary (at the reference floor, or at your overridden target), or unreachable targets. Hover/expand for the limit and value.",
             "Review the nutrient profile and target ranges; adjust feeds, quantities or constraints.",
             "Save Recipe [Salva Ricetta] to store it, or Export Excel for a document.",
@@ -521,9 +521,9 @@ para("Each feed contributes its nutrient percentage × its DM; the sum is divide
 doc.add_heading("Optimiser", level=2)
 bullets([
     "The optimiser minimises ration cost subject to the total DM, forage ratio and nutrient targets.",
-    "Optimal: all active targets are met.",
-    "Relaxed: the closest feasible ration is shown; some targets are missed and listed as warnings.",
-    "Infeasible (strict): no ration can meet the targets with the current feeds; the response lists unreachable targets.",
+    "Optimal (Soluzione ottimale trovata): all active targets are met.",
+    "Relaxed (Nessuna soluzione esatta): the closest feasible ration is shown; some targets are missed and listed as warnings.",
+    "Infeasible (Nessuna soluzione fattibile, strict): no ration can meet the targets with the current feeds; the response lists unreachable targets.",
     "At-boundary: the value is within a small band of a fibre-class limit; treat it as fragile, not as a violation. It does not block saving or feeding. The builder labels it at the reference floor or at your target.",
 ])
 doc.add_heading("Accuracy and IOFC", level=2)
