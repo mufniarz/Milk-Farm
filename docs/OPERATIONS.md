@@ -136,3 +136,23 @@ Deferred to first user acceptance. Existing coverage: `ScenarioDraftController`
 specs, `loadScenarioFlow` specs and `buildBuilderScenarioPayload` spec. There
 is no mounted-panel DOM test for save/load/discard. DOM-level verification must
 be added before any further builder UI change ships.
+
+
+## PDF ship checklist
+
+Before sending a generated guide PDF:
+
+```bash
+pdftotext <guide>.pdf - | grep -nE "Reqola|ledger registra il carico|Un solo ricetta" \
+  && echo "FAIL: known typo present" || echo "text clean"
+pdftotext <guide>.pdf - | grep -n "Regola pratica"
+pdfinfo <guide>.pdf | grep Pages
+```
+
+Also check that no page contains only the header/footer (blank-page defect).
+The current environment lacked `pdftotext`; the equivalent check used `pypdf`
+to extract each page and assert:
+- `Regola pratica` present, `Reqola` absent;
+- 18 pages;
+- no page under 120 characters;
+- `Nessuna soluzione fattibile (impossibile)` on the calculation page.

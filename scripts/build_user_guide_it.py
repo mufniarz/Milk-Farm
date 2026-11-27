@@ -104,8 +104,9 @@ def info_table(rows, widths=(Cm(3.4), Cm(13.2))):
     set_col_widths(table, widths)
     doc.add_paragraph().paragraph_format.space_after = Pt(0)
 
-def feature(num, title, location, purpose, who, how, check):
-    doc.add_page_break()
+def feature(num, title, location, purpose, who, how, check, page_break=True):
+    if page_break:
+        doc.add_page_break()
     doc.add_heading(f"{num}. {title}", level=1)
     info_table([("Dove", location), ("Perché", purpose), ("Chi", who)])
     doc.add_heading("Come si usa", level=2)
@@ -302,7 +303,7 @@ feature("7", "Scenari", "Menu → Scenari",
          "Usa Aggiorna per ricaricare l'elenco."],
         ["La selezione riservata è solo in memoria; ricaricare la pagina la cancella e non invia nulla al back office.",
          "Gli scenari eliminati spariscono dall'elenco e non possono essere riesportati.",
-         "Uno scenario creato dal formulatore conserva la base acquisita; una successiva modifica della ricetta non lo riscrive."])
+         "Uno scenario creato dal formulatore conserva la base acquisita; una successiva modifica della ricetta non lo riscrive."], page_break=False)
 
 feature("8", "Obiettivi", "Menu → Obiettivi",
         "I range nutrizionali usati dall'ottimizzatore e dall'analisi. Il riferimento del workbook resta la base; l'azienda può derogare con una motivazione.",
@@ -314,7 +315,7 @@ feature("8", "Obiettivi", "Menu → Obiettivi",
          "Leggi l'avviso fibre: una deroga sotto il minimo di riferimento è un segnale di rischio per la salute e richiede motivazione."],
         ["Le deroghe sono tracciate con autore, motivazione e ora.",
          "Una modifica degli obiettivi influisce sui calcoli futuri e sui ricalcoli correnti; gli snapshot degli scenari conservano il valore di audit.",
-         "Se l'ottimizzatore è impossibile, controlla se un obiettivo è più stretto di quanto gli alimenti possano raggiungere prima di cambiare gli alimenti."])
+         "Se l'ottimizzatore restituisce Nessuna soluzione fattibile, controlla se un obiettivo è più stretto di quanto gli alimenti possano raggiungere prima di cambiare gli alimenti."])
 
 feature("9", "Gruppi", "Menu → Gruppi",
         "Il ponte tra ricetta e mandria: numero capi, razione attiva e base di costo per scorte e IOFC.",
@@ -395,7 +396,7 @@ doc.add_heading("Ottimizzatore", level=2)
 bullets(["L'ottimizzatore minimizza il costo della razione rispettando SS totale, rapporto foraggio e obiettivi nutrizionali.",
          "Soluzione ottimale trovata: tutti gli obiettivi attivi sono rispettati.",
          "Nessuna soluzione esatta (rilassata): viene mostrata la razione fattibile più vicina; alcuni obiettivi sono mancati e compaiono negli avvisi.",
-         "Nessuna soluzione fattibile (strict): nessuna razione può rispettare gli obiettivi con gli alimenti attuali; la risposta elenca gli obiettivi non raggiungibili.",
+         "Nessuna soluzione fattibile (impossibile): nessuna razione può rispettare gli obiettivi con gli alimenti attuali; la risposta elenca gli obiettivi non raggiungibili.",
          "Al limite: il valore è entro una piccola banda di un limite relativo alla fibra; trattalo come fragile, non come violazione. Non blocca il salvataggio o il carico. Il formulatore lo etichetta al minimo di riferimento o al tuo obiettivo."])
 doc.add_heading("Precisione e IOFC", level=2)
 bullets(["Scostamento % = (caricato − chiamato) / chiamato × 100.",
